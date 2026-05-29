@@ -31,6 +31,11 @@ from ingredient_relevance import (
     parse_user_ingredients,
     validate_recipe_relevance,
 )
+from recipe_ideas import (
+    MoreRecipeIdeasRequest,
+    MoreRecipeIdeasResponse,
+    generate_recipe_ideas_with_fallback,
+)
 from analyze_ingredients_image import (
     AnalyzeIngredientsImageResponse,
     analyze_uploaded_image,
@@ -738,6 +743,18 @@ async def analyze_ingredients_image(image: UploadFile = File(...)):
         content_type=image.content_type,
         read_bytes=image.read,
     )
+
+
+@app.post("/more-recipe-ideas", response_model=MoreRecipeIdeasResponse)
+async def more_recipe_ideas(payload: MoreRecipeIdeasRequest):
+    """Return 3 alternative dish ideas from the same ingredients."""
+    print("[FOOD FOR ANY MOOD] More recipe ideas endpoint called")
+    ideas, source = await generate_recipe_ideas_with_fallback(
+        gemini_client,
+        GEMINI_MODEL,
+        payload,
+    )
+    return MoreRecipeIdeasResponse(ideas=ideas, source=source)
 
 
 def _print_registered_routes() -> None:

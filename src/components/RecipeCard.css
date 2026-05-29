@@ -358,6 +358,57 @@ html[dir='rtl'] .recipe-card__section ol li:hover {
   font-weight: 600;
 }
 
+.recipe-card__ideas {
+  margin-top: 1.25rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid rgba(148, 163, 184, 0.12);
+}
+
+.recipe-card__ideas-btn {
+  width: 100%;
+}
+
+.recipe-card__ideas-list h3 {
+  margin: 0 0 1rem;
+  font-size: 1.05rem;
+}
+
+.recipe-idea-card {
+  padding: 1rem 1.1rem;
+  margin-bottom: 0.75rem;
+  border-radius: calc(var(--radius) - 4px);
+  background: rgba(255, 255, 255, 0.45);
+  border: 1px solid rgba(148, 163, 184, 0.16);
+}
+
+.recipe-idea-card h4 {
+  margin: 0 0 0.45rem;
+  font-size: 1rem;
+}
+
+.recipe-idea-card__desc {
+  margin: 0 0 0.5rem;
+  color: var(--text-muted);
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+
+.recipe-idea-card__meta {
+  margin: 0 0 0.35rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.recipe-idea-card__match {
+  margin: 0;
+  font-size: 0.85rem;
+  line-height: 1.45;
+}
+
+.recipe-idea-card__match strong {
+  color: var(--theme-accent);
+}
+
 @keyframes matchGlow {
   0%, 100% { filter: drop-shadow(0 0 4px var(--theme-glow)); }
   50% { filter: drop-shadow(0 0 10px var(--theme-glow)); }

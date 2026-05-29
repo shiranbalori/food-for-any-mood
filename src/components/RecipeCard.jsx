@@ -65,6 +65,9 @@ export default function RecipeCard({
   saveError,
   onSave,
   onRegenerate,
+  recipeIdeas,
+  ideasLoading,
+  onLoadMoreIdeas,
 }) {
   const { t, dir, isRtl } = useLanguage()
   const matchPercent = Math.min(100, Math.max(0, recipe.matchPercent ?? 0))
@@ -193,6 +196,37 @@ export default function RecipeCard({
         <button type="button" className="btn btn--primary" onClick={onRegenerate}>
           {t('generateAnother')}
         </button>
+      </div>
+
+      <div className="recipe-card__ideas animate-in stagger-5">
+        {recipeIdeas == null && (
+          <button
+            type="button"
+            className="btn btn--secondary recipe-card__ideas-btn"
+            onClick={onLoadMoreIdeas}
+            disabled={ideasLoading}
+          >
+            {ideasLoading ? t('moreIdeasLoading') : t('showMoreIdeas')}
+          </button>
+        )}
+
+        {recipeIdeas?.length > 0 && (
+          <div className="recipe-card__ideas-list">
+            <h3>{t('moreIdeasTitle')}</h3>
+            {recipeIdeas.map((idea, index) => (
+              <article key={`${idea.title}-${index}`} className="recipe-idea-card">
+                <h4>{idea.title}</h4>
+                <p className="recipe-idea-card__desc">{idea.description}</p>
+                <p className="recipe-idea-card__meta">
+                  {t('cookTime', { count: idea.cookingTime })}
+                </p>
+                <p className="recipe-idea-card__match">
+                  <strong>{t('ideaMatchReason')}:</strong> {idea.matchReason}
+                </p>
+              </article>
+            ))}
+          </div>
+        )}
       </div>
     </article>
   )

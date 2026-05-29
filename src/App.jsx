@@ -11,6 +11,7 @@ import SavedRecipes from './components/SavedRecipes'
 import { useLanguage } from './i18n/useLanguage'
 import { getTheme } from './utils/themes'
 import { generateAppRecipe } from './services/recipeService'
+import { fetchMoreRecipeIdeas } from './services/recipeIdeasService'
 // Recipe source: FastAPI backend (default) — see .env.example
 import {
   getSavedRecipes,
@@ -37,6 +38,8 @@ export default function App() {
   const [usedTemplateKeys, setUsedTemplateKeys] = useState([])
   const [saveError, setSaveError] = useState(false)
   const [backendNotice, setBackendNotice] = useState(null)
+  const [recipeIdeas, setRecipeIdeas] = useState(null)
+  const [ideasLoading, setIdeasLoading] = useState(false)
 
   const theme = getTheme(category)
   const isSaved = recipe ? savedRecipes.some((r) => r.id === recipe.id) : false
@@ -50,6 +53,7 @@ export default function App() {
       const { excludeKeys = [], regenerate = false } = options
       setLoading(true)
       setRecipe(null)
+      setRecipeIdeas(null)
       setSaveError(false)
       setBackendNotice(null)
 
@@ -112,8 +116,30 @@ export default function App() {
   }
 
   const handleRegenerate = () => {
+    setRecipeIdeas(null)
     handleGenerate({ excludeKeys: usedTemplateKeys, regenerate: true })
   }
+
+  const handleLoadMoreIdeas = useCallback(async () => {
+    if (!recipe || ideasLoading) return
+
+    setIdeasLoading(true)
+    try {
+      const { ideas } = await fetchMoreRecipeIdeas({
+        category,
+        ingredients: form.ingredients,
+        cookingTime: form.time,
+        mood: form.mood,
+        isGlutenFree: form.glutenFree,
+        excludeTitle: recipe.name,
+      })
+      setRecipeIdeas(ideas.slice(0, 3))
+    } catch (error) {
+      console.error('[App] More recipe ideas failed:', error)
+    } finally {
+      setIdeasLoading(false)
+    }
+  }, [recipe, ideasLoading, category, form])
 
   const handleSelectSaved = (saved) => {
     if (!saved?.id) return
@@ -127,6 +153,7 @@ export default function App() {
     })
     setUsedTemplateKeys(saved.templateKey ? [saved.templateKey] : [])
     setRecipe(saved)
+    setRecipeIdeas(null)
     setSaveError(false)
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
@@ -194,6 +221,9 @@ export default function App() {
             saveError={saveError}
             onSave={handleSave}
             onRegenerate={handleRegenerate}
+            recipeIdeas={recipeIdeas}
+            ideasLoading={ideasLoading}
+            onLoadMoreIdeas={handleLoadMoreIdeas}
           />
         )}
 
