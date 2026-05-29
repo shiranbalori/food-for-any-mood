@@ -228,6 +228,7 @@ function processGeneratedRecipe(userInput, recipe) {
     recipe,
     userInput.ingredients,
     userInput.language,
+    { cookingTime: userInput.cookingTime },
   )
 
   if (validation.ok) return parsed
@@ -263,6 +264,7 @@ function processGeneratedRecipe(userInput, recipe) {
     fallback,
     userInput.ingredients,
     userInput.language,
+    { cookingTime: userInput.cookingTime },
   )
 
   return normalizedFallback

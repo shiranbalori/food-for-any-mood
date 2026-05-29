@@ -14,6 +14,7 @@ from ingredient_relevance import (
     parse_user_ingredients,
     validate_recipe_relevance,
 )
+from recipe_title import apply_descriptive_dish_title, validate_dish_title
 
 LATIN_PATTERN = re.compile(r"[a-z]", re.IGNORECASE)
 
@@ -309,12 +310,14 @@ def validate_recipe_quality(user_ingredients: list[str], recipe: dict) -> dict:
     step_score = 1 - (len(unused_in_steps) / ingredient_count) if ingredient_count else 1
     hebrew_score = 1 if not english_ingredients else 0
     ingredient_relevance_score = round(relevance["match_ratio"] * 70 + step_score * 20 + hebrew_score * 10)
+    title_validation = validate_dish_title(recipe.get("name", ""), recipe.get("ingredients") or [])
 
     ok = (
         relevance["ok"]
         and not english_ingredients
         and not unused_in_steps
         and not user_explicit_missing
+        and title_validation["ok"]
     )
 
     return {
@@ -327,15 +330,27 @@ def validate_recipe_quality(user_ingredients: list[str], recipe: dict) -> dict:
         "english_ingredients": english_ingredients,
         "unused_in_steps": unused_in_steps,
         "user_explicit_missing": user_explicit_missing,
+        "title_validation": title_validation,
     }
 
 
-def apply_recipe_ingredient_parser(recipe: dict, user_ingredients_raw: str = "") -> tuple[dict, dict]:
+def apply_recipe_ingredient_parser(
+    recipe: dict,
+    user_ingredients_raw: str = "",
+    *,
+    cooking_time: int | None = None,
+    style: str | None = None,
+) -> tuple[dict, dict]:
     normalized = normalize_recipe_ingredients(recipe, user_ingredients_raw)
+    titled = apply_descriptive_dish_title(
+        normalized,
+        cooking_time=cooking_time,
+        style=style,
+    )
     user_ingredients = parse_user_ingredients(user_ingredients_raw)
-    validation = validate_recipe_quality(user_ingredients, normalized)
-    normalized["matchPercentage"] = validation["ingredient_relevance_score"]
-    return normalized, validation
+    validation = validate_recipe_quality(user_ingredients, titled)
+    titled["matchPercentage"] = validation["ingredient_relevance_score"]
+    return titled, validation
 
 
 def is_recipe_acceptable(user_ingredients_raw: str, recipe: dict) -> bool:

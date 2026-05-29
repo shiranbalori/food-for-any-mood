@@ -362,6 +362,15 @@ def _build_gemini_prompt(payload: GenerateRecipeRequest, *, strict: bool = False
 - הפרד מרכיבים לפריטים נפרדים — אל תמזג כמה מרכיבים לשורה אחת.
 """
 
+    title_rules = """
+כללי שם המנה (חובה — שם מנה אמיתית בלבד):
+- שם המנה מתאר את האוכל: מרכיבים עיקריים וסגנון בישול.
+- מצב רוח משפיע רק על התיאור, התיבול והפלייליסט — לעולם לא על שם המנה.
+- דוגמאות טובות: "שקשוקה מהירה", "חביתת עגבניות", "פסטה ברוטב שמנת", "סלט טונה וביצים".
+- דוגמאות אסורות: "ארוחת נרות", "ארוחת נוחות", "ערב רומנטי", "וייב חמים", "מנה נעימה".
+- אסור: ארוחת, ערב, וייב, נוחות, רומנטי, נעים, אנרגטי, רגוע, מצב רוח — בשם המנה.
+"""
+
     return f"""אתה שף ישראלי שמייצר מתכונים לאפליקציה FOOD FOR ANY MOOD.
 צור מתכון אחד מקורי בעברית בלבד (שם המנה, תיאור, מרכיבים, שלבים, תגיות, פלייליסט).
 
@@ -372,7 +381,7 @@ def _build_gemini_prompt(payload: GenerateRecipeRequest, *, strict: bool = False
 - ללא גלוטן: {gluten_note}
 - מרכיבים זמינים: {ingredients_note}
 - פלטפורמת מוזיקה לפלייליסט: {payload.musicPlatform}
-{ingredient_rules}
+{ingredient_rules}{title_rules}
 כללי תוכן:
 - כל טקסט המתכון חייב להיות בעברית.
 - שמות המרכיבים בשלבים וברשימה — בעברית בלבד, ללא מילים באנגלית.
@@ -480,7 +489,11 @@ def _post_process_recipe(
     """Hebrewize ingredients, split merged entries, and validate step usage."""
     raw = _recipe_to_validation_dict(recipe)
     raw["matchPercentage"] = recipe.matchPercentage
-    processed, validation = apply_recipe_ingredient_parser(raw, payload.ingredients)
+    processed, validation = apply_recipe_ingredient_parser(
+        raw,
+        payload.ingredients,
+        cooking_time=payload.cookingTime,
+    )
 
     print(
         "[FOOD FOR ANY MOOD] Ingredient parser score:",
@@ -490,7 +503,7 @@ def _post_process_recipe(
     )
 
     return GeneratedRecipe(
-        name=recipe.name,
+        name=processed["name"],
         description=recipe.description,
         ingredients=processed["ingredients"],
         steps=processed["steps"],

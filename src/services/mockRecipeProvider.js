@@ -20,6 +20,7 @@ import {
   validateRecipeRelevance,
 } from '../utils/ingredientRelevance'
 import { applyRecipeIngredientParser } from '../utils/recipeIngredientParser'
+import { buildDescriptiveDishTitle } from '../utils/recipeTitle'
 import {
   canonicalIngredient,
   getIngredientNutrition,
@@ -522,12 +523,12 @@ function computeMatchPercent(score, matchData, userIngredients, glutenFree, temp
   return Math.min(99, Math.max(55, Math.round(raw)))
 }
 
-function ensureRecipeTitleHasUserIngredient(recipeName, rawUserIngredients, language, glutenFree) {
-  const validation = validateRecipeRelevance(rawUserIngredients, { name: recipeName, ingredients: [], steps: [], description: '' })
-  if (validation.titleHasIngredient) return recipeName
-
-  const primary = formatIngredient(rawUserIngredients[0], language, glutenFree)
-  return `מנה עם ${primary}`
+function finalizeRecipe(recipe, ingredientsRaw, language, meta = {}) {
+  const { recipe: parsed } = applyRecipeIngredientParser(recipe, ingredientsRaw, language, {
+    cookingTime: meta.cookingTime,
+    style: meta.style,
+  })
+  return parsed
 }
 
 function hasUnusualIngredientCombo(userIngredients) {
@@ -537,11 +538,6 @@ function hasUnusualIngredientCombo(userIngredients) {
   const hasSweet = canon.some((item) => sweet.has(item))
   const hasProtein = canon.some((item) => protein.has(item))
   return (hasSweet && hasProtein) || userIngredients.length >= 4
-}
-
-function finalizeRecipe(recipe, ingredientsRaw, language) {
-  const { recipe: parsed } = applyRecipeIngredientParser(recipe, ingredientsRaw, language)
-  return parsed
 }
 
 /**
@@ -566,9 +562,6 @@ export function buildIngredientFirstFallbackRecipe(
   const displayNames = filteredUserIngredients.map((item) =>
     formatIngredient(item, language, isGlutenFree),
   )
-  const primary = displayNames[0] ?? 'מרכיבים'
-  const secondary = displayNames[1]
-  const name = secondary ? `מנה עם ${primary} ו${secondary}` : `מנה עם ${primary}`
 
   const copy = getRecipeCopy(language)
   const moodPhrase = copy.moodFlavor[mood] ?? copy.defaultMood
@@ -605,6 +598,14 @@ export function buildIngredientFirstFallbackRecipe(
     `מתבלים ב${formatIngredient('salt', language, false)} ו${formatIngredient('pepper', language, false)} לפי הטעם.`,
     'מגישים חם ונהנים מהמנה.',
   ]
+
+  const name = buildDescriptiveDishTitle(finalIngredients, {
+    cookingTime,
+    steps,
+    style: 'quick',
+    tags: cookingTime <= 25 ? ['quick'] : [],
+    language,
+  })
 
   const matchRatio =
     validation?.matchRatio ??
@@ -650,7 +651,10 @@ export function buildIngredientFirstFallbackRecipe(
   }
 
   return {
-    recipe: finalizeRecipe(recipe, ingredients, language),
+    recipe: finalizeRecipe(recipe, ingredients, language, {
+      cookingTime,
+      style: 'quick',
+    }),
     meta,
   }
 }
@@ -754,13 +758,6 @@ export function buildMockRecipe(
 
   const rawUserList = parseUserIngredients(ingredients)
   if (rawUserList.length > 0) {
-    recipe.name = ensureRecipeTitleHasUserIngredient(
-      recipe.name,
-      rawUserList,
-      language,
-      glutenFree,
-    )
-
     let relevance = validateRecipeRelevance(rawUserList, recipe)
     if (!relevance.ok) {
       return buildIngredientFirstFallbackRecipe(
@@ -791,7 +788,10 @@ export function buildMockRecipe(
   }
 
   return {
-    recipe: finalizeRecipe(recipe, ingredients, language),
+    recipe: finalizeRecipe(recipe, ingredients, language, {
+      cookingTime: time,
+      style: primaryStyle,
+    }),
     meta,
   }
 }

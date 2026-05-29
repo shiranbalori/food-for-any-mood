@@ -213,6 +213,8 @@ def build_ingredient_fallback_recipe(
     build_playlist,
 ) -> dict:
     """Build a Hebrew recipe centered on the user's ingredients."""
+    from recipe_title import build_descriptive_dish_title
+
     display = list(user_ingredients)
     if is_gluten_free:
         display = [
@@ -222,18 +224,8 @@ def build_ingredient_fallback_recipe(
             for item in display
         ]
 
-    primary = display[0]
-    secondary = display[1] if len(display) > 1 else None
-
-    if secondary:
-        name = f"מנה עם {primary} ו{secondary}"
-    else:
-        name = f"מנה עם {primary}"
-
     mood_text = MOOD_DESCRIPTIONS.get(mood, "טעימים")
-    used_count = len(display)
-    total_requested = max(len(user_ingredients), used_count)
-    match_ratio = used_count / max(len(user_ingredients), 1)
+    match_ratio = len(display) / max(len(user_ingredients), 1)
 
     mismatch_note = ""
     if len(user_ingredients) > 1 and match_ratio < MIN_INGREDIENT_MATCH_RATIO:
@@ -266,11 +258,19 @@ def build_ingredient_fallback_recipe(
         "מגישים חם ונהנים מהמנה.",
     ]
 
-    match_percentage = min(99, max(72, round(match_ratio * 100)))
-    tags = ["quick"] if cooking_time <= 25 else []
+    tags: list[str] = ["quick"] if cooking_time <= 25 else []
     if category == "parve":
         tags.append("vegetarian")
 
+    name = build_descriptive_dish_title(
+        ingredients,
+        cooking_time=cooking_time,
+        steps=steps,
+        style="quick",
+        tags=tags or ["comfortFood"],
+    )
+
+    match_percentage = min(99, max(72, round(match_ratio * 100)))
     playlist = build_playlist(music_platform, match_percentage)
 
     return {

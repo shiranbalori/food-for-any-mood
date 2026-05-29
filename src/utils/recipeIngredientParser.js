@@ -11,6 +11,7 @@ import {
   parseUserIngredients,
   validateRecipeRelevance,
 } from './ingredientRelevance'
+import { applyDescriptiveDishTitle, validateDishTitle } from './recipeTitle'
 
 const LATIN_PATTERN = /[a-z]/i
 
@@ -243,9 +244,10 @@ export function normalizeRecipeIngredients(recipe, userIngredientsRaw = '', lang
 /**
  * Full quality validation including Hebrew-only ingredients and step usage.
  */
-export function validateRecipeQuality(userIngredients, recipe, language = 'he') {
+export function validateRecipeQuality(userIngredients, recipe, language = 'he', options = {}) {
   const relevance = validateRecipeRelevance(userIngredients, recipe)
   const stepsText = (recipe.steps ?? []).join('\n')
+  const titleValidation = validateDishTitle(recipe.name, recipe.ingredients ?? [])
 
   const englishIngredients = (recipe.ingredients ?? []).filter((item) =>
     containsLatinText(item),
@@ -276,7 +278,8 @@ export function validateRecipeQuality(userIngredients, recipe, language = 'he') 
     relevance.ok &&
     englishIngredients.length === 0 &&
     unusedInSteps.length === 0 &&
-    userExplicitMissing.length === 0
+    userExplicitMissing.length === 0 &&
+    titleValidation.ok
 
   return {
     ok,
@@ -288,6 +291,7 @@ export function validateRecipeQuality(userIngredients, recipe, language = 'he') 
     englishIngredients,
     unusedInSteps,
     userExplicitMissing,
+    titleValidation,
     relevance,
   }
 }
@@ -295,14 +299,19 @@ export function validateRecipeQuality(userIngredients, recipe, language = 'he') 
 /**
  * Parse, Hebrewize, and validate a generated recipe.
  */
-export function applyRecipeIngredientParser(recipe, userIngredientsRaw = '', language = 'he') {
+export function applyRecipeIngredientParser(recipe, userIngredientsRaw = '', language = 'he', options = {}) {
   const normalized = normalizeRecipeIngredients(recipe, userIngredientsRaw, language)
+  const titled = applyDescriptiveDishTitle(normalized, {
+    cookingTime: options.cookingTime,
+    style: options.style,
+    language,
+  })
   const userIngredients = parseUserIngredients(userIngredientsRaw)
-  const validation = validateRecipeQuality(userIngredients, normalized, language)
+  const validation = validateRecipeQuality(userIngredients, titled, language, options)
 
   return {
     recipe: {
-      ...normalized,
+      ...titled,
       matchPercentage: validation.ingredientRelevanceScore,
     },
     validation,
