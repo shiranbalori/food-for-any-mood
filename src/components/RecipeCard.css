@@ -351,6 +351,16 @@ html[dir='rtl'] .recipe-card__section ol li:hover {
   border-top: 1px solid rgba(148, 163, 184, 0.12);
 }
 
+.recipe-card__shopping {
+  margin-top: 0.25rem;
+  padding-top: 0.65rem;
+  border-top: 1px solid rgba(148, 163, 184, 0.12);
+}
+
+.recipe-card__shopping-btn {
+  width: 100%;
+}
+
 .recipe-card__save-error {
   font-size: 0.82rem;
   color: #dc2626;

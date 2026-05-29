@@ -1,5 +1,7 @@
+import { useState } from 'react'
 import PlaylistCard from './PlaylistCard'
 import SpiceLevel from './SpiceLevel'
+import ShoppingListModal from './ShoppingListModal'
 import { useLanguage } from '../i18n/useLanguage'
 import './RecipeCard.css'
 
@@ -72,6 +74,7 @@ export default function RecipeCard({
   onLoadMoreIdeas,
 }) {
   const { t, dir, isRtl } = useLanguage()
+  const [shoppingOpen, setShoppingOpen] = useState(false)
   const matchPercent = Math.min(100, Math.max(0, recipe.matchPercent ?? 0))
   const textDir = isRtl ? 'rtl' : dir
 
@@ -181,6 +184,16 @@ export default function RecipeCard({
         </ol>
       </div>
 
+      <div className="recipe-card__shopping animate-in stagger-5">
+        <button
+          type="button"
+          className="btn btn--secondary recipe-card__shopping-btn"
+          onClick={() => setShoppingOpen(true)}
+        >
+          {t('createShoppingList')}
+        </button>
+      </div>
+
       <div className="recipe-card__actions animate-in stagger-5">
         {saveError && (
           <p className="recipe-card__save-error" role="alert">
@@ -238,6 +251,14 @@ export default function RecipeCard({
           </div>
         )}
       </div>
+
+      <ShoppingListModal
+        open={shoppingOpen}
+        onClose={() => setShoppingOpen(false)}
+        recipeId={recipe.id}
+        recipeName={recipe.name}
+        ingredients={recipe.ingredients ?? []}
+      />
     </article>
   )
 }

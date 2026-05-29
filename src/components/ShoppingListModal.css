@@ -1,0 +1,157 @@
+.shopping-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(4px);
+  animation: shoppingFadeIn 0.2s ease;
+}
+
+.shopping-modal__panel {
+  width: min(100%, 480px);
+  max-height: min(85vh, 640px);
+  overflow: auto;
+  background: var(--surface);
+  border-radius: var(--radius);
+  border: 1px solid var(--glass-border);
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.2);
+  padding: 1.25rem 1.35rem 1.35rem;
+  animation: shoppingSlideUp 0.28s var(--ease-spring);
+}
+
+.shopping-modal__header {
+  position: relative;
+  margin-bottom: 1rem;
+  padding-inline-end: 2rem;
+}
+
+.shopping-modal__header h2 {
+  margin: 0 0 0.35rem;
+  font-size: 1.15rem;
+}
+
+.shopping-modal__recipe-name {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.shopping-modal__close {
+  position: absolute;
+  top: 0;
+  inset-inline-end: 0;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  border: none;
+  background: rgba(148, 163, 184, 0.15);
+  color: var(--text-muted);
+  font-size: 1.35rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.shopping-modal__close:hover {
+  background: rgba(148, 163, 184, 0.28);
+}
+
+.shopping-modal__empty {
+  margin: 0 0 1rem;
+  color: var(--text-muted);
+  font-size: 0.92rem;
+}
+
+.shopping-modal__list {
+  list-style: none;
+  margin: 0 0 1.15rem;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.shopping-modal__item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  padding: 0.65rem 0.75rem;
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.5);
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  cursor: pointer;
+}
+
+.shopping-modal__item input {
+  margin-top: 0.2rem;
+  width: 1.05rem;
+  height: 1.05rem;
+  flex-shrink: 0;
+  accent-color: var(--theme-accent, #6366f1);
+  cursor: pointer;
+}
+
+.shopping-modal__text {
+  flex: 1;
+  font-size: 0.95rem;
+  line-height: 1.45;
+  text-align: start;
+}
+
+.shopping-modal__text--done {
+  color: var(--text-muted);
+  text-decoration: line-through;
+  opacity: 0.75;
+}
+
+.shopping-modal__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.shopping-modal__clear {
+  color: #b45309;
+}
+
+.shopping-modal__notice {
+  margin: 0.75rem 0 0;
+  text-align: center;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #059669;
+}
+
+@keyframes shoppingFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes shoppingSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (min-width: 640px) {
+  .shopping-modal {
+    align-items: center;
+  }
+
+  .shopping-modal__actions {
+    flex-direction: row;
+  }
+
+  .shopping-modal__actions .btn {
+    flex: 1;
+  }
+}
