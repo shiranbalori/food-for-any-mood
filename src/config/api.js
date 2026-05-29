@@ -19,3 +19,4 @@ export const HEALTH_URL = `${API_BASE_URL}/health`
 export const GENERATE_RECIPE_URL = `${API_BASE_URL}/generate-recipe`
 export const ANALYZE_INGREDIENTS_IMAGE_URL = `${API_BASE_URL}/analyze-ingredients-image`
 export const MORE_RECIPE_IDEAS_URL = `${API_BASE_URL}/more-recipe-ideas`
+export const NUTRITION_ANALYSIS_URL = `${API_BASE_URL}/nutrition-analysis`

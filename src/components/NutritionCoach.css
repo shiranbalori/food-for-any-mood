@@ -1,0 +1,123 @@
+.nutrition-coach {
+  margin-bottom: 1.5rem;
+  padding: 1.15rem 1.2rem;
+  border-radius: calc(var(--radius) - 2px);
+  background: rgba(255, 255, 255, 0.5);
+  border: 1px solid rgba(148, 163, 184, 0.16);
+}
+
+.nutrition-coach__title {
+  margin: 0 0 1rem;
+  font-size: 1.05rem;
+}
+
+.nutrition-coach__loading {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.nutrition-coach__score {
+  margin-bottom: 1rem;
+}
+
+.nutrition-coach__score-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.45rem;
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.nutrition-coach__score-track {
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.2);
+  overflow: hidden;
+}
+
+.nutrition-coach__score-fill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.45s var(--ease-spring);
+}
+
+.nutrition-coach__macros {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  margin-bottom: 1rem;
+}
+
+.nutrition-coach__macro-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.92rem;
+}
+
+.nutrition-coach__level {
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.nutrition-coach__level--high {
+  background: var(--theme-accent-light, rgba(99, 102, 241, 0.12));
+  color: var(--theme-accent, #6366f1);
+}
+
+.nutrition-coach__level--medium {
+  background: rgba(217, 119, 6, 0.12);
+  color: #b45309;
+}
+
+.nutrition-coach__level--low {
+  background: rgba(100, 116, 139, 0.12);
+  color: #475569;
+}
+
+.nutrition-coach__insights {
+  list-style: none;
+  margin: 0 0 1rem;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.nutrition-coach__insight {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.88rem;
+  color: var(--text-muted);
+}
+
+.nutrition-coach__insight--active {
+  color: inherit;
+  font-weight: 600;
+}
+
+.nutrition-coach__tips h4 {
+  margin: 0 0 0.55rem;
+  font-size: 0.92rem;
+}
+
+.nutrition-coach__tips ul {
+  margin: 0;
+  padding-inline-start: 1.1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.nutrition-coach__tips li {
+  font-size: 0.88rem;
+  line-height: 1.5;
+  color: var(--text-muted);
+}

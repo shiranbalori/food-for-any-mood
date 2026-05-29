@@ -3,6 +3,7 @@ import PlaylistCard from './PlaylistCard'
 import SpiceLevel from './SpiceLevel'
 import ShoppingListModal from './ShoppingListModal'
 import MealPlanPickerModal from './MealPlanPickerModal'
+import NutritionCoach from './NutritionCoach'
 import { useLanguage } from '../i18n/useLanguage'
 import './RecipeCard.css'
 
@@ -165,6 +166,8 @@ export default function RecipeCard({
       />
 
       <HealthBar score={recipe.healthScore} />
+
+      <NutritionCoach recipe={recipe} />
 
       <div className="recipe-card__section animate-in stagger-4">
         <h3>{t('ingredients')}</h3>

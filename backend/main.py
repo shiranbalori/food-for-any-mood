@@ -31,6 +31,11 @@ from ingredient_relevance import (
     parse_user_ingredients,
     validate_recipe_relevance,
 )
+from nutrition_coach import (
+    NutritionAnalysisRequest,
+    NutritionAnalysisResponse,
+    analyze_nutrition_with_fallback,
+)
 from recipe_ideas import (
     MoreRecipeIdeasRequest,
     MoreRecipeIdeasResponse,
@@ -755,6 +760,13 @@ async def more_recipe_ideas(payload: MoreRecipeIdeasRequest):
         payload,
     )
     return MoreRecipeIdeasResponse(ideas=ideas, source=source)
+
+
+@app.post("/nutrition-analysis", response_model=NutritionAnalysisResponse)
+async def nutrition_analysis(payload: NutritionAnalysisRequest):
+    """Analyze recipe nutrition macros, insights, and health tips."""
+    print("[FOOD FOR ANY MOOD] Nutrition analysis endpoint called")
+    return await analyze_nutrition_with_fallback(gemini_client, GEMINI_MODEL, payload)
 
 
 def _print_registered_routes() -> None:
