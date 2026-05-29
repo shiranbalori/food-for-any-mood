@@ -16,6 +16,10 @@ import { getRecipeCopy } from '../i18n/recipeCopy'
 import { inferPreferredStyles, RECIPE_TAGS } from '../data/recipeStyles'
 import { recommendPlaylist } from '../utils/playlistEngine'
 import {
+  parseUserIngredients,
+  validateRecipeRelevance,
+} from '../utils/ingredientRelevance'
+import {
   canonicalIngredient,
   getIngredientNutrition,
   ingredientsMatch,
@@ -112,7 +116,7 @@ function scoreTemplate(template, userIngredients, time, mood, preferredStyles, g
   const { ratio, userRatio } = countIngredientMatches(userIngredients, workingTemplate)
 
   const ingredientScore = userIngredients.length
-    ? ratio * 0.55 + userRatio * 0.25
+    ? userRatio * 0.65 + ratio * 0.25
     : 0.45
 
   const timeScore = scoreTimeFit(template, time)
@@ -120,11 +124,15 @@ function scoreTemplate(template, userIngredients, time, mood, preferredStyles, g
   const styleScore = scoreStyleFit(template, preferredStyles)
   const glutenScore = scoreGlutenFreeFit(template, userIngredients, glutenFree)
 
-  const base =
-    ingredientScore * 0.36 +
-    timeScore * 0.22 +
-    moodScore * 0.16 +
-    styleScore * 0.14
+  const base = userIngredients.length
+    ? ingredientScore * 0.55 +
+      timeScore * 0.15 +
+      moodScore * 0.12 +
+      styleScore * 0.1
+    : ingredientScore * 0.36 +
+      timeScore * 0.22 +
+      moodScore * 0.16 +
+      styleScore * 0.14
 
   return glutenFree ? base * 0.72 + glutenScore * 0.28 : base
 }
@@ -159,6 +167,18 @@ function pickTemplate(category, userIngredients, time, mood, excludeKeys, gluten
     .filter(({ templateKey }) => !excludeKeys.includes(templateKey))
     .sort((a, b) => b.score - a.score)
 
+  let poolSource = scored
+
+  if (userIngredients.length > 0) {
+    const ingredientFocused = scored.filter(({ template }) => {
+      const workingTemplate = glutenFree ? adaptTemplateForGlutenFree(template) : template
+      return countIngredientMatches(userIngredients, workingTemplate).userRatio >= 0.35
+    })
+    if (ingredientFocused.length > 0) {
+      poolSource = ingredientFocused
+    }
+  }
+
   const fallbackSource = eligible
     .map((template, index) => ({
       template,
@@ -170,8 +190,8 @@ function pickTemplate(category, userIngredients, time, mood, excludeKeys, gluten
     .filter(({ templateKey }) => !excludeKeys.includes(templateKey))
 
   const pool = (
-    scored.length
-      ? scored
+    poolSource.length
+      ? poolSource
       : fallbackSource.length
         ? fallbackSource
         : eligible.map((template, index) => ({
@@ -501,6 +521,131 @@ function computeMatchPercent(score, matchData, userIngredients, glutenFree, temp
   return Math.min(99, Math.max(55, Math.round(raw)))
 }
 
+function ensureRecipeTitleHasUserIngredient(recipeName, rawUserIngredients, language, glutenFree) {
+  const validation = validateRecipeRelevance(rawUserIngredients, { name: recipeName, ingredients: [], steps: [], description: '' })
+  if (validation.titleHasIngredient) return recipeName
+
+  const primary = formatIngredient(rawUserIngredients[0], language, glutenFree)
+  return `מנה עם ${primary}`
+}
+
+function hasUnusualIngredientCombo(userIngredients) {
+  const canon = userIngredients.map((item) => canonicalIngredient(item)).filter(Boolean)
+  const sweet = new Set(['honey', 'sugar', 'blueberries'])
+  const protein = new Set(['chicken', 'beef', 'lamb', 'steak', 'salmon', 'tuna'])
+  const hasSweet = canon.some((item) => sweet.has(item))
+  const hasProtein = canon.some((item) => protein.has(item))
+  return (hasSweet && hasProtein) || userIngredients.length >= 4
+}
+
+/**
+ * Ingredient-first fallback when template/Gemini output fails relevance checks.
+ */
+export function buildIngredientFirstFallbackRecipe(
+  {
+    category,
+    ingredients,
+    cookingTime,
+    mood,
+    isGlutenFree = false,
+    musicPlatform = 'spotify',
+  },
+  { language = 'he', pantrySuffix = '(from your pantry)', validation = null } = {},
+) {
+  const rawUserList = parseUserIngredients(ingredients)
+  const filteredUserIngredients = isGlutenFree
+    ? rawUserList.filter((item) => !isGlutenIngredient(normalizeIngredient(item)))
+    : rawUserList
+
+  const displayNames = filteredUserIngredients.map((item) =>
+    formatIngredient(item, language, isGlutenFree),
+  )
+  const primary = displayNames[0] ?? 'מרכיבים'
+  const secondary = displayNames[1]
+  const name = secondary ? `מנה עם ${primary} ו${secondary}` : `מנה עם ${primary}`
+
+  const copy = getRecipeCopy(language)
+  const moodPhrase = copy.moodFlavor[mood] ?? copy.defaultMood
+  const cookMinutes = Math.min(cookingTime, Math.max(15, Math.round(cookingTime * 0.6)))
+
+  let mismatchNote = ''
+  if (validation?.unmatched?.length) {
+    mismatchNote =
+      ' שילוב המרכיבים לא לגמרי קלאסי — המנה משתמשת ברוב מה שציינתם ומתאימה את השאר בצורה פשוטה.'
+  } else if (hasUnusualIngredientCombo(filteredUserIngredients)) {
+    mismatchNote =
+      ' שילוב המרכיבים מגוון — המנה נבנתה סביב מה שיש לכם במטבח.'
+  } else if (filteredUserIngredients.length > 1) {
+    mismatchNote = ' המנה נבנתה סביב המרכיבים שציינתם.'
+  }
+
+  const description = `${copy.defaultOpener}${copy.descriptionJoiner}${moodPhrase}${copy.descriptionMiddle}${cookingTime}${copy.descriptionMinutes}${mismatchNote}`
+
+  const ingredientList = [
+    ...displayNames,
+    formatIngredient('salt', language, false),
+    formatIngredient('pepper', language, false),
+    formatIngredient('olive oil', language, false),
+  ]
+  const finalIngredients = isGlutenFree
+    ? applyGlutenFreeToIngredientList(ingredientList, language)
+    : ingredientList
+
+  const ingredientPhrase = displayNames.slice(0, 4).join(', ')
+  const steps = [
+    `מכינים ומסדרים את ${ingredientPhrase}.`,
+    `מחממים מחבת או סיר עם ${formatIngredient('olive oil', language, false)} על אש בינונית.`,
+    `מבשלים את המרכיבים העיקריים עד שהם מוכנים — כ-${cookMinutes} דקות.`,
+    `מתבלים ב${formatIngredient('salt', language, false)} ו${formatIngredient('pepper', language, false)} לפי הטעם.`,
+    'מגישים חם ונהנים מהמנה.',
+  ]
+
+  const matchRatio =
+    validation?.matchRatio ??
+    (filteredUserIngredients.length ? 1 : 0.75)
+  const matchPercentage = Math.min(99, Math.max(72, Math.round(matchRatio * 100)))
+
+  const playlist = recommendPlaylist(
+    { mood, category, style: 'quick', cookTime: cookingTime, spiceLevel: 1, recipeName: name },
+    musicPlatform,
+    language,
+  )
+
+  const recipe = {
+    name,
+    description,
+    ingredients: finalIngredients,
+    steps,
+    matchPercentage,
+    spiceLevel: category === 'parve' ? 1 : 0,
+    nutrition: {
+      calories: 360 + displayNames.length * 25,
+      protein: 14 + displayNames.length * 2,
+      carbs: 30 + displayNames.length * 3,
+      fat: 16 + displayNames.length,
+      servings: 2,
+    },
+    healthScore: Math.min(92, 70 + displayNames.length * 3),
+    tags: cookingTime <= 25 ? ['quick'] : ['comfortFood'],
+    playlist,
+  }
+
+  const meta = {
+    id: `ingredient-fallback-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+    templateKey: 'ingredient-fallback',
+    category,
+    mood,
+    cookingTime,
+    isGlutenFree,
+    musicPlatform,
+    language,
+    style: 'quick',
+    cookTime: cookingTime,
+  }
+
+  return { recipe, meta }
+}
+
 /**
  * Mock recipe provider — template-based generation for local MVP.
  * Replace the caller in recipeService when wiring a real AI backend.
@@ -596,6 +741,31 @@ export function buildMockRecipe(
     healthScore: nutrition.healthScore,
     tags,
     playlist,
+  }
+
+  const rawUserList = parseUserIngredients(ingredients)
+  if (rawUserList.length > 0) {
+    recipe.name = ensureRecipeTitleHasUserIngredient(
+      recipe.name,
+      rawUserList,
+      language,
+      glutenFree,
+    )
+
+    let relevance = validateRecipeRelevance(rawUserList, recipe)
+    if (!relevance.ok) {
+      return buildIngredientFirstFallbackRecipe(
+        {
+          category,
+          ingredients,
+          cookingTime: time,
+          mood,
+          isGlutenFree: glutenFree,
+          musicPlatform,
+        },
+        { language, pantrySuffix, validation: relevance },
+      )
+    }
   }
 
   const meta = {

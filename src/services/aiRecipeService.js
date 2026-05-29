@@ -1,5 +1,6 @@
 import { API_BASE_URL, GENERATE_RECIPE_URL, HEALTH_URL } from '../config/api'
-import { buildMockRecipe } from './mockRecipeProvider'
+import { parseUserIngredients, validateRecipeRelevance } from '../utils/ingredientRelevance'
+import { buildIngredientFirstFallbackRecipe, buildMockRecipe } from './mockRecipeProvider'
 
 /**
  * @typedef {'unreachable' | 'gemini'} FallbackReason
@@ -214,7 +215,43 @@ async function fetchRecipeFromBackend(payload) {
 }
 
 /**
- * Local Hebrew mock used when the backend or Gemini is unavailable.
+ * Ensure backend/Gemini recipes honor user ingredients when provided.
+ *
+ * @param {ReturnType<typeof normalizeUserInput>} userInput
+ * @param {import('./recipeService').GeneratedRecipe} recipe
+ */
+function ensureRecipeRelevance(userInput, recipe) {
+  const rawUserList = parseUserIngredients(userInput.ingredients)
+  if (!rawUserList.length) return recipe
+
+  const validation = validateRecipeRelevance(rawUserList, recipe)
+  if (validation.ok) return recipe
+
+  console.warn(
+    '[aiRecipeService] Recipe failed ingredient relevance check — using ingredient fallback',
+    validation,
+  )
+
+  const { recipe: fallback } = buildIngredientFirstFallbackRecipe(
+    {
+      category: userInput.category,
+      ingredients: userInput.ingredients,
+      cookingTime: userInput.cookingTime,
+      mood: userInput.mood,
+      isGlutenFree: userInput.isGlutenFree,
+      musicPlatform: userInput.musicPlatform,
+    },
+    {
+      language: userInput.language,
+      pantrySuffix: userInput.pantrySuffix,
+      validation,
+    },
+  )
+
+  return fallback
+}
+
+/**
  *
  * @param {ReturnType<typeof normalizeUserInput>} userInput
  */
@@ -260,7 +297,8 @@ export async function generateAIRecipe(userInput) {
   }
 
   try {
-    const { recipe, source, geminiError } = await fetchRecipeFromBackend(payload)
+    const { recipe: backendRecipe, source, geminiError } = await fetchRecipeFromBackend(payload)
+    const recipe = ensureRecipeRelevance(normalized, backendRecipe)
 
     if (source === 'gemini') {
       console.log('[aiRecipeService] Recipe generated successfully via Gemini')

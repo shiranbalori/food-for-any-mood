@@ -25,6 +25,12 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from google import genai
+from ingredient_relevance import (
+    MIN_INGREDIENT_MATCH_RATIO,
+    build_ingredient_fallback_recipe,
+    parse_user_ingredients,
+    validate_recipe_relevance,
+)
 from pydantic import BaseModel, Field, ValidationError
 
 load_dotenv()
@@ -302,12 +308,6 @@ PLAYLIST_PRESETS: dict[MusicPlatform, dict] = {
 }
 
 
-def _parse_user_ingredients(raw: str) -> list[str]:
-    if not raw.strip():
-        return []
-    parts = [part.strip() for part in raw.replace("\n", ",").split(",")]
-    return [part for part in parts if part]
-
 
 def _build_playlist(platform: MusicPlatform, match_percent: int | None = None) -> Playlist:
     preset = PLAYLIST_PRESETS[platform]
@@ -329,11 +329,31 @@ def _build_playlist(platform: MusicPlatform, match_percent: int | None = None) -
     )
 
 
-def _build_gemini_prompt(payload: GenerateRecipeRequest) -> str:
+def _build_gemini_prompt(payload: GenerateRecipeRequest, *, strict: bool = False) -> str:
     category_label = CATEGORY_LABELS[payload.category]
     mood_label = MOOD_LABELS[payload.mood]
     gluten_note = "כן — המתכון חייב להיות ללא גלוטן" if payload.isGlutenFree else "לא"
+    user_ingredients = parse_user_ingredients(payload.ingredients)
     ingredients_note = payload.ingredients.strip() or "לא צוינו — הציע מרכיבים מתאימים"
+
+    ingredient_rules = ""
+    if user_ingredients:
+        ingredient_list = ", ".join(user_ingredients)
+        threshold = int(MIN_INGREDIENT_MATCH_RATIO * 100)
+        strict_note = (
+            "\n⚠️ ניסיון קודם לא עמד בדרישות — חובה לעמוד בכל הכללים הבאים ללא חריגים:\n"
+            if strict
+            else ""
+        )
+        ingredient_rules = f"""
+{strict_note}כללי מרכיבים (חובה מוחלטת — עדיפות על קטגוריה ומצב רוח):
+- המשתמש ציין מרכיבים: {ingredient_list}
+- לפחות {threshold}% מהמרכיבים האלה חייבים להופיע ברשימת המרכיבים של המתכון.
+- שם המנה חייב לכלול לפחות אחד מהמרכיבים שציין המשתמש (בעברית, כפי שהזין או בניסוח קרוב).
+- אל תציע מנה גנרית לפי קטגוריה/מצב רוח בלבד — המרכיבים הם הבסיס למנה.
+- אם השילוב לא מתאים לחלוטין, הסבר בקצרה בתיאור והשתמש ברוב המרכיבים האפשריים.
+- מרכיבים שלא בשימוש — אל תכלול אותם ברשימה; הסבר בתיאור אם נאלצת לוותר על חלקם.
+"""
 
     return f"""אתה שף ישראלי שמייצר מתכונים לאפליקציה FOOD FOR ANY MOOD.
 צור מתכון אחד מקורי בעברית בלבד (שם המנה, תיאור, מרכיבים, שלבים, תגיות, פלייליסט).
@@ -345,11 +365,11 @@ def _build_gemini_prompt(payload: GenerateRecipeRequest) -> str:
 - ללא גלוטן: {gluten_note}
 - מרכיבים זמינים: {ingredients_note}
 - פלטפורמת מוזיקה לפלייליסט: {payload.musicPlatform}
-
+{ingredient_rules}
 כללי תוכן:
 - כל טקסט המתכון חייב להיות בעברית.
 - שם האפליקציה FOOD FOR ANY MOOD נשאר באנגלית — אל תתרגם אותו.
-- התאם את המנה לקטגוריה, למצב הרוח ולזמן ההכנה.
+- התאם את המנה לקטגוריה, למצב הרוח ולזמן ההכנה — אך כשיש מרכיבים, הם קודמים לכל השאר.
 - matchPercentage: 70–99 לפי התאמה למרכיבים ולהעדפות.
 - spiceLevel: 0–3 (0=לא חריף, 3=חריף).
 - nutrition: הערכה סבירה ל-2 מנות.
@@ -404,7 +424,11 @@ def _normalize_gemini_recipe(
     )
 
 
-def generate_recipe_with_gemini(payload: GenerateRecipeRequest) -> GeneratedRecipe:
+def generate_recipe_with_gemini(
+    payload: GenerateRecipeRequest,
+    *,
+    strict: bool = False,
+) -> GeneratedRecipe:
     """
     Call Gemini with structured JSON output.
 
@@ -413,7 +437,7 @@ def generate_recipe_with_gemini(payload: GenerateRecipeRequest) -> GeneratedReci
     if gemini_client is None:
         raise RuntimeError("Gemini client is not configured")
 
-    prompt = _build_gemini_prompt(payload)
+    prompt = _build_gemini_prompt(payload, strict=strict)
     schema = GeminiRecipeOutput.model_json_schema()
 
     response = gemini_client.models.generate_content(
@@ -432,10 +456,85 @@ def generate_recipe_with_gemini(payload: GenerateRecipeRequest) -> GeneratedReci
     return _normalize_gemini_recipe(gemini_recipe, payload)
 
 
+def _recipe_to_validation_dict(recipe: GeneratedRecipe) -> dict:
+    return {
+        "name": recipe.name,
+        "description": recipe.description,
+        "ingredients": recipe.ingredients,
+        "steps": recipe.steps,
+    }
+
+
+def _fallback_recipe_from_ingredients(payload: GenerateRecipeRequest) -> GeneratedRecipe:
+    user_ingredients = parse_user_ingredients(payload.ingredients)
+    raw = build_ingredient_fallback_recipe(
+        user_ingredients=user_ingredients,
+        category=payload.category,
+        mood=payload.mood,
+        cooking_time=payload.cookingTime,
+        is_gluten_free=payload.isGlutenFree,
+        music_platform=payload.musicPlatform,
+        build_playlist=_build_playlist,
+    )
+    return GeneratedRecipe(
+        name=raw["name"],
+        description=raw["description"],
+        ingredients=raw["ingredients"],
+        steps=raw["steps"],
+        matchPercentage=raw["matchPercentage"],
+        spiceLevel=raw["spiceLevel"],
+        nutrition=Nutrition(**raw["nutrition"]),
+        healthScore=raw["healthScore"],
+        tags=raw["tags"],
+        playlist=raw["playlist"],
+    )
+
+
+def generate_recipe_with_ingredient_validation(
+    payload: GenerateRecipeRequest,
+) -> GeneratedRecipe:
+    """Try Gemini (with one strict retry), then ingredient-based fallback."""
+    user_ingredients = parse_user_ingredients(payload.ingredients)
+
+    recipe = generate_recipe_with_gemini(payload, strict=False)
+
+    if not user_ingredients:
+        return recipe
+
+    validation = validate_recipe_relevance(
+        user_ingredients, _recipe_to_validation_dict(recipe)
+    )
+    if validation["ok"]:
+        return recipe
+
+    print(
+        "[FOOD FOR ANY MOOD] Recipe relevance low "
+        f"(ratio={validation['match_ratio']:.2f}, "
+        f"title_ok={validation['title_has_ingredient']}) — retrying with strict prompt"
+    )
+
+    recipe = generate_recipe_with_gemini(payload, strict=True)
+    validation = validate_recipe_relevance(
+        user_ingredients, _recipe_to_validation_dict(recipe)
+    )
+    if validation["ok"]:
+        return recipe
+
+    print(
+        "[FOOD FOR ANY MOOD] Strict retry still low relevance — "
+        "using ingredient-based fallback recipe"
+    )
+    return _fallback_recipe_from_ingredients(payload)
+
+
 def generate_mock_recipe(payload: GenerateRecipeRequest) -> GeneratedRecipe:
     """Hebrew mock fallback when Gemini fails or is not configured."""
+    user_ingredients = parse_user_ingredients(payload.ingredients)
+
+    if user_ingredients:
+        return _fallback_recipe_from_ingredients(payload)
+
     template = CATEGORY_RECIPES[payload.category]
-    user_ingredients = _parse_user_ingredients(payload.ingredients)
 
     ingredients = list(template["base_ingredients"])
     if payload.isGlutenFree:
@@ -446,10 +545,6 @@ def generate_mock_recipe(payload: GenerateRecipeRequest) -> GeneratedRecipe:
         ]
         if "ללא גלוטן" not in " ".join(ingredients):
             ingredients.append("מותאם ללא גלוטן")
-
-    for item in user_ingredients[:3]:
-        if item not in ingredients:
-            ingredients.append(f"{item} (מהמצבור שלך)")
 
     ingredients.extend(["מלח", "פלפל שחור", "שמן זית"])
 
@@ -462,8 +557,6 @@ def generate_mock_recipe(payload: GenerateRecipeRequest) -> GeneratedRecipe:
         description += " מותאמת במלואה לתזונה ללא גלוטן."
 
     match_percentage = random.randint(72, 94)
-    if user_ingredients:
-        match_percentage = min(99, match_percentage + len(user_ingredients) * 2)
 
     tags = list(template["tags"])
     if payload.cookingTime <= 25 and "quick" not in tags:
@@ -499,7 +592,9 @@ async def generate_recipe_with_fallback(
         return generate_mock_recipe(payload), "mock", error
 
     try:
-        recipe = await asyncio.to_thread(generate_recipe_with_gemini, payload)
+        recipe = await asyncio.to_thread(
+            generate_recipe_with_ingredient_validation, payload
+        )
         print(f"[FOOD FOR ANY MOOD] Gemini success: {recipe.name}")
         return recipe, "gemini", None
     except (ValidationError, RuntimeError, ValueError) as exc:
