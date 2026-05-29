@@ -15,6 +15,7 @@ from ingredient_relevance import (
     validate_recipe_relevance,
 )
 from recipe_title import apply_descriptive_dish_title, validate_dish_title
+from recipe_quantities import apply_recipe_quantities
 
 LATIN_PATTERN = re.compile(r"[a-z]", re.IGNORECASE)
 
@@ -347,10 +348,14 @@ def apply_recipe_ingredient_parser(
         cooking_time=cooking_time,
         style=style,
     )
+    quantified = apply_recipe_quantities(
+        titled,
+        servings=(titled.get("nutrition") or {}).get("servings"),
+    )
     user_ingredients = parse_user_ingredients(user_ingredients_raw)
-    validation = validate_recipe_quality(user_ingredients, titled)
-    titled["matchPercentage"] = validation["ingredient_relevance_score"]
-    return titled, validation
+    validation = validate_recipe_quality(user_ingredients, quantified)
+    quantified["matchPercentage"] = validation["ingredient_relevance_score"]
+    return quantified, validation
 
 
 def is_recipe_acceptable(user_ingredients_raw: str, recipe: dict) -> bool:

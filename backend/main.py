@@ -371,6 +371,14 @@ def _build_gemini_prompt(payload: GenerateRecipeRequest, *, strict: bool = False
 - אסור: ארוחת, ערב, וייב, נוחות, רומנטי, נעים, אנרגטי, רגוע, מצב רוח — בשם המנה.
 """
 
+    quantity_rules = """
+כללי כמויות (חובה):
+- לכל מרכיב חייבת להיות כמות ריאלית ויחידת מידה: whole item, tsp, tbsp, gram, ml, cup.
+- הכמויות חייבות להתאים למספר המנות (servings).
+- שלבי ההכנה חייבים להזכיר את אותן כמויות כמו ברשימת המרכיבים.
+- דוגמה: "2 ביצים", "1 עגבניה בינונית", "1 כף שמן זית", "1/2 כפית מלח", "1/4 כפית פלפל שחור".
+"""
+
     return f"""אתה שף ישראלי שמייצר מתכונים לאפליקציה FOOD FOR ANY MOOD.
 צור מתכון אחד מקורי בעברית בלבד (שם המנה, תיאור, מרכיבים, שלבים, תגיות, פלייליסט).
 
@@ -381,7 +389,7 @@ def _build_gemini_prompt(payload: GenerateRecipeRequest, *, strict: bool = False
 - ללא גלוטן: {gluten_note}
 - מרכיבים זמינים: {ingredients_note}
 - פלטפורמת מוזיקה לפלייליסט: {payload.musicPlatform}
-{ingredient_rules}{title_rules}
+{ingredient_rules}{title_rules}{quantity_rules}
 כללי תוכן:
 - כל טקסט המתכון חייב להיות בעברית.
 - שמות המרכיבים בשלבים וברשימה — בעברית בלבד, ללא מילים באנגלית.
@@ -509,8 +517,8 @@ def _post_process_recipe(
         steps=processed["steps"],
         matchPercentage=processed["matchPercentage"],
         spiceLevel=recipe.spiceLevel,
-        nutrition=recipe.nutrition,
-        healthScore=recipe.healthScore,
+        nutrition=Nutrition(**processed["nutrition"]),
+        healthScore=processed.get("healthScore", recipe.healthScore),
         tags=recipe.tags,
         playlist=recipe.playlist,
     )
@@ -527,17 +535,22 @@ def _fallback_recipe_from_ingredients(payload: GenerateRecipeRequest) -> Generat
         music_platform=payload.musicPlatform,
         build_playlist=_build_playlist,
     )
+    processed, _ = apply_recipe_ingredient_parser(
+        raw,
+        payload.ingredients,
+        cooking_time=payload.cookingTime,
+    )
     return GeneratedRecipe(
-        name=raw["name"],
-        description=raw["description"],
-        ingredients=raw["ingredients"],
-        steps=raw["steps"],
-        matchPercentage=raw["matchPercentage"],
-        spiceLevel=raw["spiceLevel"],
-        nutrition=Nutrition(**raw["nutrition"]),
-        healthScore=raw["healthScore"],
-        tags=raw["tags"],
-        playlist=raw["playlist"],
+        name=processed["name"],
+        description=processed["description"],
+        ingredients=processed["ingredients"],
+        steps=processed["steps"],
+        matchPercentage=processed["matchPercentage"],
+        spiceLevel=processed["spiceLevel"],
+        nutrition=Nutrition(**processed["nutrition"]),
+        healthScore=processed.get("healthScore", raw["healthScore"]),
+        tags=processed["tags"],
+        playlist=processed["playlist"],
     )
 
 

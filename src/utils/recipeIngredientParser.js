@@ -12,6 +12,7 @@ import {
   validateRecipeRelevance,
 } from './ingredientRelevance'
 import { applyDescriptiveDishTitle, validateDishTitle } from './recipeTitle'
+import { applyRecipeQuantities } from './recipeQuantities'
 
 const LATIN_PATTERN = /[a-z]/i
 
@@ -306,12 +307,16 @@ export function applyRecipeIngredientParser(recipe, userIngredientsRaw = '', lan
     style: options.style,
     language,
   })
+  const quantified = applyRecipeQuantities(titled, {
+    language,
+    servings: titled.nutrition?.servings,
+  })
   const userIngredients = parseUserIngredients(userIngredientsRaw)
-  const validation = validateRecipeQuality(userIngredients, titled, language, options)
+  const validation = validateRecipeQuality(userIngredients, quantified, language, options)
 
   return {
     recipe: {
-      ...titled,
+      ...quantified,
       matchPercentage: validation.ingredientRelevanceScore,
     },
     validation,
