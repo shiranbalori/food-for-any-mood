@@ -22,7 +22,7 @@ import random
 from typing import Literal
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, File, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from google import genai
 from ingredient_relevance import (
@@ -30,6 +30,10 @@ from ingredient_relevance import (
     build_ingredient_fallback_recipe,
     parse_user_ingredients,
     validate_recipe_relevance,
+)
+from analyze_ingredients_image import (
+    AnalyzeIngredientsImageResponse,
+    analyze_uploaded_image,
 )
 from recipe_ingredient_parser import (
     apply_recipe_ingredient_parser,
@@ -721,6 +725,19 @@ async def generate_recipe(payload: GenerateRecipeRequest):
 async def generate_recipe_alias(payload: GenerateRecipeRequest):
     """Backward-compatible alias for older frontend paths."""
     return await generate_recipe(payload)
+
+
+@app.post("/analyze-ingredients-image", response_model=AnalyzeIngredientsImageResponse)
+async def analyze_ingredients_image(image: UploadFile = File(...)):
+    """Detect Hebrew ingredient names from an uploaded food photo via Gemini Vision."""
+    print("[FOOD FOR ANY MOOD] Analyze ingredients image endpoint called")
+    return await analyze_uploaded_image(
+        client=gemini_client,
+        model=GEMINI_MODEL,
+        filename=image.filename,
+        content_type=image.content_type,
+        read_bytes=image.read,
+    )
 
 
 def _print_registered_routes() -> None:

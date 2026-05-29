@@ -1,5 +1,6 @@
 import { MOODS } from '../utils/themes'
 import { useLanguage } from '../i18n/useLanguage'
+import IngredientImageUpload from './IngredientImageUpload'
 import './RecipeForm.css'
 
 export default function RecipeForm({ form, onChange, onSubmit, disabled, theme }) {
@@ -18,6 +19,10 @@ export default function RecipeForm({ form, onChange, onSubmit, disabled, theme }
 
       <div className="recipe-form__field">
         <label htmlFor="ingredients">{t('ingredientsLabel')}</label>
+        <IngredientImageUpload
+          disabled={disabled}
+          onIngredientsDetected={(value) => onChange('ingredients', value)}
+        />
         <textarea
           id="ingredients"
           placeholder={t('ingredientsPlaceholder')}

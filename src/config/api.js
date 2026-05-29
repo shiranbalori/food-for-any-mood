@@ -17,3 +17,4 @@ export const API_BASE_URL = rawBaseUrl.replace(/\/$/, '')
 
 export const HEALTH_URL = `${API_BASE_URL}/health`
 export const GENERATE_RECIPE_URL = `${API_BASE_URL}/generate-recipe`
+export const ANALYZE_INGREDIENTS_IMAGE_URL = `${API_BASE_URL}/analyze-ingredients-image`
