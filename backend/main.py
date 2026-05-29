@@ -1,0 +1,580 @@
+"""
+FOOD FOR ANY MOOD — FastAPI backend
+
+Local development:
+  cd backend
+  pip install -r requirements.txt
+  cp .env.example .env          # then add your real GEMINI_API_KEY
+  uvicorn main:app --reload --host 127.0.0.1 --port 8010
+
+Production (Render):
+  uvicorn main:app --host 0.0.0.0 --port $PORT
+
+API keys stay in backend environment variables only — never in the frontend.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import logging
+import os
+import random
+from typing import Literal
+
+from dotenv import load_dotenv
+from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
+from google import genai
+from pydantic import BaseModel, Field, ValidationError
+
+load_dotenv()
+
+logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# Gemini client — key loaded from backend/.env (see .env.example)
+# ---------------------------------------------------------------------------
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "").strip()
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.0-flash").strip()
+
+gemini_client: genai.Client | None = None
+if GEMINI_API_KEY and GEMINI_API_KEY != "your_api_key_here":
+    gemini_client = genai.Client(api_key=GEMINI_API_KEY)
+else:
+    logger.warning(
+        "GEMINI_API_KEY is missing or still a placeholder — "
+        "POST /generate-recipe will use the Hebrew mock fallback."
+    )
+
+app = FastAPI(
+    title="FOOD FOR ANY MOOD API",
+    description="Recipe generation backend powered by Gemini (with mock fallback).",
+    version="0.2.0",
+)
+
+# ---------------------------------------------------------------------------
+# CORS — localhost dev + Vercel production + optional MVP open access
+# ---------------------------------------------------------------------------
+DEFAULT_CORS_ORIGINS = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+]
+
+_extra_origins = os.getenv("CORS_ORIGINS", "")
+CORS_ORIGINS = DEFAULT_CORS_ORIGINS + [
+    origin.strip() for origin in _extra_origins.split(",") if origin.strip()
+]
+
+# Matches Vercel production and preview URLs, e.g. https://my-app.vercel.app
+CORS_ORIGIN_REGEX = os.getenv("CORS_ORIGIN_REGEX", r"https://.*\.vercel\.app")
+
+# MVP public launch: set CORS_ALLOW_ALL=true on Render for easiest access.
+# TODO: disable this and restrict CORS_ORIGINS to your Vercel domain before scaling.
+CORS_ALLOW_ALL = os.getenv("CORS_ALLOW_ALL", "false").lower() in {"1", "true", "yes"}
+
+if CORS_ALLOW_ALL:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=False,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+else:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=CORS_ORIGINS,
+        allow_origin_regex=CORS_ORIGIN_REGEX,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
+
+@app.middleware("http")
+async def log_incoming_requests(request, call_next):
+    """Print every incoming request for local debugging."""
+    origin = request.headers.get("origin", "-")
+    print(
+        f"[FOOD FOR ANY MOOD] Incoming {request.method} {request.url.path} "
+        f"(origin={origin})"
+    )
+
+    if request.method == "POST" and request.url.path in {"/generate-recipe", "/recipes/generate"}:
+        body_bytes = await request.body()
+        print(
+            "[FOOD FOR ANY MOOD] Request body:",
+            body_bytes.decode("utf-8", errors="replace"),
+        )
+
+        async def receive():
+            return {"type": "http.request", "body": body_bytes, "more_body": False}
+
+        request = Request(request.scope, receive)
+
+    response = await call_next(request)
+    print(f"[FOOD FOR ANY MOOD] Response status: {response.status_code}")
+    return response
+
+
+# ---------------------------------------------------------------------------
+# Request / response models (match frontend GeneratedRecipe contract)
+# ---------------------------------------------------------------------------
+Category = Literal["dairy", "meat", "parve"]
+MusicPlatform = Literal["spotify", "youtube"]
+Mood = Literal["happy", "cozy", "energetic", "relaxed", "adventurous", "comfort"]
+
+
+class GenerateRecipeRequest(BaseModel):
+    category: Category
+    ingredients: str = ""
+    cookingTime: int = Field(default=30, ge=5, le=180)
+    mood: Mood = "cozy"
+    isGlutenFree: bool = False
+    musicPlatform: MusicPlatform = "spotify"
+
+
+class Nutrition(BaseModel):
+    calories: int
+    protein: int
+    carbs: int
+    fat: int
+    servings: int
+
+
+class Playlist(BaseModel):
+    id: str
+    name: str
+    description: str
+    energy: str
+    energyLabel: str
+    platform: MusicPlatform
+    url: str
+    matchPercent: int
+
+
+class GeneratedRecipe(BaseModel):
+    name: str
+    description: str
+    ingredients: list[str]
+    steps: list[str]
+    matchPercentage: int
+    spiceLevel: int
+    nutrition: Nutrition
+    healthScore: int
+    tags: list[str]
+    playlist: Playlist
+
+
+class GenerateRecipeResponse(BaseModel):
+    recipe: GeneratedRecipe
+    source: Literal["gemini", "mock"]
+    geminiError: str | None = None
+
+
+# ---------------------------------------------------------------------------
+# Gemini structured JSON schema (exact shape returned by the model)
+# ---------------------------------------------------------------------------
+class GeminiNutrition(BaseModel):
+    calories: int
+    protein: int
+    carbs: int
+    fat: int
+
+
+class GeminiPlaylistOutput(BaseModel):
+    title: str
+    description: str
+    platform: str
+    url: str
+
+
+class GeminiRecipeOutput(BaseModel):
+    name: str
+    description: str
+    ingredients: list[str]
+    steps: list[str]
+    matchPercentage: int
+    spiceLevel: int
+    nutrition: GeminiNutrition
+    healthScore: int
+    tags: list[str]
+    playlist: GeminiPlaylistOutput
+
+
+# ---------------------------------------------------------------------------
+# Mock recipe templates (Hebrew fallback when Gemini is unavailable)
+# ---------------------------------------------------------------------------
+CATEGORY_RECIPES: dict[Category, dict] = {
+    "dairy": {
+        "name": "פסטה שמנת פטריות",
+        "base_ingredients": ["פסטה", "שמנת מתוקה", "שום", "פטריות", "פרמזן", "חמאה"],
+        "steps": [
+            "מרתיחים סיר גדול עם מים מומלחים ומבשלים את הפסטה עד אל דנטה.",
+            "מקפיצים שום ופטריות בחמאה עד הזהבה.",
+            "מוסיפים שמנת ומבשלים בעדינות עד שהרוטב מסמיך.",
+            "מערבבים את הפסטה עם הרוטב ופרמזן.",
+            "מגישים מיד עם פלפל שחור גרוס.",
+        ],
+        "calories": 485,
+        "protein": 17,
+        "carbs": 54,
+        "fat": 22,
+        "spiceLevel": 0,
+        "healthScore": 62,
+        "tags": ["comfortFood"],
+    },
+    "meat": {
+        "name": "קציצות בשר ביתיות",
+        "base_ingredients": ["בשר בקר טחון", "בצל", "שום", "ביצה", "עגבניות", "שמן זית"],
+        "steps": [
+            "מערבבים בשר, בצל, שום, ביצה, מלח ופלפל עד תערובת דביקה.",
+            "יוצרים קציצות בגודל אחיד.",
+            "מחממים שמן במחבת וצורבים את הקציצות מכל הצדדים.",
+            "מוסיפים רוטב עגבניות ומבשלים על אש נמוכה.",
+            "מגישים חם עם עשבי תיבול טריים.",
+        ],
+        "calories": 410,
+        "protein": 28,
+        "carbs": 30,
+        "fat": 20,
+        "spiceLevel": 1,
+        "healthScore": 66,
+        "tags": ["highProtein", "comfortFood"],
+    },
+    "parve": {
+        "name": "מוקפץ ירקות מהיר",
+        "base_ingredients": ["טופו", "ברוקולי", "פלפל גמבה", "שום", "ג׳ינג׳ר", "רוטב סויה"],
+        "steps": [
+            "מייבשים וחותכים את הטופו לקוביות.",
+            "מחממים מחבת או ווק על אש גבוהה.",
+            "מוקפצים ירקות עם שום וג׳ינג׳ר עד שהם עדיין פריכים.",
+            "מוסיפים טופו ורוטב סויה, מערבבים עד ציפוי מבריק.",
+            "מגישים מיד על אורז מאודה.",
+        ],
+        "calories": 330,
+        "protein": 19,
+        "carbs": 24,
+        "fat": 18,
+        "spiceLevel": 2,
+        "healthScore": 84,
+        "tags": ["healthy", "quick", "vegetarian"],
+    },
+}
+
+CATEGORY_LABELS: dict[Category, str] = {
+    "dairy": "חלבי",
+    "meat": "בשרי",
+    "parve": "פרווה",
+}
+
+MOOD_LABELS: dict[Mood, str] = {
+    "happy": "שמח",
+    "cozy": "נעים וחמים",
+    "energetic": "אנרגטי",
+    "relaxed": "רגוע",
+    "adventurous": "הרפתקני",
+    "comfort": "מנחם",
+}
+
+MOOD_DESCRIPTIONS: dict[Mood, str] = {
+    "happy": "שמחים ומרוממים",
+    "cozy": "חמים ומנחמים",
+    "energetic": "נועזים ומלאי אנרגיה",
+    "relaxed": "רגועים ומאוזנים",
+    "adventurous": "מלאי אופי וגיוון",
+    "comfort": "מספקים ומוכרים",
+}
+
+PLAYLIST_PRESETS: dict[MusicPlatform, dict] = {
+    "spotify": {
+        "id": "soft-jazz-kitchen",
+        "name": "ג'אז רך למטבח",
+        "description": "צלילים חלקים ונעימים — מושלם לבישול רגוע ואינטימי",
+        "query": "soft jazz cooking kitchen playlist",
+    },
+    "youtube": {
+        "id": "morning-sunshine",
+        "name": "אור בוקר",
+        "description": "POP עליז וקליל — אנרגיה טובה להתחלת יום במטבח",
+        "query": "upbeat morning kitchen music",
+    },
+}
+
+
+def _parse_user_ingredients(raw: str) -> list[str]:
+    if not raw.strip():
+        return []
+    parts = [part.strip() for part in raw.replace("\n", ",").split(",")]
+    return [part for part in parts if part]
+
+
+def _build_playlist(platform: MusicPlatform, match_percent: int | None = None) -> Playlist:
+    preset = PLAYLIST_PRESETS[platform]
+    encoded = preset["query"].replace(" ", "%20")
+    if platform == "youtube":
+        url = f"https://www.youtube.com/results?search_query={encoded}"
+    else:
+        url = f"https://open.spotify.com/search/{encoded}"
+
+    return Playlist(
+        id=preset["id"],
+        name=preset["name"],
+        description=preset["description"],
+        energy="medium",
+        energyLabel="אנרגיה בינונית",
+        platform=platform,
+        url=url,
+        matchPercent=match_percent if match_percent is not None else random.randint(82, 96),
+    )
+
+
+def _build_gemini_prompt(payload: GenerateRecipeRequest) -> str:
+    category_label = CATEGORY_LABELS[payload.category]
+    mood_label = MOOD_LABELS[payload.mood]
+    gluten_note = "כן — המתכון חייב להיות ללא גלוטן" if payload.isGlutenFree else "לא"
+    ingredients_note = payload.ingredients.strip() or "לא צוינו — הציע מרכיבים מתאימים"
+
+    return f"""אתה שף ישראלי שמייצר מתכונים לאפליקציה FOOD FOR ANY MOOD.
+צור מתכון אחד מקורי בעברית בלבד (שם המנה, תיאור, מרכיבים, שלבים, תגיות, פלייליסט).
+
+העדפות המשתמש:
+- קטגוריה: {category_label} ({payload.category})
+- מצב רוח: {mood_label} ({payload.mood})
+- זמן הכנה מקסימלי: {payload.cookingTime} דקות
+- ללא גלוטן: {gluten_note}
+- מרכיבים זמינים: {ingredients_note}
+- פלטפורמת מוזיקה לפלייליסט: {payload.musicPlatform}
+
+כללי תוכן:
+- כל טקסט המתכון חייב להיות בעברית.
+- שם האפליקציה FOOD FOR ANY MOOD נשאר באנגלית — אל תתרגם אותו.
+- התאם את המנה לקטגוריה, למצב הרוח ולזמן ההכנה.
+- matchPercentage: 70–99 לפי התאמה למרכיבים ולהעדפות.
+- spiceLevel: 0–3 (0=לא חריף, 3=חריף).
+- nutrition: הערכה סבירה ל-2 מנות.
+- healthScore: 0–100.
+- tags: מערך קצר של תגיות (מחרוזות בעברית או מפתחות קצרים באנגלית).
+- playlist.title ו-playlist.description בעברית; playlist.platform = "{payload.musicPlatform}";
+  playlist.url = קישור חיפוש אמיתי ל-Spotify או YouTube המתאים למצב הרוח.
+
+החזר JSON בלבד לפי הסכימה — ללא markdown וללא טקסט נוסף."""
+
+
+def _normalize_gemini_recipe(
+    gemini_recipe: GeminiRecipeOutput,
+    payload: GenerateRecipeRequest,
+) -> GeneratedRecipe:
+    """Map Gemini JSON (playlist.title) to the frontend recipe contract (playlist.name)."""
+    if gemini_recipe.playlist.platform in ("spotify", "youtube"):
+        platform: MusicPlatform = gemini_recipe.playlist.platform  # type: ignore[assignment]
+    else:
+        platform = payload.musicPlatform
+
+    playlist_url = gemini_recipe.playlist.url.strip()
+    if not playlist_url.startswith("http"):
+        playlist_url = _build_playlist(platform).url
+
+    return GeneratedRecipe(
+        name=gemini_recipe.name,
+        description=gemini_recipe.description,
+        ingredients=gemini_recipe.ingredients,
+        steps=gemini_recipe.steps,
+        matchPercentage=max(0, min(100, gemini_recipe.matchPercentage)),
+        spiceLevel=max(0, min(3, gemini_recipe.spiceLevel)),
+        nutrition=Nutrition(
+            calories=max(0, gemini_recipe.nutrition.calories),
+            protein=max(0, gemini_recipe.nutrition.protein),
+            carbs=max(0, gemini_recipe.nutrition.carbs),
+            fat=max(0, gemini_recipe.nutrition.fat),
+            servings=2,
+        ),
+        healthScore=max(0, min(100, gemini_recipe.healthScore)),
+        tags=gemini_recipe.tags,
+        playlist=Playlist(
+            id="gemini-playlist",
+            name=gemini_recipe.playlist.title,
+            description=gemini_recipe.playlist.description,
+            energy="medium",
+            energyLabel="אנרגיה בינונית",
+            platform=platform,
+            url=playlist_url,
+            matchPercent=max(0, min(100, gemini_recipe.matchPercentage)),
+        ),
+    )
+
+
+def generate_recipe_with_gemini(payload: GenerateRecipeRequest) -> GeneratedRecipe:
+    """
+    Call Gemini with structured JSON output.
+
+    Requires GEMINI_API_KEY in backend/.env — see .env.example for setup steps.
+    """
+    if gemini_client is None:
+        raise RuntimeError("Gemini client is not configured")
+
+    prompt = _build_gemini_prompt(payload)
+    schema = GeminiRecipeOutput.model_json_schema()
+
+    response = gemini_client.models.generate_content(
+        model=GEMINI_MODEL,
+        contents=prompt,
+        config={
+            "response_mime_type": "application/json",
+            "response_json_schema": schema,
+        },
+    )
+
+    if not response.text:
+        raise RuntimeError("Gemini returned an empty response")
+
+    gemini_recipe = GeminiRecipeOutput.model_validate_json(response.text)
+    return _normalize_gemini_recipe(gemini_recipe, payload)
+
+
+def generate_mock_recipe(payload: GenerateRecipeRequest) -> GeneratedRecipe:
+    """Hebrew mock fallback when Gemini fails or is not configured."""
+    template = CATEGORY_RECIPES[payload.category]
+    user_ingredients = _parse_user_ingredients(payload.ingredients)
+
+    ingredients = list(template["base_ingredients"])
+    if payload.isGlutenFree:
+        ingredients = [
+            item.replace("פסטה", "פסטה ללא גלוטן")
+            .replace("רוטב סויה", "רוטב סויה ללא גלוטן")
+            for item in ingredients
+        ]
+        if "ללא גלוטן" not in " ".join(ingredients):
+            ingredients.append("מותאם ללא גלוטן")
+
+    for item in user_ingredients[:3]:
+        if item not in ingredients:
+            ingredients.append(f"{item} (מהמצבור שלך)")
+
+    ingredients.extend(["מלח", "פלפל שחור", "שמן זית"])
+
+    mood_text = MOOD_DESCRIPTIONS.get(payload.mood, "טעימים")
+    description = (
+        f"מנה מותאמת ל{mood_text}, בזמן הכנה של כ-{payload.cookingTime} דקות. "
+        f"{template['name']} — ארוחה ביתית מלאת טעם ונוחות."
+    )
+    if payload.isGlutenFree:
+        description += " מותאמת במלואה לתזונה ללא גלוטן."
+
+    match_percentage = random.randint(72, 94)
+    if user_ingredients:
+        match_percentage = min(99, match_percentage + len(user_ingredients) * 2)
+
+    tags = list(template["tags"])
+    if payload.cookingTime <= 25 and "quick" not in tags:
+        tags.append("quick")
+
+    return GeneratedRecipe(
+        name=template["name"],
+        description=description,
+        ingredients=ingredients,
+        steps=list(template["steps"]),
+        matchPercentage=match_percentage,
+        spiceLevel=template["spiceLevel"],
+        nutrition=Nutrition(
+            calories=template["calories"],
+            protein=template["protein"],
+            carbs=template["carbs"],
+            fat=template["fat"],
+            servings=2,
+        ),
+        healthScore=template["healthScore"],
+        tags=tags,
+        playlist=_build_playlist(payload.musicPlatform, match_percentage),
+    )
+
+
+async def generate_recipe_with_fallback(
+    payload: GenerateRecipeRequest,
+) -> tuple[GeneratedRecipe, Literal["gemini", "mock"], str | None]:
+    """Try Gemini first; on any failure return a mocked Hebrew recipe."""
+    if gemini_client is None:
+        error = "Gemini client is not configured (check GEMINI_API_KEY in backend/.env)"
+        print(f"[FOOD FOR ANY MOOD] Gemini error: {error}")
+        return generate_mock_recipe(payload), "mock", error
+
+    try:
+        recipe = await asyncio.to_thread(generate_recipe_with_gemini, payload)
+        print(f"[FOOD FOR ANY MOOD] Gemini success: {recipe.name}")
+        return recipe, "gemini", None
+    except (ValidationError, RuntimeError, ValueError) as exc:
+        error = str(exc)
+        print(f"[FOOD FOR ANY MOOD] Gemini error: {error}")
+        logger.exception("Gemini recipe generation failed, using mock fallback: %s", exc)
+        return generate_mock_recipe(payload), "mock", error
+    except Exception as exc:
+        error = str(exc)
+        print(f"[FOOD FOR ANY MOOD] Gemini error: {error}")
+        logger.exception("Unexpected Gemini error, using mock fallback: %s", exc)
+        return generate_mock_recipe(payload), "mock", error
+
+
+# ---------------------------------------------------------------------------
+# Routes — registered on the root app (no prefix)
+# ---------------------------------------------------------------------------
+@app.get("/health")
+def health_check():
+    print("[FOOD FOR ANY MOOD] Health endpoint called")
+    return {"status": "ok", "service": "food-for-any-mood-api"}
+
+
+@app.post("/generate-recipe", response_model=GenerateRecipeResponse)
+async def generate_recipe(payload: GenerateRecipeRequest):
+    """
+    Generate a Hebrew recipe via Gemini structured JSON output.
+
+    Falls back to a local Hebrew mock if the API key is missing or Gemini fails.
+    """
+    print("[FOOD FOR ANY MOOD] Generate recipe endpoint called")
+    print(
+        "[FOOD FOR ANY MOOD] Received request body:",
+        {
+            "category": payload.category,
+            "ingredients": payload.ingredients,
+            "cookingTime": payload.cookingTime,
+            "mood": payload.mood,
+            "isGlutenFree": payload.isGlutenFree,
+            "musicPlatform": payload.musicPlatform,
+        },
+    )
+    recipe, source, gemini_error = await generate_recipe_with_fallback(payload)
+    if source == "gemini":
+        print(f"[FOOD FOR ANY MOOD] Returning Gemini recipe: {recipe.name}")
+    else:
+        print(
+            "[FOOD FOR ANY MOOD] Returning mock fallback recipe "
+            f"(Gemini error: {gemini_error})"
+        )
+    return GenerateRecipeResponse(recipe=recipe, source=source, geminiError=gemini_error)
+
+
+@app.post("/recipes/generate", response_model=GenerateRecipeResponse, include_in_schema=True)
+async def generate_recipe_alias(payload: GenerateRecipeRequest):
+    """Backward-compatible alias for older frontend paths."""
+    return await generate_recipe(payload)
+
+
+def _print_registered_routes() -> None:
+    port = os.getenv("PORT", "8010")
+    print("[FOOD FOR ANY MOOD] Registered routes:")
+    for route in app.routes:
+        if hasattr(route, "methods") and hasattr(route, "path"):
+            methods = ",".join(sorted(route.methods))
+            print(f"  {methods:12} {route.path}")
+    print("[FOOD FOR ANY MOOD] CORS allow all (MVP):", CORS_ALLOW_ALL)
+    if not CORS_ALLOW_ALL:
+        print("[FOOD FOR ANY MOOD] CORS origins:", CORS_ORIGINS)
+        print("[FOOD FOR ANY MOOD] CORS origin regex:", CORS_ORIGIN_REGEX)
+    print("[FOOD FOR ANY MOOD] Render start command:")
+    print("  uvicorn main:app --host 0.0.0.0 --port $PORT")
+    print(f"[FOOD FOR ANY MOOD] Listening on port {port}")
+
+
+@app.on_event("startup")
+async def on_startup() -> None:
+    _print_registered_routes()

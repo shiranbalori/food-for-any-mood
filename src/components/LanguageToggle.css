@@ -1,0 +1,39 @@
+.language-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.4rem 0.85rem;
+  background: var(--surface);
+  backdrop-filter: blur(16px);
+  border-radius: 999px;
+  border: 1px solid var(--glass-border);
+  font-size: 0.78rem;
+  margin-bottom: 1.15rem;
+  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.04);
+  animation: fadeInUp 0.5s var(--ease-spring) both;
+}
+
+.language-toggle__btn {
+  font-weight: 500;
+  color: var(--text-muted);
+  padding: 0.2rem 0.45rem;
+  border-radius: 8px;
+  transition: all var(--transition);
+}
+
+.language-toggle__btn:hover {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.5);
+}
+
+.language-toggle__btn--active {
+  color: var(--theme-accent, #2563eb);
+  font-weight: 700;
+  background: var(--theme-accent-light);
+  box-shadow: 0 0 12px var(--theme-glow);
+}
+
+.language-toggle__sep {
+  color: #cbd5e1;
+  user-select: none;
+}

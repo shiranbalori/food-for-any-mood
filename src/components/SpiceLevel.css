@@ -1,0 +1,24 @@
+.spice-level {
+  display: flex;
+  align-items: center;
+  gap: 0.15rem;
+}
+
+.spice-level__chili {
+  font-size: 0.85rem;
+  opacity: 0.2;
+  transition: opacity var(--transition);
+  filter: grayscale(1);
+}
+
+.spice-level__chili--active {
+  opacity: 1;
+  filter: none;
+}
+
+.spice-level__label {
+  margin-left: 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text-muted);
+}

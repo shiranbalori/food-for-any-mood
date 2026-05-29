@@ -1,0 +1,109 @@
+.music-platform {
+  margin-bottom: var(--space-section);
+  animation: fadeInUp 0.65s 0.16s var(--ease-spring) both;
+}
+
+.music-platform__grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.75rem;
+}
+
+.music-platform__card {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.65rem;
+  padding: 1rem 0.85rem;
+  border-radius: var(--radius);
+  background: var(--surface);
+  backdrop-filter: blur(20px);
+  border: 1.5px solid rgba(148, 163, 184, 0.2);
+  font-weight: 700;
+  font-size: 0.92rem;
+  color: var(--text);
+  transition: all var(--ease-spring);
+  min-height: 64px;
+  overflow: hidden;
+}
+
+.music-platform__card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transition: opacity var(--transition);
+}
+
+.music-platform__card--spotify::before {
+  background: linear-gradient(135deg, rgba(29, 185, 84, 0.12), rgba(29, 185, 84, 0.04));
+}
+
+.music-platform__card--youtube::before {
+  background: linear-gradient(135deg, rgba(255, 0, 0, 0.1), rgba(255, 0, 0, 0.03));
+}
+
+.music-platform__card:hover {
+  transform: translateY(-3px);
+}
+
+.music-platform__card--spotify:hover,
+.music-platform__card--spotify.music-platform__card--active {
+  border-color: #1db954;
+  box-shadow: 0 8px 28px rgba(29, 185, 84, 0.22);
+}
+
+.music-platform__card--youtube:hover,
+.music-platform__card--youtube.music-platform__card--active {
+  border-color: #ff0000;
+  box-shadow: 0 8px 28px rgba(255, 0, 0, 0.18);
+}
+
+.music-platform__card--active::before {
+  opacity: 1;
+}
+
+.platform-icon {
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 1;
+}
+
+.platform-icon--spotify {
+  color: #1db954;
+}
+
+.platform-icon--youtube {
+  color: #ff0000;
+}
+
+.music-platform__card span:not(.music-platform__check) {
+  position: relative;
+  z-index: 1;
+}
+
+.music-platform__check {
+  position: absolute;
+  top: 0.5rem;
+  inset-inline-end: 0.5rem;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--theme-accent);
+  color: white;
+  font-size: 0.62rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1;
+  animation: fadeInScale 0.3s var(--ease-spring) both;
+}
+
+@media (max-width: 400px) {
+  .music-platform__grid {
+    grid-template-columns: 1fr;
+  }
+}

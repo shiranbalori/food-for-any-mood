@@ -1,0 +1,124 @@
+.dietary-preferences {
+  margin-bottom: var(--space-section);
+  animation: fadeInUp 0.65s 0.14s var(--ease-spring) both;
+}
+
+.dietary-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  width: 100%;
+  padding: 1rem 1.15rem;
+  background: var(--surface);
+  backdrop-filter: blur(20px);
+  border-radius: var(--radius);
+  border: 1.5px solid rgba(148, 163, 184, 0.2);
+  transition: all var(--ease-spring);
+  text-align: inherit;
+  box-shadow: 0 4px 20px rgba(15, 23, 42, 0.04);
+}
+
+.dietary-toggle:hover {
+  border-color: color-mix(in srgb, var(--theme-accent) 35%, transparent);
+  transform: translateY(-2px);
+}
+
+.dietary-toggle--active {
+  border-color: var(--theme-accent);
+  background: linear-gradient(135deg, var(--theme-accent-light) 0%, rgba(255, 255, 255, 0.85) 100%);
+  box-shadow: 0 8px 28px var(--theme-glow);
+}
+
+.dietary-toggle__icon {
+  font-size: 1.35rem;
+  flex-shrink: 0;
+}
+
+.dietary-toggle__text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.dietary-toggle__text strong {
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: -0.01em;
+}
+
+.dietary-toggle__text small {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.dietary-toggle__switch {
+  position: relative;
+  width: 46px;
+  height: 26px;
+  flex-shrink: 0;
+  background: rgba(148, 163, 184, 0.35);
+  border-radius: 999px;
+  transition: background var(--transition);
+}
+
+.dietary-toggle__switch--on {
+  background: var(--theme-accent);
+  box-shadow: 0 0 12px var(--theme-glow);
+}
+
+.dietary-toggle__knob {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 20px;
+  height: 20px;
+  background: white;
+  border-radius: 50%;
+  transition: transform var(--ease-spring);
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.15);
+}
+
+.dietary-toggle__switch--on .dietary-toggle__knob {
+  transform: translateX(20px);
+}
+
+html[dir='rtl'] .dietary-toggle__knob {
+  left: auto;
+  right: 3px;
+}
+
+html[dir='rtl'] .dietary-toggle__switch--on .dietary-toggle__knob {
+  transform: translateX(-20px);
+}
+
+html[dir='ltr'] .dietary-toggle__knob {
+  right: auto;
+  left: 3px;
+}
+
+html[dir='ltr'] .dietary-toggle__switch--on .dietary-toggle__knob {
+  transform: translateX(20px);
+}
+
+.dietary-preferences__note {
+  margin-top: 0.75rem;
+  padding: 0.75rem 1rem;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  background: rgba(255, 255, 255, 0.55);
+  border-radius: var(--radius-xs);
+  border: 1px dashed color-mix(in srgb, var(--theme-accent) 25%, transparent);
+  line-height: 1.55;
+  animation: fadeInUp 0.4s var(--ease-spring) both;
+}
+
+@media (max-width: 640px) {
+  .dietary-toggle {
+    min-height: 72px;
+  }
+}
