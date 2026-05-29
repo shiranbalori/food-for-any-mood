@@ -23,8 +23,8 @@ const MOOD_TITLE_PATTERNS = [
   /^ארוח(?:ת|ה)\s+/,
   /ארוח(?:ת|ה)?\s+(?:נרות|נוחות|רגוע(?:ה|ים)?|שמ(?:ה|ים)|חמ(?:ה|ים)|מנח(?:ם|מת)|רומנטית?)/,
   /(?:ערב|בוקר|צהריים)\s+(?:רגוע|רומנטי|שמח|נעים|חמים|מיוחד)/,
-  /(?:וייב|vibe)\s*(?:חם|חמים|נעים|רגוע)?/i,
-  /\bוייב\b|\bvibe\b/i,
+  /(?:ווייב|וייב|וייב|vibe)/i,
+  /[\s–—-]+(?:חמים|חם|נעים|נעימ(?:ה|ים)?|רגוע(?:ה|ים)?|מנח(?:ם|מת)|אנרגטי(?:ם)?|שמ(?:ח(?:ה|ים)?)?|עליז(?:ה|ים)?|הרפתקני(?:ם)?|comfort|cozy)\s*$/i,
   /^מנה\s+(?:נעימ(?:ה|ים)?|אנרגטית|רגועה|שמחה|מנחמת|מרגיעה|מיוחדת|מושלמת|חמ(?:ה|ימה))/,
   /^(?:cozy|comfort|energetic|adventurous|relaxed|happy|romantic|mood)\b/i,
   /(?:נוחות|רומנטי|נעים(?:ה|ים)?|אנרג(?:יה|ט(?:י|ית))|מצב\s+רוח|good\s+vibes|atmosphere)/i,
@@ -38,8 +38,11 @@ const FORBIDDEN_TITLE_WORDS = [
   'רומנטי',
   'נעים',
   'נעימה',
+  'ווייב',
+  'וייב',
   'וייב',
   'vibe',
+  'vibes',
   'cozy',
   'comfort',
   'energetic',
@@ -183,6 +186,7 @@ export function buildDescriptiveDishTitle(
     case 'tunaSalad':
       return 'סלט טונה וביצים'
     case 'curry':
+      if (!ingredientsSupportCurryTitle(mainCanon)) break
       return second ? `קארי ${joinHebrewList(mainNames)}` : `קארי ${first}`
     case 'stirFry':
       return second ? `מוקפץ ${joinHebrewList(mainNames)}` : `מוקפץ ${first}`
@@ -224,22 +228,40 @@ export function isMoodBasedTitle(title) {
   })
 }
 
+function ingredientsSupportCurryTitle(mainCanon) {
+  return mainCanon.some((item) => ['curry', 'lentils', 'coconut milk', 'coconut'].includes(item))
+}
+
 export function titleDescribesDish(title, ingredients = []) {
   const text = String(title ?? '').trim()
   if (!text || isMoodBasedTitle(text)) return false
 
-  if (KNOWN_DISH_PREFIXES.some((prefix) => text.includes(prefix))) {
+  const mains = filterMainIngredients(ingredients)
+  const mainCanon = mains.map((item) => canonicalIngredient(item)).filter(Boolean)
+
+  if (/קארי|curry/i.test(text) && !ingredientsSupportCurryTitle(mainCanon)) {
+    return false
+  }
+
+  if (mains.some((item) => ingredientAppearsInText(item, text))) {
     return true
   }
 
-  const mains = filterMainIngredients(ingredients)
-  return mains.some((item) => ingredientAppearsInText(item, text))
+  if (mains.length === 0) {
+    return KNOWN_DISH_PREFIXES.some((prefix) => text.startsWith(prefix))
+  }
+
+  return false
 }
 
 /**
  * Replace mood/generic titles with an ingredient-based dish name.
  */
 export function ensureDescriptiveDishTitle(title, ingredients = [], options = {}) {
+  if (isMoodBasedTitle(title)) {
+    return buildDescriptiveDishTitle(ingredients, options)
+  }
+
   if (titleDescribesDish(title, ingredients)) {
     return String(title).trim()
   }

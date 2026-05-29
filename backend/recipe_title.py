@@ -23,8 +23,12 @@ MOOD_TITLE_PATTERNS = [
     re.compile(r"^ארוח(?:ת|ה)\s+"),
     re.compile(r"ארוח(?:ת|ה)?\s+(?:נרות|נוחות|רגוע(?:ה|ים)?|שמ(?:ה|ים)|חמ(?:ה|ים)|מנח(?:ם|מת)|רומנטית?)"),
     re.compile(r"(?:ערב|בוקר|צהריים)\s+(?:רגוע|רומנטי|שמח|נעים|חמים|מיוחד)"),
-    re.compile(r"(?:וייב|vibe)\s*(?:חם|חמים|נעים|רגוע)?", re.IGNORECASE),
-    re.compile(r"\bוייב\b|\bvibe\b", re.IGNORECASE),
+    re.compile(r"(?:ווייב|וייב|וייב|vibe)", re.IGNORECASE),
+    re.compile(
+        r"[\s–—-]+(?:חמים|חם|נעים|נעימ(?:ה|ים)?|רגוע(?:ה|ים)?|מנח(?:ם|מת)|אנרגטי(?:ם)?|"
+        r"שמ(?:ח(?:ה|ים)?)?|עליז(?:ה|ים)?|הרפתקני(?:ם)?|comfort|cozy)\s*$",
+        re.IGNORECASE,
+    ),
     re.compile(r"^מנה\s+(?:נעימ(?:ה|ים)?|אנרגטית|רגועה|שמחה|מנחמת|מרגיעה|מיוחדת|מושלמת|חמ(?:ה|ימה))"),
     re.compile(r"^(?:cozy|comfort|energetic|adventurous|relaxed|happy|romantic|mood)\b", re.IGNORECASE),
     re.compile(r"(?:נוחות|רומנטי|נעים(?:ה|ים)?|אנרג(?:יה|ט(?:י|ית))|מצב\s+רוח|good\s+vibes|atmosphere)", re.IGNORECASE),
@@ -38,8 +42,11 @@ FORBIDDEN_TITLE_WORDS = [
     "רומנטי",
     "נעים",
     "נעימה",
+    "ווייב",
+    "וייב",
     "וייב",
     "vibe",
+    "vibes",
     "cozy",
     "comfort",
     "energetic",
@@ -124,6 +131,10 @@ def _join_hebrew_list(items: list[str]) -> str:
     if len(items) == 2:
         return f"{items[0]} ו{items[1]}"
     return f"{', '.join(items[:-1])} ו{items[-1]}"
+
+
+def _ingredients_support_curry_title(main_canon: list[str]) -> bool:
+    return any(item in {"curry", "lentils", "coconut milk", "coconut"} for item in main_canon)
 
 
 def _infer_cooking_style(
@@ -231,7 +242,7 @@ def build_descriptive_dish_title(
         return _build_omelette_title(main_names, main_canon)
     if pattern == "tunaSalad":
         return "סלט טונה וביצים"
-    if pattern == "curry":
+    if pattern == "curry" and _ingredients_support_curry_title(main_canon):
         return f"קארי {_join_hebrew_list(main_names)}"
     if pattern == "stirFry":
         return f"מוקפץ {_join_hebrew_list(main_names)}"
@@ -269,9 +280,20 @@ def title_describes_dish(title: str, ingredients: list[str]) -> bool:
     text = (title or "").strip()
     if not text or is_mood_based_title(text):
         return False
-    if any(prefix in text for prefix in KNOWN_DISH_PREFIXES):
+
+    mains = _filter_main_ingredients(ingredients)
+    main_canon = [canonical_ingredient(item) or item for item in mains]
+
+    if re.search(r"קארי|curry", text, re.IGNORECASE) and not _ingredients_support_curry_title(main_canon):
+        return False
+
+    if any(ingredient_appears_in_text(item, text) for item in mains):
         return True
-    return any(ingredient_appears_in_text(item, text) for item in _filter_main_ingredients(ingredients))
+
+    if not mains:
+        return any(text.startswith(prefix) for prefix in KNOWN_DISH_PREFIXES)
+
+    return False
 
 
 def ensure_descriptive_dish_title(
@@ -283,6 +305,14 @@ def ensure_descriptive_dish_title(
     style: str | None = None,
     tags: list[str] | None = None,
 ) -> str:
+    if is_mood_based_title(title):
+        return build_descriptive_dish_title(
+            ingredients,
+            cooking_time=cooking_time,
+            steps=steps,
+            style=style,
+            tags=tags,
+        )
     if title_describes_dish(title, ingredients):
         return (title or "").strip()
     return build_descriptive_dish_title(

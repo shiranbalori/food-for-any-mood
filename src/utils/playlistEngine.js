@@ -161,10 +161,10 @@ export const PLAYLISTS = [
   },
   {
     id: 'cozy-curry-vibes',
-    name: { he: 'ווייב קari', en: 'Cozy Curry Vibes' },
+    name: { he: 'מוזיקת תבלינים', en: 'Spice Kitchen Grooves' },
     description: {
-      he: 'מוזיקת עולם רגועה — לcurry ותבשילים חמים',
-      en: 'Chill world music — warm pots, spices, and slow simmers',
+      he: 'מוזיקת עולם רגועה — מתאימה לתבשילים עם תבלינים',
+      en: 'Chill world music — great for spiced stews and simmering pots',
     },
     moods: ['cozy', 'comfort', 'relaxed'],
     categories: ['parve'],
@@ -211,26 +211,25 @@ const MOOD_SEARCH_HINTS = {
 const RECIPE_KEYWORD_HINTS = [
   { pattern: /שקשוק|shakshuka|חומוס|hummus|פלאפל|falafel|ישראל|israel/i, query: 'israeli dinner music' },
   { pattern: /פסטה|pasta|risotto|שמנת/i, query: 'italian cooking playlist' },
-  { pattern: /קari|curry|תבשיל/i, query: 'cozy curry cooking playlist' },
+  { pattern: /קארי|curry|עדשים|lentil/i, query: 'cozy curry cooking playlist' },
   { pattern: /מוקפץ|wok|סויה|soy|אסי/i, query: 'asian cooking beats playlist' },
   { pattern: /קציצ|בשר|burger|steak|גריל/i, query: 'blues rock cooking playlist' },
   { pattern: /סלט|ירק|טofu|טופו|בריא/i, query: 'lofi healthy cooking playlist' },
   { pattern: /עוף|chicken|תרנגול/i, query: 'family cooking music playlist' },
 ]
 
-const MOOD_TITLE_SUFFIX = {
-  happy: { he: ' — עליז', en: ' — Happy' },
-  cozy: { he: ' — חמים', en: ' — Cozy' },
-  energetic: { he: ' — אנרגטי', en: ' — Energetic' },
-  relaxed: { he: ' — רגוע', en: ' — Relaxed' },
-  adventurous: { he: ' — הרפתקני', en: ' — Adventurous' },
-  comfort: { he: ' — מנחם', en: ' — Comfort' },
-}
-
 const CATEGORY_DESC = {
   dairy: { he: 'מתאים לארוחות חלביות ונעימות', en: 'Great for dairy dishes' },
   meat: { he: 'מתאים לבשר, גריל וארוחות עשירות', en: 'Great for meat and grill nights' },
   parve: { he: 'מתאים למנות קלות, ירקות וטופו', en: 'Great for light plant-forward meals' },
+}
+
+export function buildPlatformSearchUrl(platform, query) {
+  const encoded = encodeURIComponent(query)
+  if (platform === 'youtube') {
+    return `https://www.youtube.com/results?search_query=${encoded}`
+  }
+  return `https://open.spotify.com/search/${encoded}`
 }
 
 function inferEnergyLevel({ mood, cookTime, spiceLevel, style }) {
@@ -366,14 +365,6 @@ function buildHebrewDescription({ category, cookTime, recipeName, energy, langua
   return `${energyText}. ${categoryText}. ${timeText} ${recipeText}.`
 }
 
-export function buildPlatformSearchUrl(platform, query) {
-  const encoded = encodeURIComponent(query)
-  if (platform === 'youtube') {
-    return `https://www.youtube.com/results?search_query=${encoded}`
-  }
-  return `https://open.spotify.com/search/${encoded}`
-}
-
 /**
  * Builds a smart playlist search recommendation from recipe context.
  */
@@ -401,8 +392,7 @@ export function buildSmartPlaylistSearch(
   })
 
   const lang = language === 'he' ? 'he' : 'en'
-  const moodSuffix = MOOD_TITLE_SUFFIX[mood]?.[lang] ?? ''
-  const name = `${playlist.name[lang] ?? playlist.name.en}${moodSuffix}`
+  const name = playlist.name[lang] ?? playlist.name.en
   const description = buildHebrewDescription({
     category,
     cookTime,

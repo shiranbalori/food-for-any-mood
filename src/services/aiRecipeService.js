@@ -231,7 +231,14 @@ function processGeneratedRecipe(userInput, recipe) {
     { cookingTime: userInput.cookingTime },
   )
 
-  if (validation.ok) return parsed
+  if (validation.ok && !validation.titleValidation?.isMoodBased) {
+    return parsed
+  }
+
+  if (validation.ok && validation.titleValidation?.isMoodBased) {
+    console.warn('[aiRecipeService] Mood-based title slipped through — rebuilding from ingredients')
+    return parsed
+  }
 
   const rawUserList = parseUserIngredients(userInput.ingredients)
   if (!rawUserList.length) {
