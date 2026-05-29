@@ -1,0 +1,120 @@
+.favorite-recipes {
+  animation: fadeInUp 0.65s 0.3s var(--ease-spring) both;
+  margin-bottom: var(--space-section);
+}
+
+.favorite-recipes--empty {
+  margin-bottom: var(--space-section);
+}
+
+.favorite-recipes__empty {
+  text-align: center;
+  padding: 2rem 1.5rem;
+  background: var(--surface);
+  backdrop-filter: blur(20px);
+  border-radius: var(--radius);
+  border: 2px dashed rgba(148, 163, 184, 0.25);
+  box-shadow: 0 4px 24px rgba(15, 23, 42, 0.04);
+}
+
+.favorite-recipes__empty span {
+  font-size: 2.25rem;
+  display: block;
+  margin-bottom: 0.65rem;
+}
+
+.favorite-recipes__empty p {
+  color: var(--text-muted);
+  font-size: 0.92rem;
+  line-height: 1.6;
+}
+
+.favorite-recipes__grid {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.favorite-card {
+  background: var(--surface);
+  backdrop-filter: blur(20px);
+  border-radius: calc(var(--radius) - 2px);
+  padding: 1rem 1.1rem;
+  border: 1px solid var(--glass-border);
+  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.04);
+  transition:
+    transform var(--ease-spring),
+    box-shadow var(--transition);
+}
+
+.favorite-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.07);
+}
+
+.favorite-card__top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.45rem;
+}
+
+.favorite-card__category {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--theme-accent);
+  background: var(--theme-accent-light);
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+}
+
+.favorite-card__date {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.favorite-card__title {
+  margin: 0 0 0.45rem;
+  font-size: 0.98rem;
+  line-height: 1.35;
+}
+
+.favorite-card__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin-bottom: 0.75rem;
+}
+
+.favorite-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.favorite-card__view,
+.favorite-card__remove {
+  flex: 1;
+  min-width: 7rem;
+  font-size: 0.82rem;
+  padding: 0.45rem 0.65rem;
+}
+
+.favorite-card__remove {
+  color: #b45309;
+}
+
+@media (min-width: 640px) {
+  .favorite-recipes__grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 960px) {
+  .favorite-recipes__grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}

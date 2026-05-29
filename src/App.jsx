@@ -8,6 +8,7 @@ import RecipeForm from './components/RecipeForm'
 import LoadingAnimation from './components/LoadingAnimation'
 import RecipeCard from './components/RecipeCard'
 import SavedRecipes from './components/SavedRecipes'
+import FavoriteRecipes from './components/FavoriteRecipes'
 import { useLanguage } from './i18n/useLanguage'
 import { getTheme } from './utils/themes'
 import { generateAppRecipe } from './services/recipeService'
@@ -18,6 +19,11 @@ import {
   saveRecipe,
   removeRecipe,
 } from './utils/storage'
+import {
+  getFavoriteRecipes,
+  addFavoriteRecipe,
+  removeFavoriteRecipe,
+} from './utils/favoritesStorage'
 import './App.css'
 
 const INITIAL_FORM = {
@@ -35,6 +41,7 @@ export default function App() {
   const [recipe, setRecipe] = useState(null)
   const [loading, setLoading] = useState(false)
   const [savedRecipes, setSavedRecipes] = useState(getSavedRecipes)
+  const [favoriteRecipes, setFavoriteRecipes] = useState(getFavoriteRecipes)
   const [usedTemplateKeys, setUsedTemplateKeys] = useState([])
   const [saveError, setSaveError] = useState(false)
   const [backendNotice, setBackendNotice] = useState(null)
@@ -43,6 +50,7 @@ export default function App() {
 
   const theme = getTheme(category)
   const isSaved = recipe ? savedRecipes.some((r) => r.id === recipe.id) : false
+  const isFavorite = recipe ? favoriteRecipes.some((r) => r.id === recipe.id) : false
 
   const handleFormChange = (field, value) => {
     setForm((prev) => ({ ...prev, [field]: value }))
@@ -113,6 +121,21 @@ export default function App() {
   const handleRemove = (id) => {
     const updated = removeRecipe(id)
     setSavedRecipes(updated)
+  }
+
+  const handleAddFavorite = () => {
+    if (!recipe || isFavorite) return
+    const updated = addFavoriteRecipe({
+      ...recipe,
+      glutenFree: form.glutenFree,
+      musicPlatform: form.musicPlatform,
+    })
+    setFavoriteRecipes(updated)
+  }
+
+  const handleRemoveFavorite = (id) => {
+    const updated = removeFavoriteRecipe(id)
+    setFavoriteRecipes(updated)
   }
 
   const handleRegenerate = () => {
@@ -218,14 +241,22 @@ export default function App() {
             musicPlatform={form.musicPlatform}
             theme={getTheme(recipe.category)}
             isSaved={isSaved}
+            isFavorite={isFavorite}
             saveError={saveError}
             onSave={handleSave}
+            onAddFavorite={handleAddFavorite}
             onRegenerate={handleRegenerate}
             recipeIdeas={recipeIdeas}
             ideasLoading={ideasLoading}
             onLoadMoreIdeas={handleLoadMoreIdeas}
           />
         )}
+
+        <FavoriteRecipes
+          recipes={favoriteRecipes}
+          onRemove={handleRemoveFavorite}
+          onSelect={handleSelectSaved}
+        />
 
         <SavedRecipes
           recipes={savedRecipes}

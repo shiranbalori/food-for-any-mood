@@ -62,8 +62,10 @@ export default function RecipeCard({
   musicPlatform,
   theme,
   isSaved,
+  isFavorite,
   saveError,
   onSave,
+  onAddFavorite,
   onRegenerate,
   recipeIdeas,
   ideasLoading,
@@ -192,6 +194,14 @@ export default function RecipeCard({
           disabled={isSaved}
         >
           {isSaved ? t('saved') : t('saveRecipe')}
+        </button>
+        <button
+          type="button"
+          className={`btn btn--secondary ${isFavorite ? 'btn--saved' : ''}`}
+          onClick={onAddFavorite}
+          disabled={isFavorite}
+        >
+          {isFavorite ? t('savedToFavorites') : t('saveToFavorites')}
         </button>
         <button type="button" className="btn btn--primary" onClick={onRegenerate}>
           {t('generateAnother')}
