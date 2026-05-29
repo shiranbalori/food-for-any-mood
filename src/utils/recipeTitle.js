@@ -67,36 +67,6 @@ const KNOWN_DISH_PREFIXES = [
   'קוביות',
 ]
 
-const TOMATO_EGG_TITLES = ['חביתת עגבניות', 'ביצה בעגבניות', 'מקושקשת עגבניות']
-
-const GENERIC_DISH_TITLES = new Set([
-  'חביתה',
-  'תבשיל ביתי',
-  'מנה מהירה',
-  'מנה מהתנור',
-  'סלט טרי',
-  'מוקפץ ירקות',
-  'קארי ביתי',
-  'עוף בתנור',
-  'תבשיל בשר',
-  'סלט ירקות טרי',
-  'פסטה ביתית',
-  'פסטה מהירה',
-  'אורז מוקפץ',
-])
-
-const OMELETTE_FILLINGS = {
-  tomato: 'חביתת עגבניות',
-  spinach: 'חביתת תרד',
-  mushroom: 'חביתת פטריות',
-  cheese: 'חביתת גבינה',
-  onion: 'חביתת בצל',
-  pepper: 'חביתת פלפל',
-  potato: 'חביתת תפוחי אדמה',
-  broccoli: 'חביתת ברוקולי',
-  zucchini: 'חביתת קישואים',
-}
-
 function filterMainIngredients(ingredients = []) {
   return ingredients.filter((item) => {
     const canon = canonicalIngredient(item)
@@ -109,6 +79,12 @@ function toDisplayLabels(ingredients, language = 'he') {
     if (/[\u0590-\u05FF]/.test(item) && !/[a-z]/i.test(item)) return item.trim()
     return getIngredientLabel(item, language)
   })
+}
+
+function toMainCanon(ingredients) {
+  return filterMainIngredients(ingredients)
+    .map((item) => canonicalIngredient(item))
+    .filter(Boolean)
 }
 
 function hasDishNamePrefix(text) {
@@ -134,9 +110,6 @@ function detectDishPattern(mainCanon) {
   if (set.has('tomato') && (set.has('egg') || set.has('eggs'))) {
     return { type: 'tomatoEgg' }
   }
-  if (set.has('potato') && set.has('onion')) {
-    return { type: 'potatoOnion' }
-  }
   if (set.has('pasta')) return { type: 'pasta' }
   if (set.has('rice')) return { type: 'rice' }
   if ((set.has('egg') || set.has('eggs')) && mainCanon.length >= 2) return { type: 'omelette' }
@@ -145,7 +118,7 @@ function detectDishPattern(mainCanon) {
   if (set.has('lentils') || set.has('curry') || set.has('coconut milk')) return { type: 'curry' }
   if (set.has('chicken')) return { type: 'chicken' }
   if (set.has('beef') || set.has('steak') || set.has('lamb')) return { type: 'meat' }
-  if (mainCanon.some((item) => ['cucumber', 'tomato', 'avocado', 'chickpeas'].includes(item))) {
+  if (ingredientsSupportSaladTitle(mainCanon)) {
     return { type: 'salad' }
   }
 
@@ -156,13 +129,32 @@ function ingredientsSupportCurryTitle(mainCanon) {
   return mainCanon.some((item) => ['curry', 'lentils', 'coconut milk', 'coconut'].includes(item))
 }
 
-function buildTomatoEggTitle(cookingStyle, steps = []) {
+function ingredientsSupportSaladTitle(mainCanon) {
+  const set = new Set(mainCanon)
+  if (set.has('egg') || set.has('eggs')) return false
+  if (set.has('cucumber') || set.has('avocado') || set.has('chickpeas')) return true
+  return set.has('tomato') && set.has('cucumber')
+}
+
+function ingredientsSupportShakshukaTitle(mainCanon) {
+  const set = new Set(mainCanon)
+  return (
+    set.has('tomato') &&
+    (set.has('egg') || set.has('eggs')) &&
+    set.has('onion')
+  )
+}
+
+function buildTomatoEggTitle(mainCanon, cookingStyle, steps = []) {
   const stepsText = steps.join(' ')
-  if (/שקשוק|שקשק/i.test(stepsText) || cookingStyle === 'shakshuka') {
-    return cookingStyle === 'quick' ? 'שקשוקה מהירה' : 'שקשוקה'
+  if (
+    ingredientsSupportShakshukaTitle(mainCanon) ||
+    /שקשוק|שקשק/i.test(stepsText) ||
+    cookingStyle === 'shakshuka'
+  ) {
+    return 'שקשוקה מהירה'
   }
-  if (cookingStyle === 'quick') return 'שקשוקה מהירה'
-  return TOMATO_EGG_TITLES[Math.floor(Math.random() * TOMATO_EGG_TITLES.length)]
+  return 'חביתת עגבניות'
 }
 
 function buildPastaTitle(mainCanon, cookingStyle) {
@@ -174,54 +166,38 @@ function buildPastaTitle(mainCanon, cookingStyle) {
   return cookingStyle === 'quick' ? 'פסטה מהירה' : 'פסטה ביתית'
 }
 
-function buildOmeletteTitle(mainCanon, mainNames = []) {
-  for (const [key, title] of Object.entries(OMELETTE_FILLINGS)) {
-    if (mainCanon.includes(key)) return title
-  }
-
-  const extraName = mainNames.find((_, index) => {
-    const canon = mainCanon[index]
-    return canon && canon !== 'egg' && canon !== 'eggs'
-  })
-  if (extraName) return `חביתת ${extraName}`
-
+function buildOmeletteTitle(mainCanon) {
+  if (mainCanon.includes('tomato')) return 'חביתת עגבניות'
+  if (mainCanon.includes('spinach')) return 'חביתת תרד'
+  if (mainCanon.includes('mushroom')) return 'חביתת פטריות'
+  if (mainCanon.includes('cheese')) return 'חביתת גבינה'
   return 'חביתה'
 }
 
-function buildPotatoOnionTitle(cookingStyle) {
-  if (cookingStyle === 'baked') return 'תפוחי אדמה ובצל בתנור'
-  if (cookingStyle === 'stirFry') return 'תפוחי אדמה ובצל מוקפצים'
-  return 'תפוחי אדמה ובצל'
-}
-
-function isTooGenericTitle(title, ingredients = []) {
-  const text = String(title ?? '').trim()
-  if (!GENERIC_DISH_TITLES.has(text)) return false
-
-  const mainCanon = filterMainIngredients(ingredients)
-    .map((item) => canonicalIngredient(item))
-    .filter(Boolean)
-  const nonEgg = mainCanon.filter((item) => item !== 'egg' && item !== 'eggs')
-
-  return nonEgg.length >= 1
-}
-
-function buildGenericDishTitle(mainCanon, mainNames, cookingStyle, steps = []) {
+function buildGenericDishTitle(mainCanon, cookingStyle, steps = []) {
   if (mainCanon.includes('tomato') && (mainCanon.includes('egg') || mainCanon.includes('eggs'))) {
-    return buildTomatoEggTitle(cookingStyle, steps)
-  }
-  if (mainCanon.includes('potato') && mainCanon.includes('onion')) {
-    return buildPotatoOnionTitle(cookingStyle)
+    return buildTomatoEggTitle(mainCanon, cookingStyle, steps)
   }
   if (mainCanon.includes('egg') || mainCanon.includes('eggs')) {
-    return buildOmeletteTitle(mainCanon, mainNames)
+    return buildOmeletteTitle(mainCanon)
   }
   if (cookingStyle === 'stirFry') return 'מוקפץ ירקות'
   if (cookingStyle === 'stew') return 'תבשיל ביתי'
-  if (cookingStyle === 'salad') return 'סלט טרי'
+  if (cookingStyle === 'salad' && ingredientsSupportSaladTitle(mainCanon)) return 'סלט טרי'
   if (cookingStyle === 'baked') return 'מנה מהתנור'
   if (cookingStyle === 'quick') return 'מנה מהירה'
   return 'תבשיל ביתי'
+}
+
+function titleMatchesIngredients(title, ingredients = []) {
+  const text = String(title ?? '').trim()
+  const mainCanon = toMainCanon(ingredients)
+
+  if (/סלט/i.test(text) && !ingredientsSupportSaladTitle(mainCanon)) return false
+  if (/קארי|curry/i.test(text) && !ingredientsSupportCurryTitle(mainCanon)) return false
+  if (/שקשוק/i.test(text) && !ingredientsSupportShakshukaTitle(mainCanon)) return false
+
+  return true
 }
 
 /**
@@ -248,7 +224,7 @@ export function isLiteralIngredientTitle(title, ingredients = [], language = 'he
 }
 
 /**
- * Build a natural Hebrew dish name — never a raw ingredient list.
+ * Build a natural Hebrew dish name from the actual ingredients.
  */
 export function buildDescriptiveDishTitle(
   ingredients = [],
@@ -267,15 +243,13 @@ export function buildDescriptiveDishTitle(
 
   switch (pattern.type) {
     case 'tomatoEgg':
-      return buildTomatoEggTitle(cookingStyle, steps)
-    case 'potatoOnion':
-      return buildPotatoOnionTitle(cookingStyle)
+      return buildTomatoEggTitle(mainCanon, cookingStyle, steps)
     case 'pasta':
       return buildPastaTitle(mainCanon, cookingStyle)
     case 'rice':
       return mainCanon.includes('chicken') ? 'אורז עם עוף' : 'אורז מוקפץ'
     case 'omelette':
-      return buildOmeletteTitle(mainCanon, mainNames)
+      return buildOmeletteTitle(mainCanon)
     case 'tunaSalad':
       return 'סלט טונה וביצים'
     case 'curry':
@@ -294,7 +268,7 @@ export function buildDescriptiveDishTitle(
       break
   }
 
-  return buildGenericDishTitle(mainCanon, mainNames, cookingStyle, steps)
+  return buildGenericDishTitle(mainCanon, cookingStyle, steps)
 }
 
 export function isMoodBasedTitle(title) {
@@ -335,7 +309,7 @@ export function ensureDescriptiveDishTitle(title, ingredients = [], options = {}
   if (
     isMoodBasedTitle(title) ||
     isLiteralIngredientTitle(title, ingredients, language) ||
-    isTooGenericTitle(title, ingredients) ||
+    !titleMatchesIngredients(title, ingredients) ||
     !titleDescribesDish(title, ingredients, language)
   ) {
     return buildDescriptiveDishTitle(ingredients, options)

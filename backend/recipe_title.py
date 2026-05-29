@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import random
 import re
 
 from ingredient_relevance import canonical_ingredient, ingredient_appears_in_text
@@ -72,36 +71,6 @@ KNOWN_DISH_PREFIXES = [
     "קוביות",
 ]
 
-TOMATO_EGG_TITLES = ["חביתת עגבניות", "ביצה בעגבניות", "מקושקשת עגבניות"]
-
-GENERIC_DISH_TITLES = {
-    "חביתה",
-    "תבשיל ביתי",
-    "מנה מהירה",
-    "מנה מהתנור",
-    "סלט טרי",
-    "מוקפץ ירקות",
-    "קארי ביתי",
-    "עוף בתנור",
-    "תבשיל בשר",
-    "סלט ירקות טרי",
-    "פסטה ביתית",
-    "פסטה מהירה",
-    "אורז מוקפץ",
-}
-
-OMELETTE_FILLINGS = {
-    "tomato": "חביתת עגבניות",
-    "spinach": "חביתת תרד",
-    "mushroom": "חביתת פטריות",
-    "cheese": "חביתת גבינה",
-    "onion": "חביתת בצל",
-    "pepper": "חביתת פלפל",
-    "potato": "חביתת תפוחי אדמה",
-    "broccoli": "חביתת ברוקולי",
-    "zucchini": "חביתת קישואים",
-}
-
 HEBREW_LABELS: dict[str, str] = {
     "pasta": "פסטה",
     "cream": "שמנת מתוקה",
@@ -146,12 +115,30 @@ def _display_ingredient(item: str) -> str:
     return item.strip()
 
 
+def _main_canon(ingredients: list[str]) -> list[str]:
+    return [canonical_ingredient(item) or item for item in _filter_main_ingredients(ingredients)]
+
+
 def _has_dish_name_prefix(text: str) -> bool:
     return any(prefix in text for prefix in KNOWN_DISH_PREFIXES)
 
 
 def _ingredients_support_curry_title(main_canon: list[str]) -> bool:
     return any(item in {"curry", "lentils", "coconut milk", "coconut"} for item in main_canon)
+
+
+def _ingredients_support_salad_title(main_canon: list[str]) -> bool:
+    canon = set(main_canon)
+    if "egg" in canon or "eggs" in canon:
+        return False
+    if {"cucumber", "avocado", "chickpeas"} & canon:
+        return True
+    return "tomato" in canon and "cucumber" in canon
+
+
+def _ingredients_support_shakshuka_title(main_canon: list[str]) -> bool:
+    canon = set(main_canon)
+    return "tomato" in canon and ("egg" in canon or "eggs" in canon) and "onion" in canon
 
 
 def _infer_cooking_style(
@@ -180,8 +167,6 @@ def _detect_dish_pattern(main_canon: list[str]) -> str:
     canon = set(main_canon)
     if "tomato" in canon and ("egg" in canon or "eggs" in canon):
         return "tomatoEgg"
-    if "potato" in canon and "onion" in canon:
-        return "potatoOnion"
     if "pasta" in canon:
         return "pasta"
     if "rice" in canon:
@@ -198,18 +183,20 @@ def _detect_dish_pattern(main_canon: list[str]) -> str:
         return "chicken"
     if {"beef", "steak", "lamb"} & canon:
         return "meat"
-    if {"cucumber", "tomato", "avocado", "chickpeas"} & canon:
+    if _ingredients_support_salad_title(main_canon):
         return "salad"
     return "generic"
 
 
-def _build_tomato_egg_title(cooking_style: str | None, steps: list[str]) -> str:
+def _build_tomato_egg_title(main_canon: list[str], cooking_style: str | None, steps: list[str]) -> str:
     steps_text = " ".join(steps)
-    if re.search(r"שקשוק|שקשק", steps_text) or cooking_style == "shakshuka":
-        return "שקשוקה מהירה" if cooking_style == "quick" else "שקשוקה"
-    if cooking_style == "quick":
+    if (
+        _ingredients_support_shakshuka_title(main_canon)
+        or re.search(r"שקשוק|שקשק", steps_text)
+        or cooking_style == "shakshuka"
+    ):
         return "שקשוקה מהירה"
-    return random.choice(TOMATO_EGG_TITLES)
+    return "חביתת עגבניות"
 
 
 def _build_pasta_title(main_canon: list[str], cooking_style: str | None) -> str:
@@ -222,60 +209,48 @@ def _build_pasta_title(main_canon: list[str], cooking_style: str | None) -> str:
     return "פסטה מהירה" if cooking_style == "quick" else "פסטה ביתית"
 
 
-def _build_omelette_title(main_canon: list[str], main_names: list[str] | None = None) -> str:
-    main_names = main_names or []
-    for key, title in OMELETTE_FILLINGS.items():
-        if key in main_canon:
-            return title
-
-    for index, canon in enumerate(main_canon):
-        if canon and canon not in {"egg", "eggs"} and index < len(main_names):
-            return f"חביתת {main_names[index]}"
-
+def _build_omelette_title(main_canon: list[str]) -> str:
+    if "tomato" in main_canon:
+        return "חביתת עגבניות"
+    if "spinach" in main_canon:
+        return "חביתת תרד"
+    if "mushroom" in main_canon:
+        return "חביתת פטריות"
+    if "cheese" in main_canon:
+        return "חביתת גבינה"
     return "חביתה"
 
 
-def _build_potato_onion_title(cooking_style: str | None) -> str:
-    if cooking_style == "baked":
-        return "תפוחי אדמה ובצל בתנור"
-    if cooking_style == "stirFry":
-        return "תפוחי אדמה ובצל מוקפצים"
-    return "תפוחי אדמה ובצל"
-
-
-def _is_too_generic_title(title: str, ingredients: list[str]) -> bool:
-    text = (title or "").strip()
-    if text not in GENERIC_DISH_TITLES:
-        return False
-
-    main_canon = [canonical_ingredient(item) or item for item in _filter_main_ingredients(ingredients)]
-    non_egg = [item for item in main_canon if item not in {"egg", "eggs"}]
-    return len(non_egg) >= 1
-
-
-def _build_generic_dish_title(
-    main_canon: list[str],
-    main_names: list[str],
-    cooking_style: str | None,
-    steps: list[str],
-) -> str:
+def _build_generic_dish_title(main_canon: list[str], cooking_style: str | None, steps: list[str]) -> str:
     if "tomato" in main_canon and ("egg" in main_canon or "eggs" in main_canon):
-        return _build_tomato_egg_title(cooking_style, steps)
-    if "potato" in main_canon and "onion" in main_canon:
-        return _build_potato_onion_title(cooking_style)
+        return _build_tomato_egg_title(main_canon, cooking_style, steps)
     if "egg" in main_canon or "eggs" in main_canon:
-        return _build_omelette_title(main_canon, main_names)
+        return _build_omelette_title(main_canon)
     if cooking_style == "stirFry":
         return "מוקפץ ירקות"
     if cooking_style == "stew":
         return "תבשיל ביתי"
-    if cooking_style == "salad":
+    if cooking_style == "salad" and _ingredients_support_salad_title(main_canon):
         return "סלט טרי"
     if cooking_style == "baked":
         return "מנה מהתנור"
     if cooking_style == "quick":
         return "מנה מהירה"
     return "תבשיל ביתי"
+
+
+def _title_matches_ingredients(title: str, ingredients: list[str]) -> bool:
+    text = (title or "").strip()
+    main_canon = _main_canon(ingredients)
+
+    if re.search(r"סלט", text) and not _ingredients_support_salad_title(main_canon):
+        return False
+    if re.search(r"קארי|curry", text, re.IGNORECASE) and not _ingredients_support_curry_title(main_canon):
+        return False
+    if re.search(r"שקשוק", text) and not _ingredients_support_shakshuka_title(main_canon):
+        return False
+
+    return True
 
 
 def is_literal_ingredient_title(title: str, ingredients: list[str]) -> bool:
@@ -318,15 +293,13 @@ def build_descriptive_dish_title(
     pattern = _detect_dish_pattern(main_canon)
 
     if pattern == "tomatoEgg":
-        return _build_tomato_egg_title(cooking_style, steps)
-    if pattern == "potatoOnion":
-        return _build_potato_onion_title(cooking_style)
+        return _build_tomato_egg_title(main_canon, cooking_style, steps)
     if pattern == "pasta":
         return _build_pasta_title(main_canon, cooking_style)
     if pattern == "rice":
         return "אורז עם עוף" if "chicken" in main_canon else "אורז מוקפץ"
     if pattern == "omelette":
-        return _build_omelette_title(main_canon, main_names)
+        return _build_omelette_title(main_canon)
     if pattern == "tunaSalad":
         return "סלט טונה וביצים"
     if pattern == "curry" and _ingredients_support_curry_title(main_canon):
@@ -340,7 +313,7 @@ def build_descriptive_dish_title(
     if pattern == "salad":
         return "סלט ירקות טרי"
 
-    return _build_generic_dish_title(main_canon, main_names, cooking_style, steps)
+    return _build_generic_dish_title(main_canon, cooking_style, steps)
 
 
 def is_mood_based_title(title: str) -> bool:
@@ -355,7 +328,7 @@ def is_mood_based_title(title: str) -> bool:
 
 def title_describes_dish(title: str, ingredients: list[str]) -> bool:
     text = (title or "").strip()
-    if not text or is_mood_based_title(text) or is_literal_ingredient_title(text, ingredients):
+    if not text or is_mood_based_title(text) or is_literal_ingredient_title(title, ingredients):
         return False
 
     mains = _filter_main_ingredients(ingredients)
@@ -385,7 +358,7 @@ def ensure_descriptive_dish_title(
     if (
         is_mood_based_title(title)
         or is_literal_ingredient_title(title, ingredients)
-        or _is_too_generic_title(title, ingredients)
+        or not _title_matches_ingredients(title, ingredients)
         or not title_describes_dish(title, ingredients)
     ):
         return build_descriptive_dish_title(
