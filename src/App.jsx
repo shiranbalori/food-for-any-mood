@@ -82,7 +82,7 @@ export default function App() {
         )
       } catch (error) {
         console.error('[App] Recipe generation failed:', error)
-        setBackendNotice('unreachable')
+        setBackendNotice('error')
       } finally {
         setLoading(false)
       }
@@ -172,11 +172,15 @@ export default function App() {
 
         {loading && <LoadingAnimation theme={theme} />}
 
-        {backendNotice && !loading && (
-          <p className="app__backend-notice" role="status">
-            {backendNotice === 'gemini'
-              ? t('backendGeminiError')
-              : t('backendUnreachable')}
+        {backendNotice === 'fallback' && recipe && !loading && (
+          <p className="app__backend-notice app__backend-notice--info" role="status">
+            {t('backendFallbackNotice')}
+          </p>
+        )}
+
+        {backendNotice === 'error' && !recipe && !loading && (
+          <p className="app__backend-notice app__backend-notice--error" role="alert">
+            {t('backendUnreachable')}
           </p>
         )}
 

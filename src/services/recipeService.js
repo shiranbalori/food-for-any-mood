@@ -40,7 +40,7 @@ import { buildMockRecipe } from './mockRecipeProvider'
  *
  * @typedef {Object} AppRecipeResult
  * @property {object} recipe
- * @property {'unreachable' | 'gemini' | null} fallbackReason
+ * @property {'fallback' | null} fallbackReason
  */
 
 /** @deprecated Use RECIPE_GENERATION_MODE from config/recipeProvider.js */

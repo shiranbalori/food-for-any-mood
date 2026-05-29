@@ -6,7 +6,7 @@ import {
 import { buildIngredientFirstFallbackRecipe, buildMockRecipe } from './mockRecipeProvider'
 
 /**
- * @typedef {'unreachable' | 'gemini'} FallbackReason
+ * @typedef {'fallback'} FallbackReason
  *
  * @typedef {Object} AIRecipeUserInput
  * @property {string} category
@@ -318,7 +318,7 @@ export async function generateAIRecipe(userInput) {
     console.warn('[aiRecipeService] Backend unreachable — using local mock fallback')
     return {
       recipe: fetchMockFallbackRecipe(normalized),
-      fallbackReason: 'unreachable',
+      fallbackReason: 'fallback',
     }
   }
 
@@ -334,14 +334,14 @@ export async function generateAIRecipe(userInput) {
     console.warn('[aiRecipeService] Backend connected but Gemini failed:', geminiError)
     return {
       recipe,
-      fallbackReason: 'gemini',
+      fallbackReason: 'fallback',
     }
   } catch (error) {
     logFetchError('Generate-recipe failed after health check', error)
     console.warn('[aiRecipeService] Using local mock fallback after generate failure')
     return {
       recipe: fetchMockFallbackRecipe(normalized),
-      fallbackReason: 'unreachable',
+      fallbackReason: 'fallback',
     }
   }
 }

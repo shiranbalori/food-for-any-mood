@@ -45,12 +45,21 @@
   margin: 0 0 1rem;
   padding: 0.85rem 1rem;
   border-radius: var(--radius-sm);
-  background: rgba(217, 119, 6, 0.12);
-  border: 1px solid rgba(217, 119, 6, 0.28);
-  color: #92400e;
   font-size: 0.9rem;
   line-height: 1.55;
   text-align: start;
+}
+
+.app__backend-notice--info {
+  background: rgba(59, 130, 246, 0.08);
+  border: 1px solid rgba(59, 130, 246, 0.22);
+  color: #1e40af;
+}
+
+.app__backend-notice--error {
+  background: rgba(217, 119, 6, 0.12);
+  border: 1px solid rgba(217, 119, 6, 0.28);
+  color: #92400e;
 }
 
 html[dir='rtl'] .app__backend-notice {
