@@ -2,6 +2,7 @@ import { useState } from 'react'
 import PlaylistCard from './PlaylistCard'
 import SpiceLevel from './SpiceLevel'
 import ShoppingListModal from './ShoppingListModal'
+import MealPlanPickerModal from './MealPlanPickerModal'
 import { useLanguage } from '../i18n/useLanguage'
 import './RecipeCard.css'
 
@@ -72,9 +73,11 @@ export default function RecipeCard({
   recipeIdeas,
   ideasLoading,
   onLoadMoreIdeas,
+  onMealPlanUpdated,
 }) {
   const { t, dir, isRtl } = useLanguage()
   const [shoppingOpen, setShoppingOpen] = useState(false)
+  const [mealPlanOpen, setMealPlanOpen] = useState(false)
   const matchPercent = Math.min(100, Math.max(0, recipe.matchPercent ?? 0))
   const textDir = isRtl ? 'rtl' : dir
 
@@ -192,6 +195,13 @@ export default function RecipeCard({
         >
           {t('createShoppingList')}
         </button>
+        <button
+          type="button"
+          className="btn btn--secondary recipe-card__shopping-btn"
+          onClick={() => setMealPlanOpen(true)}
+        >
+          {t('addToWeeklyPlan')}
+        </button>
       </div>
 
       <div className="recipe-card__actions animate-in stagger-5">
@@ -258,6 +268,13 @@ export default function RecipeCard({
         recipeId={recipe.id}
         recipeName={recipe.name}
         ingredients={recipe.ingredients ?? []}
+      />
+
+      <MealPlanPickerModal
+        open={mealPlanOpen}
+        onClose={() => setMealPlanOpen(false)}
+        recipe={recipe}
+        onPlanUpdated={onMealPlanUpdated}
       />
     </article>
   )

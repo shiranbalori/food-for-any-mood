@@ -9,6 +9,7 @@ import LoadingAnimation from './components/LoadingAnimation'
 import RecipeCard from './components/RecipeCard'
 import SavedRecipes from './components/SavedRecipes'
 import FavoriteRecipes from './components/FavoriteRecipes'
+import WeeklyMealPlanner from './components/WeeklyMealPlanner'
 import { useLanguage } from './i18n/useLanguage'
 import { getTheme } from './utils/themes'
 import { generateAppRecipe } from './services/recipeService'
@@ -24,6 +25,11 @@ import {
   addFavoriteRecipe,
   removeFavoriteRecipe,
 } from './utils/favoritesStorage'
+import {
+  clearMealPlan,
+  getMealPlan,
+  removeRecipeFromMealPlan,
+} from './utils/mealPlannerStorage'
 import './App.css'
 
 const INITIAL_FORM = {
@@ -47,6 +53,7 @@ export default function App() {
   const [backendNotice, setBackendNotice] = useState(null)
   const [recipeIdeas, setRecipeIdeas] = useState(null)
   const [ideasLoading, setIdeasLoading] = useState(false)
+  const [mealPlan, setMealPlan] = useState(getMealPlan)
 
   const theme = getTheme(category)
   const isSaved = recipe ? savedRecipes.some((r) => r.id === recipe.id) : false
@@ -136,6 +143,18 @@ export default function App() {
   const handleRemoveFavorite = (id) => {
     const updated = removeFavoriteRecipe(id)
     setFavoriteRecipes(updated)
+  }
+
+  const handleMealPlanUpdated = (plan) => {
+    setMealPlan(plan)
+  }
+
+  const handleRemoveFromMealPlan = (day, mealType) => {
+    setMealPlan(removeRecipeFromMealPlan(day, mealType))
+  }
+
+  const handleClearMealPlan = () => {
+    setMealPlan(clearMealPlan())
   }
 
   const handleRegenerate = () => {
@@ -249,8 +268,16 @@ export default function App() {
             recipeIdeas={recipeIdeas}
             ideasLoading={ideasLoading}
             onLoadMoreIdeas={handleLoadMoreIdeas}
+            onMealPlanUpdated={handleMealPlanUpdated}
           />
         )}
+
+        <WeeklyMealPlanner
+          plan={mealPlan}
+          onRemoveSlot={handleRemoveFromMealPlan}
+          onClear={handleClearMealPlan}
+          onSelectRecipe={handleSelectSaved}
+        />
 
         <FavoriteRecipes
           recipes={favoriteRecipes}

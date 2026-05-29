@@ -355,6 +355,9 @@ html[dir='rtl'] .recipe-card__section ol li:hover {
   margin-top: 0.25rem;
   padding-top: 0.65rem;
   border-top: 1px solid rgba(148, 163, 184, 0.12);
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
 }
 
 .recipe-card__shopping-btn {
