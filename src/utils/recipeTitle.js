@@ -59,7 +59,6 @@ const KNOWN_DISH_PREFIXES = [
   'קציצ',
   'ריזוטו',
   'מוקפץ',
-  'תבשיל',
   'עוף',
   'בשר',
   'טונה',
@@ -67,23 +66,47 @@ const KNOWN_DISH_PREFIXES = [
   'קוביות',
 ]
 
+const GENERIC_DISH_TITLES = new Set([
+  'תבשיל ביתי',
+  'סלט ירקות טרי',
+  'סלט טרי',
+  'מנה מהירה',
+  'מנה מהתנור',
+  'מוקפץ ירקות',
+  'עוף בתנור',
+  'תבשיל בשר',
+  'קארי ביתי',
+  'פסטה ביתית',
+  'פסטה מהירה',
+  'אורז מוקפץ',
+])
+
+const QTY_PREFIX = /^[\d./]+\s*(?:כפית|כפיות|כף|כפות|גרם|מ"ל|כוס|כוסות|tsp|tbsp|gram|grams|g|ml|cup|cups)?\s*/i
+
+function stripQtyPrefix(raw) {
+  return String(raw ?? '')
+    .replace(QTY_PREFIX, '')
+    .trim()
+}
+
 function filterMainIngredients(ingredients = []) {
   return ingredients.filter((item) => {
-    const canon = canonicalIngredient(item)
+    const canon = canonicalIngredient(stripQtyPrefix(item))
     return !canon || !STAPLE_CANONICAL.has(canon)
   })
 }
 
 function toDisplayLabels(ingredients, language = 'he') {
   return filterMainIngredients(ingredients).map((item) => {
-    if (/[\u0590-\u05FF]/.test(item) && !/[a-z]/i.test(item)) return item.trim()
-    return getIngredientLabel(item, language)
+    const bare = stripQtyPrefix(item)
+    if (/[\u0590-\u05FF]/.test(bare) && !/[a-z]/i.test(bare)) return bare
+    return getIngredientLabel(bare, language)
   })
 }
 
 function toMainCanon(ingredients) {
   return filterMainIngredients(ingredients)
-    .map((item) => canonicalIngredient(item))
+    .map((item) => canonicalIngredient(stripQtyPrefix(item)))
     .filter(Boolean)
 }
 
@@ -111,8 +134,8 @@ function detectDishPattern(mainCanon) {
     return { type: 'tomatoEgg' }
   }
   if (set.has('pasta')) return { type: 'pasta' }
+  if (set.has('egg') || set.has('eggs')) return { type: 'omelette' }
   if (set.has('rice')) return { type: 'rice' }
-  if ((set.has('egg') || set.has('eggs')) && mainCanon.length >= 2) return { type: 'omelette' }
   if (set.has('tuna') && (set.has('egg') || set.has('eggs'))) return { type: 'tunaSalad' }
   if (set.has('tofu') || set.has('broccoli') || set.has('pepper')) return { type: 'stirFry' }
   if (set.has('lentils') || set.has('curry') || set.has('coconut milk')) return { type: 'curry' }
@@ -178,15 +201,23 @@ function buildGenericDishTitle(mainCanon, cookingStyle, steps = []) {
   if (mainCanon.includes('tomato') && (mainCanon.includes('egg') || mainCanon.includes('eggs'))) {
     return buildTomatoEggTitle(mainCanon, cookingStyle, steps)
   }
+  if (mainCanon.includes('pasta')) return buildPastaTitle(mainCanon, cookingStyle)
   if (mainCanon.includes('egg') || mainCanon.includes('eggs')) {
     return buildOmeletteTitle(mainCanon)
   }
+  if (mainCanon.includes('chicken')) return 'עוף בתנור'
+  if (mainCanon.includes('beef') || mainCanon.includes('steak') || mainCanon.includes('lamb')) {
+    return 'תבשיל בשר'
+  }
   if (cookingStyle === 'stirFry') return 'מוקפץ ירקות'
-  if (cookingStyle === 'stew') return 'תבשיל ביתי'
   if (cookingStyle === 'salad' && ingredientsSupportSaladTitle(mainCanon)) return 'סלט טרי'
-  if (cookingStyle === 'baked') return 'מנה מהתנור'
-  if (cookingStyle === 'quick') return 'מנה מהירה'
   return 'תבשיל ביתי'
+}
+
+function isGenericDishTitle(title, ingredients = []) {
+  const text = String(title ?? '').trim()
+  if (!GENERIC_DISH_TITLES.has(text)) return false
+  return toMainCanon(ingredients).length >= 1
 }
 
 function titleMatchesIngredients(title, ingredients = []) {
@@ -196,6 +227,7 @@ function titleMatchesIngredients(title, ingredients = []) {
   if (/סלט/i.test(text) && !ingredientsSupportSaladTitle(mainCanon)) return false
   if (/קארי|curry/i.test(text) && !ingredientsSupportCurryTitle(mainCanon)) return false
   if (/שקשוק/i.test(text) && !ingredientsSupportShakshukaTitle(mainCanon)) return false
+  if (isGenericDishTitle(text, ingredients)) return false
 
   return true
 }
@@ -237,7 +269,9 @@ export function buildDescriptiveDishTitle(
   } = {},
 ) {
   const mainNames = [...new Set(toDisplayLabels(ingredients, language))].slice(0, 4)
-  const mainCanon = mainNames.map((name) => canonicalIngredient(name)).filter(Boolean)
+  const mainCanon = mainNames
+    .map((name) => canonicalIngredient(stripQtyPrefix(name)))
+    .filter(Boolean)
   const cookingStyle = inferCookingStyle({ cookingTime, steps, style, tags })
   const pattern = detectDishPattern(mainCanon)
 
@@ -294,6 +328,10 @@ export function titleDescribesDish(title, ingredients = [], language = 'he') {
     return false
   }
 
+  if (isGenericDishTitle(text, ingredients)) {
+    return false
+  }
+
   if (hasDishNamePrefix(text)) return true
 
   if (mains.some((item) => ingredientAppearsInText(item, text))) {
@@ -309,6 +347,7 @@ export function ensureDescriptiveDishTitle(title, ingredients = [], options = {}
   if (
     isMoodBasedTitle(title) ||
     isLiteralIngredientTitle(title, ingredients, language) ||
+    isGenericDishTitle(title, ingredients) ||
     !titleMatchesIngredients(title, ingredients) ||
     !titleDescribesDish(title, ingredients, language)
   ) {

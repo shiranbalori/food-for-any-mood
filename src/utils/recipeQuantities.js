@@ -5,6 +5,25 @@ export const DEFAULT_SERVINGS = 2
 
 const PANTRY_SUFFIX = /\s*\([^)]*\)\s*$/
 
+const STAPLE_PROFILE_KEYS = {
+  salt: 'salt',
+  מלח: 'salt',
+  pepper: 'black pepper',
+  'black pepper': 'black pepper',
+  'פלפל שחור': 'black pepper',
+  'olive oil': 'olive oil',
+  'שמן זית': 'olive oil',
+  olive: 'olive oil',
+  oil: 'olive oil',
+  egg: 'egg',
+  eggs: 'eggs',
+  ביצה: 'egg',
+  ביצים: 'eggs',
+}
+
+const MEASURED_UNIT_PATTERN =
+  /(?:כפית|כפיות|כף|כפות|גרם|מ"ל|כוס|כוסות|\btsp\b|\btbsp\b|\bgram\b|\bgrams\b|\bg\b|\bml\b|\bcup\b|\bcups\b)/i
+
 const UNIT_LABELS = {
   he: { tsp: 'כפית', tbsp: 'כף', gram: 'גרם', ml: 'מ"ל', cup: 'כוס' },
   en: { tsp: 'tsp', tbsp: 'tbsp', gram: 'gram', ml: 'ml', cup: 'cup' },
@@ -179,30 +198,64 @@ function stripQuantity(raw) {
   return { name: withoutQty, canonical: canonicalIngredient(withoutQty) }
 }
 
-function resolveProfile(canon, name, language) {
-  const normalizedName = normalizeIngredient(name)
+function resolveProfileKey(canon, name) {
+  const normalized = normalizeIngredient(name)
+  const normalizedCanon = canon ? normalizeIngredient(canon) : ''
+
+  for (const [alias, key] of Object.entries(STAPLE_PROFILE_KEYS)) {
+    const aliasNorm = normalizeIngredient(alias)
+    if (normalized === aliasNorm || normalized.includes(aliasNorm)) return key
+    if (normalizedCanon === aliasNorm) return key
+  }
+
   if (
-    (canon === 'pepper' || normalizedName.includes('שחור') || normalizedName.includes('black pepper')) &&
-    !normalizedName.includes('גמבה') &&
-    !normalizedName.includes('bell')
+    (canon === 'pepper' || normalized.includes('שחור') || normalized.includes('black pepper')) &&
+    !normalized.includes('גמבה') &&
+    !normalized.includes('bell')
   ) {
-    return { ...QUANTITY_PROFILES['black pepper'], canon: 'black pepper' }
+    return 'black pepper'
   }
-  if (canon === 'pepper') {
-    return { ...QUANTITY_PROFILES['bell pepper'], canon: 'bell pepper' }
+  if (canon === 'pepper') return 'bell pepper'
+  if (canon && QUANTITY_PROFILES[canon]) return canon
+
+  const label = getIngredientLabel(canon ?? name, 'he')
+  const labelNorm = normalizeIngredient(label)
+  for (const [alias, key] of Object.entries(STAPLE_PROFILE_KEYS)) {
+    if (labelNorm === normalizeIngredient(alias)) return key
   }
-  if (canon && QUANTITY_PROFILES[canon]) {
-    return { ...QUANTITY_PROFILES[canon], canon }
+
+  return canon ?? normalized.split(/\s+/)[0]
+}
+
+function resolveProfile(canon, name, language) {
+  const profileKey = resolveProfileKey(canon, name)
+  if (profileKey && QUANTITY_PROFILES[profileKey]) {
+    return { ...QUANTITY_PROFILES[profileKey], canon: profileKey }
   }
-  const label = getIngredientLabel(canon ?? '', language)
+  const label = getIngredientLabel(profileKey ?? canon ?? name, language)
   return {
     unit: 'whole',
     base: 1,
     perServing: true,
     wholeSingular: label,
     wholePlural: label,
-    canon: canon ?? label,
+    canon: profileKey ?? canon ?? label,
   }
+}
+
+/**
+ * A measured ingredient must include its unit word; whole items must not look like "2 מלח".
+ */
+export function isValidQuantifiedDisplay(display, unit) {
+  const text = String(display ?? '').trim()
+  if (!text) return false
+
+  if (unit === 'whole') {
+    if (MEASURED_UNIT_PATTERN.test(text)) return false
+    return /^\d+(?:\s+\d+\/\d+)?\s+\S/.test(text)
+  }
+
+  return MEASURED_UNIT_PATTERN.test(text)
 }
 
 function formatWholeDisplay(amount, profile, language) {
@@ -255,13 +308,17 @@ export function quantifyIngredient(raw, servings = DEFAULT_SERVINGS, language = 
   const { name, canonical: canon } = stripQuantity(raw)
   const profile = resolveProfile(canon, name, language)
   const amount = computeAmount(profile, servings)
-  const display = formatQuantifiedItem(canon, name, amount, profile, language)
+  const displayName = getIngredientLabel(profile.canon, language) || name
+  const display =
+    profile.unit === 'whole'
+      ? formatWholeDisplay(amount, { ...profile, canon: profile.canon }, language)
+      : formatMeasuredDisplay(amount, profile.unit, displayName, language)
   const stepPhrase = display
 
   return {
     raw,
-    canon: canon ?? normalizeIngredient(name),
-    name: getIngredientLabel(canon ?? name, language) || name,
+    canon: profile.canon,
+    name: displayName,
     amount,
     unit: profile.unit,
     display: pantryNote ? `${display} ${pantryNote}` : display,
@@ -324,7 +381,13 @@ export function applyRecipeQuantities(recipe, options = {}) {
   const language = options.language ?? 'he'
   const servings = recipe.nutrition?.servings ?? options.servings ?? DEFAULT_SERVINGS
   const ingredients = Array.isArray(recipe.ingredients) ? recipe.ingredients : []
-  const quantifiedItems = ingredients.map((entry) => quantifyIngredient(entry, servings, language))
+  let quantifiedItems = ingredients.map((entry) => quantifyIngredient(entry, servings, language))
+
+  quantifiedItems = quantifiedItems.map((item) => {
+    if (isValidQuantifiedDisplay(item.display, item.unit)) return item
+    const bare = stripQuantity(item.raw).name
+    return quantifyIngredient(bare, servings, language)
+  })
   const nextIngredients = quantifiedItems.map((item) => item.display)
   const nextSteps = syncStepsWithQuantities(recipe.steps ?? [], quantifiedItems)
   const nutrition = computeNutritionFromQuantities(quantifiedItems, servings)

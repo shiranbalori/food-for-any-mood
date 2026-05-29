@@ -13,6 +13,27 @@ QTY_PREFIX = re.compile(
     re.IGNORECASE,
 )
 
+STAPLE_PROFILE_KEYS = {
+    "salt": "salt",
+    "מלח": "salt",
+    "pepper": "black pepper",
+    "black pepper": "black pepper",
+    "פלפל שחור": "black pepper",
+    "olive oil": "olive oil",
+    "שמן זית": "olive oil",
+    "olive": "olive oil",
+    "oil": "olive oil",
+    "egg": "egg",
+    "eggs": "eggs",
+    "ביצה": "egg",
+    "ביצים": "eggs",
+}
+
+MEASURED_UNIT_PATTERN = re.compile(
+    r"(?:כפית|כפיות|כף|כפות|גרם|מ\"ל|כוס|כוסות|\btsp\b|\btbsp\b|\bgram\b|\bgrams\b|\bg\b|\bml\b|\bcup\b|\bcups\b)",
+    re.IGNORECASE,
+)
+
 UNIT_LABELS = {
     "he": {"tsp": "כפית", "tbsp": "כף", "gram": "גרם", "ml": "מ\"ל", "cup": "כוס"},
     "en": {"tsp": "tsp", "tbsp": "tbsp", "gram": "gram", "ml": "ml", "cup": "cup"},
@@ -186,27 +207,61 @@ def _strip_quantity(raw: str) -> tuple[str, str | None]:
     return without_qty, canonical_ingredient(without_qty)
 
 
-def _resolve_profile(canon: str | None, name: str) -> dict:
-    normalized_name = normalize_ingredient(name)
+def _resolve_profile_key(canon: str | None, name: str) -> str:
+    normalized = normalize_ingredient(name)
+    normalized_canon = normalize_ingredient(canon or "")
+
+    for alias, key in STAPLE_PROFILE_KEYS.items():
+        alias_norm = normalize_ingredient(alias)
+        if normalized == alias_norm or alias_norm in normalized:
+            return key
+        if normalized_canon == alias_norm:
+            return key
+
     if (
-        (canon == "pepper" or "שחור" in normalized_name or "black pepper" in normalized_name)
-        and "גמבה" not in normalized_name
-        and "bell" not in normalized_name
+        (canon == "pepper" or "שחור" in normalized or "black pepper" in normalized)
+        and "גמבה" not in normalized
+        and "bell" not in normalized
     ):
-        return {**QUANTITY_PROFILES["black pepper"], "canon": "black pepper"}
+        return "black pepper"
     if canon == "pepper":
-        return {**QUANTITY_PROFILES["bell pepper"], "canon": "bell pepper"}
+        return "bell pepper"
     if canon and canon in QUANTITY_PROFILES:
-        return {**QUANTITY_PROFILES[canon], "canon": canon}
+        return canon
+
     label = HEBREW_LABELS.get(canon or "", name)
+    label_norm = normalize_ingredient(label)
+    for alias, key in STAPLE_PROFILE_KEYS.items():
+        if label_norm == normalize_ingredient(alias):
+            return key
+
+    return canon or normalized.split()[0] if normalized else name
+
+
+def _resolve_profile(canon: str | None, name: str) -> dict:
+    profile_key = _resolve_profile_key(canon, name)
+    if profile_key in QUANTITY_PROFILES:
+        return {**QUANTITY_PROFILES[profile_key], "canon": profile_key}
+    label = HEBREW_LABELS.get(profile_key, name)
     return {
         "unit": "whole",
         "base": 1,
         "per_serving": True,
         "singular": label,
         "plural": label,
-        "canon": canon or name,
+        "canon": profile_key,
     }
+
+
+def is_valid_quantified_display(display: str, unit: str) -> bool:
+    text = (display or "").strip()
+    if not text:
+        return False
+    if unit == "whole":
+        if MEASURED_UNIT_PATTERN.search(text):
+            return False
+        return bool(re.match(r"^\d+(?:\s+\d+/\d+)?\s+\S", text))
+    return bool(MEASURED_UNIT_PATTERN.search(text))
 
 
 def _compute_amount(profile: dict, servings: int, base_servings: int = DEFAULT_SERVINGS) -> float:
@@ -311,6 +366,12 @@ def apply_recipe_quantities(recipe: dict, *, language: str = "he", servings: int
     current_servings = servings or (recipe.get("nutrition") or {}).get("servings") or DEFAULT_SERVINGS
     ingredients = recipe.get("ingredients") or []
     quantified_items = [quantify_ingredient(entry, current_servings, language) for entry in ingredients]
+    quantified_items = [
+        item
+        if is_valid_quantified_display(item["display"], item["unit"])
+        else quantify_ingredient(_strip_quantity(item["raw"])[0], current_servings, language)
+        for item in quantified_items
+    ]
     next_ingredients = [item["display"] for item in quantified_items]
     next_steps = sync_steps_with_quantities(recipe.get("steps") or [], quantified_items)
     nutrition = compute_nutrition_from_quantities(quantified_items, current_servings)
