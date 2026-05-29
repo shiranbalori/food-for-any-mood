@@ -1,6 +1,37 @@
 export const translations = {
   he: {
     badge: '✨ בישול לפי מצב רוח',
+    heroSubtitle: 'הפוך את מה שיש במטבח לארוחה מושלמת בעזרת AI',
+    heroDescription:
+      'קבל מתכונים מותאמים אישית לפי מצב הרוח, זמן ההכנה והמרכיבים שיש לך בבית.',
+    heroCta: '🚀 התחל לבשל',
+    featuresTitle: 'הכל במקום אחד',
+    features: {
+      aiRecipes: {
+        title: 'AI Recipe Generation',
+        desc: 'מתכונים חכמים בעברית — מותאמים למרכיבים, למצב רוח ולזמן שלך.',
+      },
+      nutritionCoach: {
+        title: 'Nutrition Coach',
+        desc: 'ניתוח תזונתי, ציון בריאות וטיפים מעשיים לכל מנה.',
+      },
+      shoppingList: {
+        title: 'Shopping List',
+        desc: 'רשימת קניות אינטראקטיבית עם סימון וי והעתקה מהירה.',
+      },
+      weeklyPlanner: {
+        title: 'Weekly Meal Planner',
+        desc: 'תכנון שבועי לפי יום וסוג ארוחה — בוקר, צהריים וערב.',
+      },
+      spotifyMood: {
+        title: 'Spotify Mood Matching',
+        desc: 'פלייליסט מוזיקה שמתאים למצב הרוח ולסגנון הבישול.',
+      },
+      imageUpload: {
+        title: 'Ingredient Image Upload',
+        desc: 'העלאת תמונת מצרכים וזיהוי מרכיבים אוטומטי בעברית.',
+      },
+    },
     subtitle:
       'ספרו לנו מה יש במטבח, כמה זמן יש לכם, ואנחנו נבשל לכם את הווייב.',
     chooseCategory: 'בחרו קטגוריה',
@@ -151,6 +182,37 @@ export const translations = {
   },
   en: {
     badge: '✨ Mood-Based Cooking',
+    heroSubtitle: 'Turn what’s in your kitchen into the perfect meal with AI',
+    heroDescription:
+      'Get personalized recipes based on your mood, cooking time, and the ingredients you have at home.',
+    heroCta: '🚀 Start cooking',
+    featuresTitle: 'Everything in one place',
+    features: {
+      aiRecipes: {
+        title: 'AI Recipe Generation',
+        desc: 'Smart Hebrew recipes tailored to your ingredients, mood, and time.',
+      },
+      nutritionCoach: {
+        title: 'Nutrition Coach',
+        desc: 'Nutrition analysis, health score, and practical tips for every dish.',
+      },
+      shoppingList: {
+        title: 'Shopping List',
+        desc: 'Interactive checklist with check-offs and one-tap copy.',
+      },
+      weeklyPlanner: {
+        title: 'Weekly Meal Planner',
+        desc: 'Plan your week by day and meal — breakfast, lunch, and dinner.',
+      },
+      spotifyMood: {
+        title: 'Spotify Mood Matching',
+        desc: 'Music playlists matched to your mood and cooking vibe.',
+      },
+      imageUpload: {
+        title: 'Ingredient Image Upload',
+        desc: 'Upload a photo and auto-detect ingredients in Hebrew.',
+      },
+    },
     subtitle:
       "Tell us what you have, how you feel, and how much time you've got — we'll craft the perfect recipe.",
     chooseCategory: 'Choose your category',

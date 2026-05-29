@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react'
 import BackgroundDecor from './components/BackgroundDecor'
-import Header from './components/Header'
+import HeroSection from './components/HeroSection'
+import FeatureCards from './components/FeatureCards'
 import CategorySelector from './components/CategorySelector'
 import DietaryPreferences from './components/DietaryPreferences'
 import MusicPlatformSelector from './components/MusicPlatformSelector'
@@ -200,6 +201,13 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
+  const handleStartCooking = () => {
+    document.getElementById('recipe-generator')?.scrollIntoView({
+      behavior: 'smooth',
+      block: 'start',
+    })
+  }
+
   return (
     <div
       className={`app ${loading ? 'app--loading' : ''}`}
@@ -215,8 +223,10 @@ export default function App() {
       <div className="app__bg" />
 
       <main className="app__main">
-        <Header />
+        <HeroSection onStartCooking={handleStartCooking} />
+        <FeatureCards />
 
+        <section id="recipe-generator" className="app__generator">
         <CategorySelector selected={category} onSelect={setCategory} />
 
         <DietaryPreferences
@@ -271,6 +281,7 @@ export default function App() {
             onMealPlanUpdated={handleMealPlanUpdated}
           />
         )}
+        </section>
 
         <WeeklyMealPlanner
           plan={mealPlan}

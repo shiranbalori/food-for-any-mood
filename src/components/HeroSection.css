@@ -1,0 +1,102 @@
+.hero {
+  text-align: center;
+  margin-bottom: calc(var(--space-section) + 0.25rem);
+  animation: fadeInUp 0.7s var(--ease-spring) both;
+}
+
+.hero__top {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 0.5rem;
+}
+
+html[dir='rtl'] .hero__top {
+  justify-content: flex-start;
+}
+
+.hero__content {
+  padding: 1.5rem 1.25rem 2rem;
+  border-radius: var(--radius);
+  background: var(--surface);
+  backdrop-filter: blur(24px) saturate(1.4);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--shadow-hero);
+}
+
+.hero__brand {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.85rem;
+  margin-bottom: 1.15rem;
+}
+
+.hero__logo {
+  width: 4.5rem;
+  height: 4.5rem;
+  animation: fadeInScale 0.8s 0.08s var(--ease-spring) both;
+}
+
+.hero__logo-svg {
+  width: 100%;
+  height: 100%;
+  filter: drop-shadow(0 8px 20px rgba(99, 102, 241, 0.25));
+}
+
+.hero__title {
+  font-family: var(--font-brand);
+  font-size: clamp(1.9rem, 6.5vw, 3.15rem);
+  font-weight: 800;
+  letter-spacing: -0.035em;
+  line-height: 1.08;
+  direction: ltr;
+  unicode-bidi: isolate;
+  animation: fadeInUp 0.7s 0.12s var(--ease-spring) both;
+}
+
+.hero__highlight {
+  background: var(--theme-gradient, linear-gradient(135deg, #818cf8, #6366f1));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.hero__subtitle {
+  font-size: clamp(1.05rem, 3vw, 1.25rem);
+  font-weight: 700;
+  line-height: 1.45;
+  margin: 0 auto 0.75rem;
+  max-width: 34rem;
+  color: var(--text);
+  animation: fadeInUp 0.7s 0.18s var(--ease-spring) both;
+}
+
+.hero__description {
+  font-size: clamp(0.92rem, 2.4vw, 1.02rem);
+  line-height: 1.75;
+  color: var(--text-muted);
+  max-width: 32rem;
+  margin: 0 auto 1.5rem;
+  animation: fadeInUp 0.7s 0.24s var(--ease-spring) both;
+}
+
+.hero__cta {
+  width: 100%;
+  max-width: 18rem;
+  margin: 0 auto;
+  padding: 1rem 1.75rem;
+  font-size: 1rem;
+  border-radius: 999px;
+  animation: fadeInUp 0.7s 0.3s var(--ease-spring) both;
+}
+
+@media (min-width: 640px) {
+  .hero__content {
+    padding: 2rem 2.25rem 2.35rem;
+  }
+
+  .hero__cta {
+    width: auto;
+    min-width: 14rem;
+  }
+}

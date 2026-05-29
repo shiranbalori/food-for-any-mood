@@ -13,16 +13,19 @@
   --font-brand: 'Outfit', system-ui, sans-serif;
   --text: #0f172a;
   --text-muted: #64748b;
-  --surface: rgba(255, 255, 255, 0.72);
-  --surface-solid: rgba(255, 255, 255, 0.95);
-  --glass-border: rgba(255, 255, 255, 0.75);
-  --radius: 24px;
-  --radius-sm: 14px;
-  --radius-xs: 10px;
+  --surface: rgba(255, 255, 255, 0.78);
+  --surface-solid: rgba(255, 255, 255, 0.96);
+  --glass-border: rgba(255, 255, 255, 0.82);
+  --radius: 22px;
+  --radius-sm: 16px;
+  --radius-xs: 12px;
   --transition: 0.35s cubic-bezier(0.4, 0, 0.2, 1);
   --ease-spring: 0.55s cubic-bezier(0.34, 1.4, 0.64, 1);
-  --space-section: 2rem;
-  --space-card: 1.75rem;
+  --space-section: 2.25rem;
+  --space-card: 1.85rem;
+  --shadow-hero: 0 20px 50px rgba(15, 23, 42, 0.08), 0 4px 16px rgba(99, 102, 241, 0.06);
+  --shadow-card: 0 6px 24px rgba(15, 23, 42, 0.05);
+  --shadow-card-hover: 0 16px 40px rgba(15, 23, 42, 0.09), 0 0 0 1px rgba(99, 102, 241, 0.06);
 }
 
 html {
@@ -42,7 +45,10 @@ html[dir='ltr'] {
 body {
   font-family: var(--font);
   color: var(--text);
-  background: #f8fafc;
+  background:
+    radial-gradient(ellipse 80% 50% at 50% -10%, rgba(129, 140, 248, 0.12), transparent),
+    radial-gradient(ellipse 60% 40% at 100% 50%, rgba(251, 191, 36, 0.06), transparent),
+    linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
   line-height: 1.65;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
