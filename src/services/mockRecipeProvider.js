@@ -19,6 +19,7 @@ import {
   parseUserIngredients,
   validateRecipeRelevance,
 } from '../utils/ingredientRelevance'
+import { applyRecipeIngredientParser } from '../utils/recipeIngredientParser'
 import {
   canonicalIngredient,
   getIngredientNutrition,
@@ -538,6 +539,11 @@ function hasUnusualIngredientCombo(userIngredients) {
   return (hasSweet && hasProtein) || userIngredients.length >= 4
 }
 
+function finalizeRecipe(recipe, ingredientsRaw, language) {
+  const { recipe: parsed } = applyRecipeIngredientParser(recipe, ingredientsRaw, language)
+  return parsed
+}
+
 /**
  * Ingredient-first fallback when template/Gemini output fails relevance checks.
  */
@@ -643,7 +649,10 @@ export function buildIngredientFirstFallbackRecipe(
     cookTime: cookingTime,
   }
 
-  return { recipe, meta }
+  return {
+    recipe: finalizeRecipe(recipe, ingredients, language),
+    meta,
+  }
 }
 
 /**
@@ -781,5 +790,8 @@ export function buildMockRecipe(
     cookTime,
   }
 
-  return { recipe, meta }
+  return {
+    recipe: finalizeRecipe(recipe, ingredients, language),
+    meta,
+  }
 }

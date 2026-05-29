@@ -1,5 +1,8 @@
 import { API_BASE_URL, GENERATE_RECIPE_URL, HEALTH_URL } from '../config/api'
-import { parseUserIngredients, validateRecipeRelevance } from '../utils/ingredientRelevance'
+import { parseUserIngredients } from '../utils/ingredientRelevance'
+import {
+  applyRecipeIngredientParser,
+} from '../utils/recipeIngredientParser'
 import { buildIngredientFirstFallbackRecipe, buildMockRecipe } from './mockRecipeProvider'
 
 /**
@@ -215,20 +218,28 @@ async function fetchRecipeFromBackend(payload) {
 }
 
 /**
- * Ensure backend/Gemini recipes honor user ingredients when provided.
+ * Parse Hebrew ingredients, validate quality, and fall back if needed.
  *
  * @param {ReturnType<typeof normalizeUserInput>} userInput
  * @param {import('./recipeService').GeneratedRecipe} recipe
  */
-function ensureRecipeRelevance(userInput, recipe) {
-  const rawUserList = parseUserIngredients(userInput.ingredients)
-  if (!rawUserList.length) return recipe
+function processGeneratedRecipe(userInput, recipe) {
+  const { recipe: parsed, validation } = applyRecipeIngredientParser(
+    recipe,
+    userInput.ingredients,
+    userInput.language,
+  )
 
-  const validation = validateRecipeRelevance(rawUserList, recipe)
-  if (validation.ok) return recipe
+  if (validation.ok) return parsed
+
+  const rawUserList = parseUserIngredients(userInput.ingredients)
+  if (!rawUserList.length) {
+    console.warn('[aiRecipeService] Recipe quality check failed (no user ingredients):', validation)
+    return parsed
+  }
 
   console.warn(
-    '[aiRecipeService] Recipe failed ingredient relevance check — using ingredient fallback',
+    '[aiRecipeService] Recipe failed ingredient/quality checks — using ingredient fallback',
     validation,
   )
 
@@ -244,11 +255,17 @@ function ensureRecipeRelevance(userInput, recipe) {
     {
       language: userInput.language,
       pantrySuffix: userInput.pantrySuffix,
-      validation,
+      validation: validation.relevance ?? validation,
     },
   )
 
-  return fallback
+  const { recipe: normalizedFallback } = applyRecipeIngredientParser(
+    fallback,
+    userInput.ingredients,
+    userInput.language,
+  )
+
+  return normalizedFallback
 }
 
 /**
@@ -298,7 +315,7 @@ export async function generateAIRecipe(userInput) {
 
   try {
     const { recipe: backendRecipe, source, geminiError } = await fetchRecipeFromBackend(payload)
-    const recipe = ensureRecipeRelevance(normalized, backendRecipe)
+    const recipe = processGeneratedRecipe(normalized, backendRecipe)
 
     if (source === 'gemini') {
       console.log('[aiRecipeService] Recipe generated successfully via Gemini')

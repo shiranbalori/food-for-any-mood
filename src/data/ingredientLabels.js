@@ -1,7 +1,6 @@
-import { canonicalIngredient } from './ingredientKnowledge'
+import { canonicalIngredient, INGREDIENT_SYNONYMS, normalizeIngredient } from './ingredientKnowledge'
 
-const LABELS = {
-  he: {
+export const INGREDIENT_LABELS_HE = {
     pasta: 'פסטה',
     'pasta shells': 'קונכיות פסטה',
     'gluten-free pasta': 'פסטה ללא גלוטן',
@@ -18,6 +17,19 @@ const LABELS = {
     pepper: 'פלפל שחור',
     'black pepper': 'פלפל שחור',
     'olive oil': 'שמן זית',
+    olive: 'שמן זית',
+    olives: 'זיתים',
+    water: 'מים',
+    basil: 'בזיליקום',
+    paprika: 'פפריקה',
+    cinnamon: 'קינמון',
+    oregano: 'אורגנו',
+    thyme: 'טימין',
+    vinegar: 'חומץ',
+    wine: 'יין',
+    stock: 'ציר',
+    vegetable: 'ירק',
+    vegetables: 'ירקות',
     eggs: 'ביצים',
     egg: 'ביצה',
     cheese: 'גבינה',
@@ -108,8 +120,36 @@ const LABELS = {
     salmon: 'סלמון',
     tuna: 'טונה',
     hummus: 'חומוס',
-  },
+}
+
+const LABELS = {
+  he: INGREDIENT_LABELS_HE,
   en: {},
+}
+
+function findHebrewSynonym(name) {
+  const normalized = normalizeIngredient(name)
+  if (!normalized) return null
+
+  for (const [canonical, aliases] of Object.entries(INGREDIENT_SYNONYMS)) {
+    const terms = [canonical, ...aliases].map(normalizeIngredient)
+    const hit = terms.some(
+      (term) =>
+        term &&
+        (normalized === term ||
+          normalized.includes(term) ||
+          term.includes(normalized)),
+    )
+    if (!hit) continue
+
+    const label = INGREDIENT_LABELS_HE[canonical]
+    if (label) return label
+
+    const hebrewAlias = aliases.find((alias) => /[\u0590-\u05FF]/.test(alias))
+    if (hebrewAlias) return hebrewAlias.trim()
+  }
+
+  return null
 }
 
 function capitalizeEn(str) {
@@ -125,8 +165,10 @@ export function getIngredientLabel(name, language = 'he') {
   if (lang === 'he') {
     const direct = LABELS.he[normalized] ?? LABELS.he[canonical]
     if (direct) return direct
-    if (/[\u0590-\u05FF]/.test(name)) return name.trim()
-    return capitalizeEn(canonical.replace(/_/g, ' '))
+    if (/[\u0590-\u05FF]/.test(name) && !/[a-z]/i.test(name)) return name.trim()
+    const fromSynonym = findHebrewSynonym(name)
+    if (fromSynonym) return fromSynonym
+    return findHebrewSynonym(canonical) ?? name.trim()
   }
 
   return capitalizeEn((canonical || normalized).replace(/_/g, ' '))

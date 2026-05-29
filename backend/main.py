@@ -31,6 +31,10 @@ from ingredient_relevance import (
     parse_user_ingredients,
     validate_recipe_relevance,
 )
+from recipe_ingredient_parser import (
+    apply_recipe_ingredient_parser,
+    is_recipe_acceptable,
+)
 from pydantic import BaseModel, Field, ValidationError
 
 load_dotenv()
@@ -353,6 +357,9 @@ def _build_gemini_prompt(payload: GenerateRecipeRequest, *, strict: bool = False
 - אל תציע מנה גנרית לפי קטגוריה/מצב רוח בלבד — המרכיבים הם הבסיס למנה.
 - אם השילוב לא מתאים לחלוטין, הסבר בקצרה בתיאור והשתמש ברוב המרכיבים האפשריים.
 - מרכיבים שלא בשימוש — אל תכלול אותם ברשימה; הסבר בתיאור אם נאלצת לוותר על חלקם.
+- כל שמות המרכיבים חייבים להיות בעברית בלבד (למשל "שמן זית" ולא "Olive" או "Olive oil").
+- כל מרכיב ברשימה חייב להופיע במפורש באחד משלבי ההכנה.
+- הפרד מרכיבים לפריטים נפרדים — אל תמזג כמה מרכיבים לשורה אחת.
 """
 
     return f"""אתה שף ישראלי שמייצר מתכונים לאפליקציה FOOD FOR ANY MOOD.
@@ -368,6 +375,7 @@ def _build_gemini_prompt(payload: GenerateRecipeRequest, *, strict: bool = False
 {ingredient_rules}
 כללי תוכן:
 - כל טקסט המתכון חייב להיות בעברית.
+- שמות המרכיבים בשלבים וברשימה — בעברית בלבד, ללא מילים באנגלית.
 - שם האפליקציה FOOD FOR ANY MOOD נשאר באנגלית — אל תתרגם אותו.
 - התאם את המנה לקטגוריה, למצב הרוח ולזמן ההכנה — אך כשיש מרכיבים, הם קודמים לכל השאר.
 - matchPercentage: 70–99 לפי התאמה למרכיבים ולהעדפות.
@@ -465,6 +473,36 @@ def _recipe_to_validation_dict(recipe: GeneratedRecipe) -> dict:
     }
 
 
+def _post_process_recipe(
+    recipe: GeneratedRecipe,
+    payload: GenerateRecipeRequest,
+) -> GeneratedRecipe:
+    """Hebrewize ingredients, split merged entries, and validate step usage."""
+    raw = _recipe_to_validation_dict(recipe)
+    raw["matchPercentage"] = recipe.matchPercentage
+    processed, validation = apply_recipe_ingredient_parser(raw, payload.ingredients)
+
+    print(
+        "[FOOD FOR ANY MOOD] Ingredient parser score:",
+        validation["ingredient_relevance_score"],
+        "ok=",
+        validation["ok"],
+    )
+
+    return GeneratedRecipe(
+        name=recipe.name,
+        description=recipe.description,
+        ingredients=processed["ingredients"],
+        steps=processed["steps"],
+        matchPercentage=processed["matchPercentage"],
+        spiceLevel=recipe.spiceLevel,
+        nutrition=recipe.nutrition,
+        healthScore=recipe.healthScore,
+        tags=recipe.tags,
+        playlist=recipe.playlist,
+    )
+
+
 def _fallback_recipe_from_ingredients(payload: GenerateRecipeRequest) -> GeneratedRecipe:
     user_ingredients = parse_user_ingredients(payload.ingredients)
     raw = build_ingredient_fallback_recipe(
@@ -493,10 +531,10 @@ def _fallback_recipe_from_ingredients(payload: GenerateRecipeRequest) -> Generat
 def generate_recipe_with_ingredient_validation(
     payload: GenerateRecipeRequest,
 ) -> GeneratedRecipe:
-    """Try Gemini (with one strict retry), then ingredient-based fallback."""
+    """Try Gemini (with one strict retry), parse Hebrew ingredients, then fallback."""
     user_ingredients = parse_user_ingredients(payload.ingredients)
 
-    recipe = generate_recipe_with_gemini(payload, strict=False)
+    recipe = _post_process_recipe(generate_recipe_with_gemini(payload, strict=False), payload)
 
     if not user_ingredients:
         return recipe
@@ -504,24 +542,29 @@ def generate_recipe_with_ingredient_validation(
     validation = validate_recipe_relevance(
         user_ingredients, _recipe_to_validation_dict(recipe)
     )
-    if validation["ok"]:
+    quality_ok = is_recipe_acceptable(payload.ingredients, _recipe_to_validation_dict(recipe))
+
+    if validation["ok"] and quality_ok:
         return recipe
 
     print(
-        "[FOOD FOR ANY MOOD] Recipe relevance low "
+        "[FOOD FOR ANY MOOD] Recipe relevance/quality low "
         f"(ratio={validation['match_ratio']:.2f}, "
-        f"title_ok={validation['title_has_ingredient']}) — retrying with strict prompt"
+        f"title_ok={validation['title_has_ingredient']}, quality_ok={quality_ok}) "
+        "— retrying with strict prompt"
     )
 
-    recipe = generate_recipe_with_gemini(payload, strict=True)
+    recipe = _post_process_recipe(generate_recipe_with_gemini(payload, strict=True), payload)
     validation = validate_recipe_relevance(
         user_ingredients, _recipe_to_validation_dict(recipe)
     )
-    if validation["ok"]:
+    quality_ok = is_recipe_acceptable(payload.ingredients, _recipe_to_validation_dict(recipe))
+
+    if validation["ok"] and quality_ok:
         return recipe
 
     print(
-        "[FOOD FOR ANY MOOD] Strict retry still low relevance — "
+        "[FOOD FOR ANY MOOD] Strict retry still failed quality checks — "
         "using ingredient-based fallback recipe"
     )
     return _fallback_recipe_from_ingredients(payload)
