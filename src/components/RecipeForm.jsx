@@ -3,6 +3,8 @@ import { useLanguage } from '../i18n/useLanguage'
 import IngredientImageUpload from './IngredientImageUpload'
 import './RecipeForm.css'
 
+const SERVING_OPTIONS = [1, 2, 4, 6, 8]
+
 export default function RecipeForm({ form, onChange, onSubmit, disabled, theme }) {
   const { t } = useLanguage()
 
@@ -67,6 +69,23 @@ export default function RecipeForm({ form, onChange, onSubmit, disabled, theme }
             >
               <span>{mood.emoji}</span>
               {t(`moods.${mood.id}`)}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="recipe-form__field">
+        <label>{t('servingsLabel')}</label>
+        <div className="mood-grid">
+          {SERVING_OPTIONS.map((count) => (
+            <button
+              key={count}
+              type="button"
+              className={`mood-chip ${form.servings === count ? 'mood-chip--active' : ''}`}
+              onClick={() => onChange('servings', count)}
+              aria-pressed={form.servings === count}
+            >
+              {count}
             </button>
           ))}
         </div>

@@ -13,6 +13,8 @@ import { buildMockRecipe } from './mockRecipeProvider'
  * @property {string} mood
  * @property {boolean} isGlutenFree
  * @property {MusicPlatform} musicPlatform
+ * @property {number} [servings=4]
+ * @property {'meal' | 'dessert'} [recipeType='meal']
  *
  * @typedef {Object} GenerateRecipeOptions
  * @property {string} [language='he']
@@ -62,6 +64,8 @@ export function normalizeGenerateParams(params) {
     mood: params.mood ?? 'cozy',
     isGlutenFree: Boolean(params.isGlutenFree),
     musicPlatform: params.musicPlatform ?? 'spotify',
+    servings: params.servings ?? 4,
+    recipeType: params.recipeType ?? 'meal',
   }
 }
 

@@ -18,6 +18,8 @@ import { buildIngredientFirstFallbackRecipe, buildMockRecipe } from './mockRecip
  * @property {string} [language='he']
  * @property {string} [pantrySuffix]
  * @property {string[]} [excludeTemplateKeys]
+ * @property {number} [servings=4]
+ * @property {'meal' | 'dessert'} [recipeType='meal']
  */
 
 /**
@@ -46,6 +48,8 @@ function buildApiRequestPayload(userInput) {
     mood: userInput.mood ?? 'cozy',
     isGlutenFree: Boolean(userInput.isGlutenFree),
     musicPlatform: userInput.musicPlatform ?? 'spotify',
+    servings: userInput.servings ?? 4,
+    recipeType: userInput.recipeType ?? 'meal',
   }
 }
 
@@ -60,6 +64,8 @@ function normalizeUserInput(userInput) {
     language: userInput.language ?? 'he',
     pantrySuffix: userInput.pantrySuffix,
     excludeTemplateKeys: userInput.excludeTemplateKeys ?? [],
+    servings: userInput.servings ?? 4,
+    recipeType: userInput.recipeType ?? 'meal',
   }
 }
 
@@ -228,7 +234,7 @@ function processGeneratedRecipe(userInput, recipe) {
     recipe,
     userInput.ingredients,
     userInput.language,
-    { cookingTime: userInput.cookingTime },
+    { cookingTime: userInput.cookingTime, servings: userInput.servings },
   )
 
   if (validation.ok && !validation.titleValidation?.isMoodBased) {
@@ -259,6 +265,8 @@ function processGeneratedRecipe(userInput, recipe) {
       mood: userInput.mood,
       isGlutenFree: userInput.isGlutenFree,
       musicPlatform: userInput.musicPlatform,
+      servings: userInput.servings,
+      recipeType: userInput.recipeType,
     },
     {
       language: userInput.language,
@@ -271,7 +279,7 @@ function processGeneratedRecipe(userInput, recipe) {
     fallback,
     userInput.ingredients,
     userInput.language,
-    { cookingTime: userInput.cookingTime },
+    { cookingTime: userInput.cookingTime, servings: userInput.servings },
   )
 
   return normalizedFallback
@@ -290,6 +298,8 @@ function fetchMockFallbackRecipe(userInput) {
       mood: userInput.mood,
       isGlutenFree: userInput.isGlutenFree,
       musicPlatform: userInput.musicPlatform,
+      servings: userInput.servings,
+      recipeType: userInput.recipeType,
     },
     {
       language: userInput.language,

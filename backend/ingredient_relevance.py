@@ -211,6 +211,7 @@ def build_ingredient_fallback_recipe(
     is_gluten_free: bool,
     music_platform: MusicPlatform,
     build_playlist,
+    recipe_type: str = "meal",
 ) -> dict:
     """Build a Hebrew recipe centered on the user's ingredients."""
     from recipe_title import build_descriptive_dish_title
@@ -237,26 +238,41 @@ def build_ingredient_fallback_recipe(
         mismatch_note = " המנה נבנתה סביב המרכיבים שציינתם."
 
     description = (
-        f"מנה שנבנתה בעיקר מהמרכיבים שלכם, עם ניחוחות {mood_text}, "
+        f"קינוח שנבנה בעיקר מהמרכיבים שלכם, עם ניחוחות {mood_text}, "
+        f"מותאם לכ-{cooking_time} דקות הכנה.{mismatch_note}"
+        if recipe_type == "dessert"
+        else f"מנה שנבנתה בעיקר מהמרכיבים שלכם, עם ניחוחות {mood_text}, "
         f"מותאמת לכ-{cooking_time} דקות בישול.{mismatch_note}"
     )
     if is_gluten_free:
         description += " מותאמת במלואה לתזונה ללא גלוטן."
 
-    ingredients = [*display, "מלח", "פלפל שחור", "שמן זית"]
+    if recipe_type == "dessert":
+        ingredients = [*display, "סוכר", "וניל", "חמאה"]
+    else:
+        ingredients = [*display, "מלח", "פלפל שחור", "שמן זית"]
     if is_gluten_free and not any("ללא גלוטן" in item for item in ingredients):
         ingredients.append("מותאם ללא גלוטן")
 
     ingredient_phrase = ", ".join(display[:4])
     cook_minutes = min(cooking_time, max(15, cooking_time // 2))
 
-    steps = [
-        f"מכינים ומסדרים את {ingredient_phrase}.",
-        "מחממים מחבת או סיר עם שמן זית על אש בינונית.",
-        f"מבשלים את המרכיבים העיקריים עד שהם מוכנים — כ-{cook_minutes} דקות.",
-        "מתבלים במלח ופלפל לפי הטעם ומערבבים בעדינות.",
-        "מגישים חם ונהנים מהמנה.",
-    ]
+    if recipe_type == "dessert":
+        steps = [
+            f"מכינים ומסדרים את {ingredient_phrase} לקינוח.",
+            "מערבבים את המרכיבים המתוקים עם סוכר, וניל וחמאה עד תערובת אחידה.",
+            f"אופים או מקררים לפי סוג הקינוח — כ-{cook_minutes} דקות.",
+            "מקשטים בפירות, שוקולד או אבקת סוכר לפי הטעם.",
+            "מגישים קר או חם כקינוח.",
+        ]
+    else:
+        steps = [
+            f"מכינים ומסדרים את {ingredient_phrase}.",
+            "מחממים מחבת או סיר עם שמן זית על אש בינונית.",
+            f"מבשלים את המרכיבים העיקריים עד שהם מוכנים — כ-{cook_minutes} דקות.",
+            "מתבלים במלח ופלפל לפי הטעם ומערבבים בעדינות.",
+            "מגישים חם ונהנים מהמנה.",
+        ]
 
     tags: list[str] = ["quick"] if cooking_time <= 25 else []
     if category == "parve":

@@ -35,6 +35,11 @@ export const translations = {
     subtitle:
       'ספרו לנו מה יש במטבח, כמה זמן יש לכם, ואנחנו נבשל לכם את הווייב.',
     chooseCategory: 'בחרו קטגוריה',
+    recipeTypeLabel: 'סוג מתכון',
+    recipeTypes: {
+      meal: 'ארוחה',
+      dessert: 'קינוח',
+    },
     dietaryTitle: 'העדפות תזונה',
     glutenFreeLabel: 'ללא גלוטן',
     glutenFreeHint: 'מתכונים מותאמים — ללא חיטה, פסטה או לחם',
@@ -78,6 +83,7 @@ export const translations = {
       comfort: 'נוחות',
     },
     generateRecipe: '🍳 צור מתכון',
+    servingsLabel: 'מספר מנות',
     backendUnreachable: 'לא הצלחנו ליצור מתכון. נסו שוב בעוד רגע.',
     backendFallbackNotice: 'נוצר מתכון חלופי על בסיס המרכיבים שסיפקתם',
     loading: 'מכינים לכם את המתכון המושלם...',
@@ -216,6 +222,11 @@ export const translations = {
     subtitle:
       "Tell us what you have, how you feel, and how much time you've got — we'll craft the perfect recipe.",
     chooseCategory: 'Choose your category',
+    recipeTypeLabel: 'Recipe type',
+    recipeTypes: {
+      meal: 'Meal',
+      dessert: 'Dessert',
+    },
     dietaryTitle: 'Dietary preferences',
     glutenFreeLabel: 'Gluten Free',
     glutenFreeHint: 'Adapted recipes — no wheat, pasta, or bread',
@@ -259,6 +270,7 @@ export const translations = {
       comfort: 'Comfort',
     },
     generateRecipe: '🍳 Generate My Recipe',
+    servingsLabel: 'Number of servings',
     backendUnreachable: 'We could not generate a recipe. Please try again in a moment.',
     backendFallbackNotice: 'An alternative recipe was created from the ingredients you provided',
     loading: 'Crafting your perfect recipe...',

@@ -309,7 +309,7 @@ export function applyRecipeIngredientParser(recipe, userIngredientsRaw = '', lan
   })
   const quantified = applyRecipeQuantities(titled, {
     language,
-    servings: titled.nutrition?.servings,
+    servings: options.servings ?? titled.nutrition?.servings,
   })
   const userIngredients = parseUserIngredients(userIngredientsRaw)
   const validation = validateRecipeQuality(userIngredients, quantified, language, options)

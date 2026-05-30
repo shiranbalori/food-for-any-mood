@@ -28,6 +28,63 @@ import {
   normalizeIngredient,
 } from '../data/ingredientKnowledge'
 
+const DESSERT_MOCK_BY_CATEGORY = {
+  dairy: {
+    name: 'עוגת גבינה קלאסית',
+    ingredients: ['גבינת שמנת', 'סוכר', 'ביצים', 'וניל', 'חמאה', 'עוגיות', 'סוכר', 'וניל'],
+    steps: [
+      'טוחנים עוגיות לפירורים ומערבבים עם חמאה מומסת. לוחצים לתחתית תבנית.',
+      'מערבבים גבינת שמנת, סוכר, ביצים ווניל עד תערובת חלקה.',
+      'יוצקים על בסיס העוגיות ומעבירים למקרר לקירור של לפחות 4 שעות.',
+      'מקשטים בפירות יער או רוטב פירות לפני ההגשה.',
+      'מגישים קר ומתוק.',
+    ],
+    calories: 420,
+    protein: 9,
+    carbs: 38,
+    fat: 26,
+    spiceLevel: 0,
+    healthScore: 58,
+    tags: ['comfortFood'],
+  },
+  meat: {
+    name: 'תפוחים בתנור עם דבש וקינמון',
+    ingredients: ['תפוחים', 'דבש', 'קינמון', 'לימון', 'שמן זית', 'סוכר', 'וניל'],
+    steps: [
+      'חותכים תפוחים לחצאים ומסירים גרעינים.',
+      'מערבבים דבש, קינמון, מיץ לימון ושמן זית.',
+      'מסדרים את התפוחים בתבנית ומוזקים את התערובת המתוקה.',
+      'אופים בתנור ב-180°C כ-25 דקות עד רכות וקרמל.',
+      'מגישים חמים עם כף יוגורט או גלידה פרווה.',
+    ],
+    calories: 280,
+    protein: 2,
+    carbs: 52,
+    fat: 8,
+    spiceLevel: 0,
+    healthScore: 70,
+    tags: ['healthy'],
+  },
+  parve: {
+    name: 'עוגיות שוקולד שחיות',
+    ingredients: ['קמח', 'סוכר', 'אבקת קקאו', 'שמן', 'וניל', 'אבקת אפייה', 'סוכר', 'וניל'],
+    steps: [
+      'מערבבים קמח, סוכר, קקאו ואבקת אפייה בקערה.',
+      'מוסיפים שמן, וניל ומעט מים — עד לבצק דביק.',
+      'יוצרים כדורים קטנים ומגלגלים בקמח נוסף.',
+      'אופים בתנור ב-175°C כ-12 דקות.',
+      'מקררים מעט ומגישים כקינוח פרווה.',
+    ],
+    calories: 190,
+    protein: 3,
+    carbs: 28,
+    fat: 8,
+    spiceLevel: 0,
+    healthScore: 55,
+    tags: ['comfortFood', 'vegetarian'],
+  },
+}
+
 function parseIngredients(input) {
   return input
     .split(/[,;\n]+/)
@@ -527,6 +584,7 @@ function finalizeRecipe(recipe, ingredientsRaw, language, meta = {}) {
   const { recipe: parsed } = applyRecipeIngredientParser(recipe, ingredientsRaw, language, {
     cookingTime: meta.cookingTime,
     style: meta.style,
+    servings: meta.servings,
   })
   return parsed
 }
@@ -551,6 +609,8 @@ export function buildIngredientFirstFallbackRecipe(
     mood,
     isGlutenFree = false,
     musicPlatform = 'spotify',
+    servings = 4,
+    recipeType = 'meal',
   },
   { language = 'he', pantrySuffix = '(from your pantry)', validation = null } = {},
 ) {
@@ -578,26 +638,46 @@ export function buildIngredientFirstFallbackRecipe(
     mismatchNote = ' המנה נבנתה סביב המרכיבים שציינתם.'
   }
 
-  const description = `${copy.defaultOpener}${copy.descriptionJoiner}${moodPhrase}${copy.descriptionMiddle}${cookingTime}${copy.descriptionMinutes}${mismatchNote}`
+  const description =
+    recipeType === 'dessert'
+      ? `קינוח ביתי${copy.descriptionJoiner}${moodPhrase}${copy.descriptionMiddle}${cookingTime}${copy.descriptionMinutes}${mismatchNote}`
+      : `${copy.defaultOpener}${copy.descriptionJoiner}${moodPhrase}${copy.descriptionMiddle}${cookingTime}${copy.descriptionMinutes}${mismatchNote}`
 
-  const ingredientList = [
-    ...displayNames,
-    formatIngredient('salt', language, false),
-    formatIngredient('pepper', language, false),
-    formatIngredient('olive oil', language, false),
-  ]
+  const ingredientList =
+    recipeType === 'dessert'
+      ? [
+          ...displayNames,
+          formatIngredient('sugar', language, false),
+          'וניל',
+          formatIngredient('butter', language, false),
+        ]
+      : [
+          ...displayNames,
+          formatIngredient('salt', language, false),
+          formatIngredient('pepper', language, false),
+          formatIngredient('olive oil', language, false),
+        ]
   const finalIngredients = isGlutenFree
     ? applyGlutenFreeToIngredientList(ingredientList, language)
     : ingredientList
 
   const ingredientPhrase = displayNames.slice(0, 4).join(', ')
-  const steps = [
-    `מכינים ומסדרים את ${ingredientPhrase}.`,
-    `מחממים מחבת או סיר עם ${formatIngredient('olive oil', language, false)} על אש בינונית.`,
-    `מבשלים את המרכיבים העיקריים עד שהם מוכנים — כ-${cookMinutes} דקות.`,
-    `מתבלים ב${formatIngredient('salt', language, false)} ו${formatIngredient('pepper', language, false)} לפי הטעם.`,
-    'מגישים חם ונהנים מהמנה.',
-  ]
+  const steps =
+    recipeType === 'dessert'
+      ? [
+          `מכינים ומסדרים את ${ingredientPhrase} לקינוח.`,
+          `מערבבים עם ${formatIngredient('sugar', language, false)}, וניל ו${formatIngredient('butter', language, false)} עד תערובת אחידה.`,
+          `אופים או מקררים לפי סוג הקינוח — כ-${cookMinutes} דקות.`,
+          'מקשטים בפירות, שוקולד או אבקת סוכר לפי הטעם.',
+          'מגישים קר או חם כקינוח.',
+        ]
+      : [
+          `מכינים ומסדרים את ${ingredientPhrase}.`,
+          `מחממים מחבת או סיר עם ${formatIngredient('olive oil', language, false)} על אש בינונית.`,
+          `מבשלים את המרכיבים העיקריים עד שהם מוכנים — כ-${cookMinutes} דקות.`,
+          `מתבלים ב${formatIngredient('salt', language, false)} ו${formatIngredient('pepper', language, false)} לפי הטעם.`,
+          'מגישים חם ונהנים מהמנה.',
+        ]
 
   const name = buildDescriptiveDishTitle(finalIngredients, {
     cookingTime,
@@ -624,13 +704,13 @@ export function buildIngredientFirstFallbackRecipe(
     ingredients: finalIngredients,
     steps,
     matchPercentage,
-    spiceLevel: category === 'parve' ? 1 : 0,
+    spiceLevel: recipeType === 'dessert' ? 0 : category === 'parve' ? 1 : 0,
     nutrition: {
       calories: 360 + displayNames.length * 25,
       protein: 14 + displayNames.length * 2,
       carbs: 30 + displayNames.length * 3,
       fat: 16 + displayNames.length,
-      servings: 2,
+      servings,
     },
     healthScore: Math.min(92, 70 + displayNames.length * 3),
     tags: cookingTime <= 25 ? ['quick'] : ['comfortFood'],
@@ -654,6 +734,90 @@ export function buildIngredientFirstFallbackRecipe(
     recipe: finalizeRecipe(recipe, ingredients, language, {
       cookingTime,
       style: 'quick',
+      servings,
+    }),
+    meta,
+  }
+}
+
+function buildDessertMockRecipe(
+  {
+    category,
+    ingredients,
+    cookingTime,
+    mood,
+    isGlutenFree = false,
+    musicPlatform = 'spotify',
+    servings = 4,
+  },
+  { language = 'he', pantrySuffix = '(from your pantry)', validation = null } = {},
+) {
+  const rawUserList = parseUserIngredients(ingredients)
+  if (rawUserList.length > 0) {
+    return buildIngredientFirstFallbackRecipe(
+      {
+        category,
+        ingredients,
+        cookingTime,
+        mood,
+        isGlutenFree,
+        musicPlatform,
+        servings,
+        recipeType: 'dessert',
+      },
+      { language, pantrySuffix, validation },
+    )
+  }
+
+  const template = DESSERT_MOCK_BY_CATEGORY[category] ?? DESSERT_MOCK_BY_CATEGORY.parve
+  const cookTime = Math.min(cookingTime, 45)
+  const copy = getRecipeCopy(language)
+  const moodPhrase = copy.moodFlavor[mood] ?? copy.defaultMood
+  const description = `קינוח מותאם${copy.descriptionJoiner}${moodPhrase}${copy.descriptionMiddle}${cookTime}${copy.descriptionMinutes}`
+
+  const playlist = recommendPlaylist(
+    { mood, category, style: 'comfort', cookTime, spiceLevel: 0, recipeName: template.name },
+    musicPlatform,
+    language,
+  )
+
+  const recipe = {
+    name: template.name,
+    description,
+    ingredients: template.ingredients,
+    steps: template.steps,
+    matchPercentage: Math.min(94, Math.max(72, Math.round(72 + Math.random() * 22))),
+    spiceLevel: 0,
+    nutrition: {
+      calories: template.calories,
+      protein: template.protein,
+      carbs: template.carbs,
+      fat: template.fat,
+      servings,
+    },
+    healthScore: template.healthScore,
+    tags: template.tags,
+    playlist,
+  }
+
+  const meta = {
+    id: `dessert-mock-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+    templateKey: `dessert-mock-${category}`,
+    category,
+    mood,
+    cookingTime,
+    isGlutenFree,
+    musicPlatform,
+    language,
+    style: 'comfort',
+    cookTime,
+  }
+
+  return {
+    recipe: finalizeRecipe(recipe, ingredients, language, {
+      cookingTime,
+      style: 'comfort',
+      servings,
     }),
     meta,
   }
@@ -671,6 +835,8 @@ export function buildMockRecipe(
     mood,
     isGlutenFree = false,
     musicPlatform = 'spotify',
+    servings = 4,
+    recipeType = 'meal',
   },
   {
     language = 'he',
@@ -678,6 +844,13 @@ export function buildMockRecipe(
     excludeTemplateKeys = [],
   } = {},
 ) {
+  if (recipeType === 'dessert') {
+    return buildDessertMockRecipe(
+      { category, ingredients, cookingTime, mood, isGlutenFree, musicPlatform, servings },
+      { language, pantrySuffix },
+    )
+  }
+
   const time = cookingTime
   const glutenFree = isGlutenFree
   const excludeKeys = excludeTemplateKeys
@@ -700,7 +873,7 @@ export function buildMockRecipe(
   const workingTemplate = glutenFree ? adaptTemplateForGlutenFree(template) : template
   const matchData = countIngredientMatches(filteredUserIngredients, workingTemplate)
   const cookTime = Math.min(time, Math.max(template.minTime, template.idealTime))
-  const nutrition = computeNutrition(workingTemplate, matchData, template.servings)
+  const nutrition = computeNutrition(workingTemplate, matchData, servings)
   const tags = deriveTags(template, category, nutrition, cookTime, primaryStyle)
   const matchPercentage = computeMatchPercent(
     score,
@@ -749,7 +922,7 @@ export function buildMockRecipe(
       protein: nutrition.protein,
       carbs: nutrition.carbs,
       fat: nutrition.fat,
-      servings: template.servings,
+      servings,
     },
     healthScore: nutrition.healthScore,
     tags,
@@ -768,6 +941,8 @@ export function buildMockRecipe(
           mood,
           isGlutenFree: glutenFree,
           musicPlatform,
+          servings,
+          recipeType,
         },
         { language, pantrySuffix, validation: relevance },
       )
@@ -791,6 +966,7 @@ export function buildMockRecipe(
     recipe: finalizeRecipe(recipe, ingredients, language, {
       cookingTime: time,
       style: primaryStyle,
+      servings,
     }),
     meta,
   }

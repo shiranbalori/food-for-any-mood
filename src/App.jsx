@@ -38,11 +38,13 @@ const INITIAL_FORM = {
   mood: 'cozy',
   glutenFree: false,
   musicPlatform: 'spotify',
+  servings: 4,
 }
 
 export default function App() {
   const { t, language } = useLanguage()
   const [category, setCategory] = useState('dairy')
+  const [recipeType, setRecipeType] = useState('meal')
   const [form, setForm] = useState(INITIAL_FORM)
   const [recipe, setRecipe] = useState(null)
   const [loading, setLoading] = useState(false)
@@ -86,6 +88,8 @@ export default function App() {
             mood: form.mood,
             isGlutenFree: form.glutenFree,
             musicPlatform: form.musicPlatform,
+            servings: form.servings,
+            recipeType,
           },
           {
             language,
@@ -106,7 +110,7 @@ export default function App() {
         setLoading(false)
       }
     },
-    [category, form, t, language],
+    [category, form, t, language, recipeType],
   )
 
   const handleSave = () => {
@@ -217,7 +221,12 @@ export default function App() {
       <main className="app__main">
         <Header />
 
-        <CategorySelector selected={category} onSelect={setCategory} />
+        <CategorySelector
+          selected={category}
+          onSelect={setCategory}
+          recipeType={recipeType}
+          onRecipeTypeChange={setRecipeType}
+        />
 
         <DietaryPreferences
           glutenFree={form.glutenFree}

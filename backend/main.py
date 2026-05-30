@@ -147,6 +147,8 @@ async def log_incoming_requests(request, call_next):
 Category = Literal["dairy", "meat", "parve"]
 MusicPlatform = Literal["spotify", "youtube"]
 Mood = Literal["happy", "cozy", "energetic", "relaxed", "adventurous", "comfort"]
+ServingsCount = Literal[1, 2, 4, 6, 8]
+RecipeType = Literal["meal", "dessert"]
 
 
 class GenerateRecipeRequest(BaseModel):
@@ -156,6 +158,8 @@ class GenerateRecipeRequest(BaseModel):
     mood: Mood = "cozy"
     isGlutenFree: bool = False
     musicPlatform: MusicPlatform = "spotify"
+    servings: ServingsCount = 4
+    recipeType: RecipeType = "meal"
 
 
 class Nutrition(BaseModel):
@@ -286,6 +290,63 @@ CATEGORY_RECIPES: dict[Category, dict] = {
     },
 }
 
+DESSERT_CATEGORY_RECIPES: dict[Category, dict] = {
+    "dairy": {
+        "name": "עוגת גבינה קלאסית",
+        "base_ingredients": ["גבינת שמנת", "סוכר", "ביצים", "וניל", "חמאה", "עוגיות"],
+        "steps": [
+            "טוחנים עוגיות לפירורים ומערבבים עם חמאה מומסת. לוחצים לתחתית תבנית.",
+            "מערבבים גבינת שמנת, סוכר, ביצים ווניל עד תערובת חלקה.",
+            "יוצקים על בסיס העוגיות ומעבירים למקרר לקירור של לפחות 4 שעות.",
+            "מקשטים בפירות יער או רוטב פירות לפני ההגשה.",
+            "מגישים קר ומתוק.",
+        ],
+        "calories": 420,
+        "protein": 9,
+        "carbs": 38,
+        "fat": 26,
+        "spiceLevel": 0,
+        "healthScore": 58,
+        "tags": ["comfortFood"],
+    },
+    "meat": {
+        "name": "תפוחים בתנור עם דבש וקינמון",
+        "base_ingredients": ["תפוחים", "דבש", "קינמון", "לימון", "שמן זית"],
+        "steps": [
+            "חותכים תפוחים לחצאים ומסירים גרעינים.",
+            "מערבבים דבש, קינמון, מיץ לימון ושמן זית.",
+            "מסדרים את התפוחים בתבנית ומוזקים את התערובת המתוקה.",
+            "אופים בתנור ב-180°C כ-25 דקות עד רכות וקרמל.",
+            "מגישים חמים עם כף יוגורט או גלידה פרווה.",
+        ],
+        "calories": 280,
+        "protein": 2,
+        "carbs": 52,
+        "fat": 8,
+        "spiceLevel": 0,
+        "healthScore": 70,
+        "tags": ["healthy"],
+    },
+    "parve": {
+        "name": "עוגיות שוקולד שחיות",
+        "base_ingredients": ["קמח", "סוכר", "אבקת קקאו", "שמן", "וניל", "אבקת אפייה"],
+        "steps": [
+            "מערבבים קמח, סוכר, קקאו ואבקת אפייה בקערה.",
+            "מוסיפים שמן, וניל ומעט מים — עד לבצק דביק.",
+            "יוצרים כדורים קטנים ומגלגלים בקמח נוסף.",
+            "אופים בתנור ב-175°C כ-12 דקות.",
+            "מקררים מעט ומגישים כקינוח פרווה.",
+        ],
+        "calories": 190,
+        "protein": 3,
+        "carbs": 28,
+        "fat": 8,
+        "spiceLevel": 0,
+        "healthScore": 55,
+        "tags": ["comfortFood", "vegetarian"],
+    },
+}
+
 CATEGORY_LABELS: dict[Category, str] = {
     "dairy": "חלבי",
     "meat": "בשרי",
@@ -308,6 +369,11 @@ MOOD_DESCRIPTIONS: dict[Mood, str] = {
     "relaxed": "רגועים ומאוזנים",
     "adventurous": "מלאי אופי וגיוון",
     "comfort": "מספקים ומוכרים",
+}
+
+RECIPE_TYPE_LABELS: dict[RecipeType, str] = {
+    "meal": "ארוחה",
+    "dessert": "קינוח",
 }
 
 PLAYLIST_PRESETS: dict[MusicPlatform, dict] = {
@@ -385,12 +451,25 @@ def _build_gemini_prompt(payload: GenerateRecipeRequest, *, strict: bool = False
 - אסור: ארוחת, ערב, וייב, נוחות, רומנטי, נעים, אנרגטי, רגוע, מצב רוח — בשם המנה.
 """
 
-    quantity_rules = """
+    quantity_rules = f"""
 כללי כמויות (חובה):
 - לכל מרכיב חייבת להיות כמות ריאלית ויחידת מידה: whole item, tsp, tbsp, gram, ml, cup.
-- הכמויות חייבות להתאים למספר המנות (servings).
+- הכמויות חייבות להתאים בדיוק ל-{payload.servings} מנות.
 - שלבי ההכנה חייבים להזכיר את אותן כמויות כמו ברשימת המרכיבים.
-- דוגמה: "2 ביצים", "1 עגבניה בינונית", "1 כף שמן זית", "1/2 כפית מלח", "1/4 כפית פלפל שחור".
+- דוגמה ל-{payload.servings} מנות: כמויות מוגדלות/מוקטנות בהתאם (למשל 6 מנות — כ-600g פסטה, 6 עגבניות).
+"""
+
+    recipe_type_label = RECIPE_TYPE_LABELS[payload.recipeType]
+    dessert_rules = ""
+    if payload.recipeType == "dessert":
+        dessert_rules = """
+כללי קינוח (חובה — סוג מתכון: קינוח):
+- המתכון חייב להיות קינוח בלבד — לא מנה עיקרית ולא ארוחה מלוחה.
+- השתמש במרכיבים מתוקים: סוכר, דבש, שוקולד, פירות, קמח, שמנת, חמאה, וניל, קינמון.
+- שלבי ההכנה בסגנון קינוח: ערבוב, אפייה, קירור, קישוט והגשה.
+- spiceLevel חייב להיות 0 (קינוחים אינם חריפים).
+- שם המנה חייב לשקף קינוח (עוגה, עוגיות, מוס, טרifle, סורבה, פנקייק מתוק וכו').
+- אם המשתמש ציין מרכיבים — שלב אותם בהקשר מתוק ומתאים לקינוח.
 """
 
     return f"""אתה שף ישראלי שמייצר מתכונים לאפליקציה FOOD FOR ANY MOOD.
@@ -398,12 +477,14 @@ def _build_gemini_prompt(payload: GenerateRecipeRequest, *, strict: bool = False
 
 העדפות המשתמש:
 - קטגוריה: {category_label} ({payload.category})
+- סוג מתכון: {recipe_type_label} ({payload.recipeType})
 - מצב רוח: {mood_label} ({payload.mood})
 - זמן הכנה מקסימלי: {payload.cookingTime} דקות
 - ללא גלוטן: {gluten_note}
 - מרכיבים זמינים: {ingredients_note}
+- מספר מנות: {payload.servings}
 - פלטפורמת מוזיקה לפלייליסט: {payload.musicPlatform}
-{ingredient_rules}{title_rules}{quantity_rules}
+{ingredient_rules}{title_rules}{quantity_rules}{dessert_rules}
 כללי תוכן:
 - כל טקסט המתכון חייב להיות בעברית.
 - שמות המרכיבים בשלבים וברשימה — בעברית בלבד, ללא מילים באנגלית.
@@ -411,7 +492,7 @@ def _build_gemini_prompt(payload: GenerateRecipeRequest, *, strict: bool = False
 - התאם את המנה לקטגוריה, למצב הרוח ולזמן ההכנה — אך כשיש מרכיבים, הם קודמים לכל השאר.
 - matchPercentage: 70–99 לפי התאמה למרכיבים ולהעדפות.
 - spiceLevel: 0–3 (0=לא חריף, 3=חריף).
-- nutrition: הערכה סבירה ל-2 מנות.
+- nutrition: הערכה סבירה ל-{payload.servings} מנות; nutrition.servings חייב להיות {payload.servings}.
 - healthScore: 0–100.
 - tags: מערך קצר של תגיות (מחרוזות בעברית או מפתחות קצרים באנגלית).
 - playlist.title ו-playlist.description בעברית; playlist.platform = "{payload.musicPlatform}";
@@ -446,7 +527,7 @@ def _normalize_gemini_recipe(
             protein=max(0, gemini_recipe.nutrition.protein),
             carbs=max(0, gemini_recipe.nutrition.carbs),
             fat=max(0, gemini_recipe.nutrition.fat),
-            servings=2,
+            servings=payload.servings,
         ),
         healthScore=max(0, min(100, gemini_recipe.healthScore)),
         tags=gemini_recipe.tags,
@@ -515,6 +596,7 @@ def _post_process_recipe(
         raw,
         payload.ingredients,
         cooking_time=payload.cookingTime,
+        servings=payload.servings,
     )
 
     print(
@@ -548,11 +630,13 @@ def _fallback_recipe_from_ingredients(payload: GenerateRecipeRequest) -> Generat
         is_gluten_free=payload.isGlutenFree,
         music_platform=payload.musicPlatform,
         build_playlist=_build_playlist,
+        recipe_type=payload.recipeType,
     )
     processed, _ = apply_recipe_ingredient_parser(
         raw,
         payload.ingredients,
         cooking_time=payload.cookingTime,
+        servings=payload.servings,
     )
     return GeneratedRecipe(
         name=processed["name"],
@@ -617,25 +701,39 @@ def generate_mock_recipe(payload: GenerateRecipeRequest) -> GeneratedRecipe:
     if user_ingredients:
         return _fallback_recipe_from_ingredients(payload)
 
-    template = CATEGORY_RECIPES[payload.category]
+    template_source = (
+        DESSERT_CATEGORY_RECIPES if payload.recipeType == "dessert" else CATEGORY_RECIPES
+    )
+    template = template_source[payload.category]
 
     ingredients = list(template["base_ingredients"])
     if payload.isGlutenFree:
         ingredients = [
             item.replace("פסטה", "פסטה ללא גלוטן")
             .replace("רוטב סויה", "רוטב סויה ללא גלוטן")
+            .replace("קמח", "קמח ללא גלוטן")
+            .replace("עוגיות", "עוגיות ללא גלוטן")
             for item in ingredients
         ]
         if "ללא גלוטן" not in " ".join(ingredients):
             ingredients.append("מותאם ללא גלוטן")
 
-    ingredients.extend(["מלח", "פלפל שחור", "שמן זית"])
+    if payload.recipeType == "dessert":
+        ingredients.extend(["סוכר", "וניל"])
+    else:
+        ingredients.extend(["מלח", "פלפל שחור", "שמן זית"])
 
     mood_text = MOOD_DESCRIPTIONS.get(payload.mood, "טעימים")
-    description = (
-        f"מנה מותאמת ל{mood_text}, בזמן הכנה של כ-{payload.cookingTime} דקות. "
-        f"{template['name']} — ארוחה ביתית מלאת טעם ונוחות."
-    )
+    if payload.recipeType == "dessert":
+        description = (
+            f"קינוח מותאם ל{mood_text}, בזמן הכנה של כ-{payload.cookingTime} דקות. "
+            f"{template['name']} — מתוק ומפנק."
+        )
+    else:
+        description = (
+            f"מנה מותאמת ל{mood_text}, בזמן הכנה של כ-{payload.cookingTime} דקות. "
+            f"{template['name']} — ארוחה ביתית מלאת טעם ונוחות."
+        )
     if payload.isGlutenFree:
         description += " מותאמת במלואה לתזונה ללא גלוטן."
 
@@ -645,23 +743,26 @@ def generate_mock_recipe(payload: GenerateRecipeRequest) -> GeneratedRecipe:
     if payload.cookingTime <= 25 and "quick" not in tags:
         tags.append("quick")
 
-    return GeneratedRecipe(
-        name=template["name"],
-        description=description,
-        ingredients=ingredients,
-        steps=list(template["steps"]),
-        matchPercentage=match_percentage,
-        spiceLevel=template["spiceLevel"],
-        nutrition=Nutrition(
-            calories=template["calories"],
-            protein=template["protein"],
-            carbs=template["carbs"],
-            fat=template["fat"],
-            servings=2,
+    return _post_process_recipe(
+        GeneratedRecipe(
+            name=template["name"],
+            description=description,
+            ingredients=ingredients,
+            steps=list(template["steps"]),
+            matchPercentage=match_percentage,
+            spiceLevel=template["spiceLevel"],
+            nutrition=Nutrition(
+                calories=template["calories"],
+                protein=template["protein"],
+                carbs=template["carbs"],
+                fat=template["fat"],
+                servings=payload.servings,
+            ),
+            healthScore=template["healthScore"],
+            tags=tags,
+            playlist=_build_playlist(payload.musicPlatform, match_percentage),
         ),
-        healthScore=template["healthScore"],
-        tags=tags,
-        playlist=_build_playlist(payload.musicPlatform, match_percentage),
+        payload,
     )
 
 
@@ -718,6 +819,8 @@ async def generate_recipe(payload: GenerateRecipeRequest):
             "mood": payload.mood,
             "isGlutenFree": payload.isGlutenFree,
             "musicPlatform": payload.musicPlatform,
+            "servings": payload.servings,
+            "recipeType": payload.recipeType,
         },
     )
     recipe, source, gemini_error = await generate_recipe_with_fallback(payload)

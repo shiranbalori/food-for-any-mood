@@ -341,6 +341,7 @@ def apply_recipe_ingredient_parser(
     *,
     cooking_time: int | None = None,
     style: str | None = None,
+    servings: int | None = None,
 ) -> tuple[dict, dict]:
     normalized = normalize_recipe_ingredients(recipe, user_ingredients_raw)
     titled = apply_descriptive_dish_title(
@@ -350,7 +351,7 @@ def apply_recipe_ingredient_parser(
     )
     quantified = apply_recipe_quantities(
         titled,
-        servings=(titled.get("nutrition") or {}).get("servings"),
+        servings=servings or (titled.get("nutrition") or {}).get("servings"),
     )
     user_ingredients = parse_user_ingredients(user_ingredients_raw)
     validation = validate_recipe_quality(user_ingredients, quantified)
