@@ -1,0 +1,51 @@
+/** Mock community recipes — replaced by Supabase queries in Step 2. */
+export const MOCK_COMMUNITY_RECIPES = [
+  {
+    id: 'mock-community-1',
+    title: 'שקשוקה מהירה של סבתא',
+    authorName: 'מיכל א.',
+    category: 'dairy',
+    rating: 4.9,
+    views: 1842,
+  },
+  {
+    id: 'mock-community-2',
+    title: 'עוף בתנור עם לימון ושום',
+    authorName: 'דוד ר.',
+    category: 'meat',
+    rating: 4.7,
+    views: 956,
+  },
+  {
+    id: 'mock-community-3',
+    title: 'סלט קינואה וירקות קלויים',
+    authorName: 'נועה ש.',
+    category: 'parve',
+    rating: 4.6,
+    views: 721,
+  },
+  {
+    id: 'mock-community-4',
+    title: 'עוגת גבינה עם פירות יער',
+    authorName: 'יעל כ.',
+    category: 'dairy',
+    rating: 4.8,
+    views: 2103,
+  },
+  {
+    id: 'mock-community-5',
+    title: 'קציצות עדשים בתנור',
+    authorName: 'אורי מ.',
+    category: 'parve',
+    rating: 4.5,
+    views: 534,
+  },
+  {
+    id: 'mock-community-6',
+    title: 'צלי בקר ברוטב יין אדום',
+    authorName: 'רוני ל.',
+    category: 'meat',
+    rating: 4.9,
+    views: 1288,
+  },
+]

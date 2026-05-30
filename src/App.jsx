@@ -8,6 +8,7 @@ import RecipeForm from './components/RecipeForm'
 import LoadingAnimation from './components/LoadingAnimation'
 import RecipeCard from './components/RecipeCard'
 import SavedRecipes from './components/SavedRecipes'
+import CommunityRecipes from './components/CommunityRecipes'
 import FavoriteRecipes from './components/FavoriteRecipes'
 import WeeklyMealPlanner from './components/WeeklyMealPlanner'
 import { useLanguage } from './i18n/useLanguage'
@@ -299,6 +300,8 @@ export default function App() {
           onRemove={handleRemove}
           onSelect={handleSelectSaved}
         />
+
+        <CommunityRecipes />
       </main>
 
       <footer className="app__footer">
