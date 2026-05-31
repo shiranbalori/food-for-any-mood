@@ -352,6 +352,33 @@ def build_descriptive_dish_title(
     return _build_generic_dish_title(main_canon, cooking_style, steps)
 
 
+CATEGORY_GUARANTEED_DESSERT_TITLES = {
+    "dairy": "קינוח גבינה",
+    "parve": "עוגיות מהירות",
+}
+
+DESSERT_FALLBACK_TITLES = (
+    "עוגת שוקולד ביתית",
+    "עוגיות מהירות",
+    "מאפינס וניל",
+    "קינוח גבינה",
+    "בראוניז מהיר",
+)
+
+
+def build_guaranteed_dessert_title(
+    ingredients: list[str],
+    *,
+    category: str = "dairy",
+    ingredient_phrase: str | None = None,
+) -> str:
+    """Return a guaranteed dessert title from the allowed fallback list only."""
+    _ = ingredients, ingredient_phrase
+    if category == "meat":
+        return "קציצות בשר ביתיות"
+    return CATEGORY_GUARANTEED_DESSERT_TITLES.get(category, DESSERT_FALLBACK_TITLES[0])
+
+
 def is_mood_based_title(title: str) -> bool:
     text = (title or "").strip()
     if not text:
@@ -411,7 +438,33 @@ def ensure_descriptive_dish_title(
     return (title or "").strip()
 
 
-def apply_descriptive_dish_title(recipe: dict, *, cooking_time: int | None = None, style: str | None = None) -> dict:
+def apply_descriptive_dish_title(
+    recipe: dict,
+    *,
+    cooking_time: int | None = None,
+    style: str | None = None,
+    recipe_type: str | None = None,
+    category: str | None = None,
+) -> dict:
+    if recipe_type == "dessert":
+        from recipe_quality import is_invalid_recipe_selection
+
+        name = (recipe.get("name") or "").strip()
+        if is_invalid_recipe_selection("dessert", category or "dairy"):
+            return {**recipe, "name": "קציצות בשר ביתיות"}
+
+        probe = {**recipe, "name": name}
+        if validate_recipe_type("dessert", probe):
+            return {**recipe, "name": name}
+
+        return {
+            **recipe,
+            "name": build_guaranteed_dessert_title(
+                recipe.get("ingredients") or [],
+                category=category or "dairy",
+            ),
+        }
+
     name = ensure_descriptive_dish_title(
         recipe.get("name", ""),
         recipe.get("ingredients") or [],

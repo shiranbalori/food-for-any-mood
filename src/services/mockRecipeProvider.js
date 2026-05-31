@@ -21,6 +21,8 @@ import {
 } from '../utils/ingredientRelevance'
 import { applyRecipeIngredientParser } from '../utils/recipeIngredientParser'
 import { buildDescriptiveDishTitle } from '../utils/recipeTitle'
+import { pickGuaranteedDessertTitle } from '../utils/recipeTypeGuard'
+import { getEffectiveRecipeType, isInvalidRecipeSelection } from '../utils/recipeCategoryGuard'
 import {
   canonicalIngredient,
   getIngredientNutrition,
@@ -30,7 +32,7 @@ import {
 
 const DESSERT_MOCK_BY_CATEGORY = {
   dairy: {
-    name: 'עוגת גבינה קלאסית',
+    name: 'קינוח גבינה',
     ingredients: ['גבינת שמנת', 'סוכר', 'ביצים', 'וניל', 'חמאה', 'עוגיות', 'סוכר', 'וניל'],
     steps: [
       'טוחנים עוגיות לפירורים ומערבבים עם חמאה מומסת. לוחצים לתחתית תבנית.',
@@ -48,7 +50,7 @@ const DESSERT_MOCK_BY_CATEGORY = {
     tags: ['comfortFood'],
   },
   meat: {
-    name: 'תפוחים בתנור עם דבש וקינמון',
+    name: 'תפוחים אפויים בדבש',
     ingredients: ['תפוחים', 'דבש', 'קינמון', 'לימון', 'שמן זית', 'סוכר', 'וניל'],
     steps: [
       'חותכים תפוחים לחצאים ומסירים גרעינים.',
@@ -66,7 +68,7 @@ const DESSERT_MOCK_BY_CATEGORY = {
     tags: ['healthy'],
   },
   parve: {
-    name: 'עוגיות שוקולד שחיות',
+    name: 'עוגיות מהירות',
     ingredients: ['קמח', 'סוכר', 'אבקת קקאו', 'שמן', 'וניל', 'אבקת אפייה', 'סוכר', 'וניל'],
     steps: [
       'מערבבים קמח, סוכר, קקאו ואבקת אפייה בקערה.',
@@ -585,6 +587,8 @@ function finalizeRecipe(recipe, ingredientsRaw, language, meta = {}) {
     cookingTime: meta.cookingTime,
     style: meta.style,
     servings: meta.servings,
+    recipeType: meta.recipeType ?? 'meal',
+    category: meta.category ?? 'dairy',
   })
   return parsed
 }
@@ -679,13 +683,22 @@ export function buildIngredientFirstFallbackRecipe(
           'מגישים חם ונהנים מהמנה.',
         ]
 
-  const name = buildDescriptiveDishTitle(finalIngredients, {
-    cookingTime,
-    steps,
-    style: 'quick',
-    tags: cookingTime <= 25 ? ['quick'] : [],
-    language,
-  })
+  const effectiveRecipeType = getEffectiveRecipeType(recipeType, category)
+
+  let name
+  if (effectiveRecipeType === 'dessert') {
+    name = pickGuaranteedDessertTitle(category) ?? 'קינוח גבינה'
+  } else if (category === 'meat') {
+    name = 'קציצות בשר ביתיות'
+  } else {
+    name = buildDescriptiveDishTitle(finalIngredients, {
+      cookingTime,
+      steps,
+      style: 'quick',
+      tags: cookingTime <= 25 ? ['quick'] : [],
+      language,
+    })
+  }
 
   const matchRatio =
     validation?.matchRatio ??
@@ -735,6 +748,8 @@ export function buildIngredientFirstFallbackRecipe(
       cookingTime,
       style: 'quick',
       servings,
+      recipeType: 'dessert',
+      category,
     }),
     meta,
   }
@@ -752,6 +767,22 @@ function buildDessertMockRecipe(
   },
   { language = 'he', pantrySuffix = '(from your pantry)', validation = null } = {},
 ) {
+  if (isInvalidRecipeSelection('dessert', category)) {
+    return buildMockRecipe(
+      {
+        category,
+        ingredients,
+        cookingTime,
+        mood,
+        isGlutenFree,
+        musicPlatform,
+        servings,
+        recipeType: 'meal',
+      },
+      { language, pantrySuffix, validation },
+    )
+  }
+
   const rawUserList = parseUserIngredients(ingredients)
   if (rawUserList.length > 0) {
     return buildIngredientFirstFallbackRecipe(
@@ -818,6 +849,8 @@ function buildDessertMockRecipe(
       cookingTime,
       style: 'comfort',
       servings,
+      recipeType: 'dessert',
+      category,
     }),
     meta,
   }
@@ -844,7 +877,9 @@ export function buildMockRecipe(
     excludeTemplateKeys = [],
   } = {},
 ) {
-  if (recipeType === 'dessert') {
+  const effectiveRecipeType = getEffectiveRecipeType(recipeType, category)
+
+  if (effectiveRecipeType === 'dessert') {
     return buildDessertMockRecipe(
       { category, ingredients, cookingTime, mood, isGlutenFree, musicPlatform, servings },
       { language, pantrySuffix },
@@ -967,6 +1002,8 @@ export function buildMockRecipe(
       cookingTime: time,
       style: primaryStyle,
       servings,
+      recipeType: 'meal',
+      category,
     }),
     meta,
   }

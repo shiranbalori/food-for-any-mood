@@ -342,12 +342,16 @@ def apply_recipe_ingredient_parser(
     cooking_time: int | None = None,
     style: str | None = None,
     servings: int | None = None,
+    recipe_type: str | None = None,
+    category: str | None = None,
 ) -> tuple[dict, dict]:
     normalized = normalize_recipe_ingredients(recipe, user_ingredients_raw)
     titled = apply_descriptive_dish_title(
         normalized,
         cooking_time=cooking_time,
         style=style,
+        recipe_type=recipe_type,
+        category=category,
     )
     quantified = apply_recipe_quantities(
         titled,

@@ -1,0 +1,125 @@
+.upload-recipe-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1100;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.upload-recipe-modal__backdrop {
+  position: absolute;
+  inset: 0;
+  border: none;
+  background: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(4px);
+  cursor: pointer;
+}
+
+.upload-recipe-modal__panel {
+  position: relative;
+  width: min(100%, 480px);
+  max-height: min(90vh, 720px);
+  overflow: auto;
+  background: var(--surface);
+  border-radius: var(--radius);
+  border: 1px solid var(--glass-border);
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.2);
+  padding: 1.25rem 1.35rem 1.35rem;
+  animation: mealPlanSlideUp 0.28s var(--ease-spring);
+}
+
+.upload-recipe-modal__header {
+  position: relative;
+  margin-bottom: 1rem;
+  padding-inline-end: 2rem;
+}
+
+.upload-recipe-modal__header h2 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.upload-recipe-modal__close {
+  position: absolute;
+  top: 0;
+  inset-inline-end: 0;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  border: none;
+  background: rgba(148, 163, 184, 0.15);
+  color: var(--text-muted);
+  font-size: 1.35rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.upload-recipe-modal__form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.upload-recipe-modal__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.upload-recipe-modal__field span {
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.upload-recipe-modal__field input,
+.upload-recipe-modal__field textarea {
+  width: 100%;
+  padding: 0.75rem 0.85rem;
+  border: 1.5px solid rgba(148, 163, 184, 0.25);
+  border-radius: var(--radius-xs);
+  font-size: 0.92rem;
+  background: var(--surface-solid);
+  resize: vertical;
+}
+
+.upload-recipe-modal__field input:focus,
+.upload-recipe-modal__field textarea:focus {
+  outline: none;
+  border-color: var(--theme-accent, #6366f1);
+}
+
+.upload-recipe-modal__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.upload-recipe-modal__chip {
+  padding: 0.45rem 0.65rem;
+  border-radius: var(--radius-xs);
+  font-size: 0.78rem;
+  font-weight: 600;
+  border: 1.5px solid rgba(148, 163, 184, 0.2);
+  background: var(--surface-solid);
+  color: var(--text);
+}
+
+.upload-recipe-modal__chip--active {
+  border-color: var(--theme-accent, #6366f1);
+  background: var(--theme-accent-light, rgba(99, 102, 241, 0.08));
+  color: var(--theme-accent, #6366f1);
+}
+
+.upload-recipe-modal__error {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #b45309;
+}
+
+@media (min-width: 640px) {
+  .upload-recipe-modal {
+    align-items: center;
+  }
+}

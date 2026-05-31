@@ -212,9 +212,10 @@ def build_ingredient_fallback_recipe(
     music_platform: MusicPlatform,
     build_playlist,
     recipe_type: str = "meal",
+    servings: int = 4,
 ) -> dict:
     """Build a Hebrew recipe centered on the user's ingredients."""
-    from recipe_title import build_descriptive_dish_title
+    from recipe_title import build_guaranteed_dessert_title, build_descriptive_dish_title
 
     display = list(user_ingredients)
     if is_gluten_free:
@@ -278,13 +279,31 @@ def build_ingredient_fallback_recipe(
     if category == "parve":
         tags.append("vegetarian")
 
-    name = build_descriptive_dish_title(
-        ingredients,
-        cooking_time=cooking_time,
-        steps=steps,
-        style="quick",
-        tags=tags or ["comfortFood"],
-    )
+    if recipe_type == "dessert":
+        if category == "meat":
+            name = "קציצות בשר ביתיות"
+            steps = [
+                "מערבבים בשר, בצל, שום, ביצה, מלח ופלפל עד תערובת דביקה.",
+                "יוצרים קציצות בגודל אחיד.",
+                "מחממים שמן במחבת וצורבים את הקציצות מכל הצדדים.",
+                f"מבשלים על אש נמוכה כ-{cook_minutes} דקות עד שהן מוכנות.",
+                "מגישים חם — קינוח אינו מתאים לארוחה בשרית.",
+            ]
+            ingredients = [*display, "בשר בקר טחון", "בצל", "שום", "שמן זית", "מלח", "פלפל שחור"]
+        else:
+            name = build_guaranteed_dessert_title(
+                ingredients,
+                category=category,
+                ingredient_phrase=ingredient_phrase or None,
+            )
+    else:
+        name = build_descriptive_dish_title(
+            ingredients,
+            cooking_time=cooking_time,
+            steps=steps,
+            style="quick",
+            tags=tags or ["comfortFood"],
+        )
 
     match_percentage = min(99, max(72, round(match_ratio * 100)))
     playlist = build_playlist(music_platform, match_percentage)
@@ -295,13 +314,13 @@ def build_ingredient_fallback_recipe(
         "ingredients": ingredients,
         "steps": steps,
         "matchPercentage": match_percentage,
-        "spiceLevel": 1 if category == "parve" else 0,
+        "spiceLevel": 0 if recipe_type == "dessert" else (1 if category == "parve" else 0),
         "nutrition": {
             "calories": 360 + len(display) * 25,
             "protein": 14 + len(display) * 2,
             "carbs": 30 + len(display) * 3,
             "fat": 16 + len(display),
-            "servings": 2,
+            "servings": servings,
         },
         "healthScore": min(92, 70 + len(display) * 3),
         "tags": tags or ["comfortFood"],

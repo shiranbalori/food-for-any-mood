@@ -1,9 +1,16 @@
 import { API_BASE_URL, GENERATE_RECIPE_URL, HEALTH_URL } from '../config/api'
-import { parseUserIngredients } from '../utils/ingredientRelevance'
 import {
   applyRecipeIngredientParser,
 } from '../utils/recipeIngredientParser'
-import { buildIngredientFirstFallbackRecipe, buildMockRecipe } from './mockRecipeProvider'
+import { enforceRecipeTypeTitle } from '../utils/recipeTypeGuard'
+import {
+  getEffectiveRecipeType,
+  logRecipeValidation,
+  validateRecipeCategory,
+} from '../utils/recipeCategoryGuard'
+import { buildMockRecipe } from './mockRecipeProvider'
+
+const GEMINI_REQUEST_TIMEOUT_MS = 15000
 
 /**
  * @typedef {'fallback'} FallbackReason
@@ -171,10 +178,14 @@ async function fetchRecipeFromBackend(payload) {
   const url = GENERATE_RECIPE_URL
   const body = JSON.stringify(payload)
 
+  console.log('[aiRecipeService] recipeType received:', payload.recipeType)
   console.log('[aiRecipeService] Calling generate-recipe:', url)
   console.log('[aiRecipeService] API_BASE_URL:', API_BASE_URL)
   console.log('[aiRecipeService] Payload:', payload)
   console.log('[aiRecipeService] JSON body:', body)
+
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), GEMINI_REQUEST_TIMEOUT_MS)
 
   let response
 
@@ -187,10 +198,17 @@ async function fetchRecipeFromBackend(payload) {
         'Content-Type': 'application/json',
       },
       body,
+      signal: controller.signal,
     })
   } catch (error) {
+    if (error?.name === 'AbortError') {
+      console.warn('[aiRecipeService] Backend request timed out after 15s — using local fallback')
+      throw new Error('Recipe API timed out after 15 seconds', { cause: error })
+    }
     logFetchError('Generate-recipe fetch failed', error)
     throw error
+  } finally {
+    clearTimeout(timeoutId)
   }
 
   const responseText = await response.text()
@@ -224,72 +242,41 @@ async function fetchRecipeFromBackend(payload) {
 }
 
 /**
- * Parse Hebrew ingredients, validate quality, and fall back if needed.
- *
  * @param {ReturnType<typeof normalizeUserInput>} userInput
  * @param {import('./recipeService').GeneratedRecipe} recipe
+ * @param {{ fallbackUsed?: boolean }} [meta]
  */
-function processGeneratedRecipe(userInput, recipe) {
-  const { recipe: parsed, validation } = applyRecipeIngredientParser(
+function finalizeRecipeForUser(userInput, recipe, meta = {}) {
+  const parserOptions = {
+    cookingTime: userInput.cookingTime,
+    servings: userInput.servings,
+    recipeType: userInput.recipeType,
+    category: userInput.category,
+  }
+
+  const { recipe: parsed } = applyRecipeIngredientParser(
     recipe,
     userInput.ingredients,
     userInput.language,
-    { cookingTime: userInput.cookingTime, servings: userInput.servings },
+    parserOptions,
   )
 
-  if (validation.ok && !validation.titleValidation?.isMoodBased) {
-    return parsed
-  }
+  const typed = enforceRecipeTypeTitle(parsed, userInput.recipeType, userInput.category)
+  const passed = validateRecipeCategory(userInput.recipeType, userInput.category, typed)
 
-  if (validation.ok && validation.titleValidation?.isMoodBased) {
-    console.warn('[aiRecipeService] Mood-based title slipped through — rebuilding from ingredients')
-    return parsed
-  }
+  logRecipeValidation({
+    selectedRecipeType: userInput.recipeType,
+    selectedCategory: userInput.category,
+    generatedTitle: typed.name,
+    validationPassed: passed,
+    fallbackUsed: Boolean(meta.fallbackUsed),
+  })
 
-  const rawUserList = parseUserIngredients(userInput.ingredients)
-  if (!rawUserList.length) {
-    console.warn('[aiRecipeService] Recipe quality check failed (no user ingredients):', validation)
-    return parsed
-  }
-
-  console.warn(
-    '[aiRecipeService] Recipe failed ingredient/quality checks — using ingredient fallback',
-    validation,
-  )
-
-  const { recipe: fallback } = buildIngredientFirstFallbackRecipe(
-    {
-      category: userInput.category,
-      ingredients: userInput.ingredients,
-      cookingTime: userInput.cookingTime,
-      mood: userInput.mood,
-      isGlutenFree: userInput.isGlutenFree,
-      musicPlatform: userInput.musicPlatform,
-      servings: userInput.servings,
-      recipeType: userInput.recipeType,
-    },
-    {
-      language: userInput.language,
-      pantrySuffix: userInput.pantrySuffix,
-      validation: validation.relevance ?? validation,
-    },
-  )
-
-  const { recipe: normalizedFallback } = applyRecipeIngredientParser(
-    fallback,
-    userInput.ingredients,
-    userInput.language,
-    { cookingTime: userInput.cookingTime, servings: userInput.servings },
-  )
-
-  return normalizedFallback
+  return { recipe: typed, passed }
 }
 
-/**
- *
- * @param {ReturnType<typeof normalizeUserInput>} userInput
- */
-function fetchMockFallbackRecipe(userInput) {
+function buildCategoryFallbackRecipe(userInput) {
+  const effectiveRecipeType = getEffectiveRecipeType(userInput.recipeType, userInput.category)
   const { recipe } = buildMockRecipe(
     {
       category: userInput.category,
@@ -299,7 +286,7 @@ function fetchMockFallbackRecipe(userInput) {
       isGlutenFree: userInput.isGlutenFree,
       musicPlatform: userInput.musicPlatform,
       servings: userInput.servings,
-      recipeType: userInput.recipeType,
+      recipeType: effectiveRecipeType,
     },
     {
       language: userInput.language,
@@ -307,8 +294,32 @@ function fetchMockFallbackRecipe(userInput) {
       excludeTemplateKeys: userInput.excludeTemplateKeys,
     },
   )
+  return finalizeRecipeForUser(userInput, recipe, { fallbackUsed: true }).recipe
+}
 
-  return recipe
+/**
+ * Parse Hebrew ingredients, validate quality, and fall back if needed.
+ *
+ * @param {ReturnType<typeof normalizeUserInput>} userInput
+ * @param {import('./recipeService').GeneratedRecipe} recipe
+ */
+function processGeneratedRecipe(userInput, recipe) {
+  const { recipe: result, passed } = finalizeRecipeForUser(userInput, recipe)
+
+  if (passed) {
+    return result
+  }
+
+  console.warn('[aiRecipeService] Category/type validation failed — using category fallback')
+  return buildCategoryFallbackRecipe(userInput)
+}
+
+/**
+ *
+ * @param {ReturnType<typeof normalizeUserInput>} userInput
+ */
+function fetchMockFallbackRecipe(userInput) {
+  return buildCategoryFallbackRecipe(userInput)
 }
 
 /**
@@ -322,6 +333,9 @@ export async function generateAIRecipe(userInput) {
 
   const normalized = normalizeUserInput(userInput)
   const payload = buildApiRequestPayload(normalized)
+
+  console.log('[aiRecipeService] recipeType received:', normalized.recipeType)
+  console.log('[aiRecipeService] category received:', normalized.category)
 
   const isHealthy = await checkBackendHealth()
   if (!isHealthy) {

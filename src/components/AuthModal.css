@@ -1,0 +1,126 @@
+.auth-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1100;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.auth-modal__backdrop {
+  position: absolute;
+  inset: 0;
+  border: none;
+  background: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(4px);
+  cursor: pointer;
+}
+
+.auth-modal__panel {
+  position: relative;
+  width: min(100%, 420px);
+  background: var(--surface);
+  border-radius: var(--radius);
+  border: 1px solid var(--glass-border);
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.2);
+  padding: 1.25rem 1.35rem 1.35rem;
+  animation: mealPlanSlideUp 0.28s var(--ease-spring);
+}
+
+.auth-modal__header {
+  position: relative;
+  margin-bottom: 1rem;
+  padding-inline-end: 2rem;
+}
+
+.auth-modal__header h2 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.auth-modal__close {
+  position: absolute;
+  top: 0;
+  inset-inline-end: 0;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  border: none;
+  background: rgba(148, 163, 184, 0.15);
+  color: var(--text-muted);
+  font-size: 1.35rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.auth-modal__form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.auth-modal__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.auth-modal__field span {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.auth-modal__field input {
+  width: 100%;
+  padding: 0.75rem 0.85rem;
+  border: 1.5px solid rgba(148, 163, 184, 0.25);
+  border-radius: var(--radius-xs);
+  font-size: 0.92rem;
+  background: var(--surface-solid);
+}
+
+.auth-modal__field input:focus {
+  outline: none;
+  border-color: var(--theme-accent, #6366f1);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--theme-accent, #6366f1) 15%, transparent);
+}
+
+.auth-modal__error {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #b45309;
+}
+
+.auth-modal__success {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #059669;
+}
+
+.auth-modal__submit {
+  margin-top: 0.25rem;
+}
+
+.auth-modal__switch {
+  margin: 1rem 0 0;
+  text-align: center;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.auth-modal__switch-btn {
+  border: none;
+  background: none;
+  color: var(--theme-accent, #6366f1);
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0;
+}
+
+@media (min-width: 640px) {
+  .auth-modal {
+    align-items: center;
+  }
+}

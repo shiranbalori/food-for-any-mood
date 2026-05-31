@@ -1,11 +1,13 @@
-/** Mock community recipes — replaced by Supabase queries in Step 2. */
+/** Mock community recipes when Supabase env vars are not set. */
 export const MOCK_COMMUNITY_RECIPES = [
   {
     id: 'mock-community-1',
     title: 'שקשוקה מהירה של סבתא',
     authorName: 'מיכל א.',
     category: 'dairy',
+    recipeType: 'meal',
     rating: 4.9,
+    likeCount: 42,
     views: 1842,
   },
   {
@@ -13,7 +15,9 @@ export const MOCK_COMMUNITY_RECIPES = [
     title: 'עוף בתנור עם לימון ושום',
     authorName: 'דוד ר.',
     category: 'meat',
+    recipeType: 'meal',
     rating: 4.7,
+    likeCount: 28,
     views: 956,
   },
   {
@@ -21,7 +25,9 @@ export const MOCK_COMMUNITY_RECIPES = [
     title: 'סלט קינואה וירקות קלויים',
     authorName: 'נועה ש.',
     category: 'parve',
+    recipeType: 'meal',
     rating: 4.6,
+    likeCount: 19,
     views: 721,
   },
   {
@@ -29,7 +35,9 @@ export const MOCK_COMMUNITY_RECIPES = [
     title: 'עוגת גבינה עם פירות יער',
     authorName: 'יעל כ.',
     category: 'dairy',
+    recipeType: 'dessert',
     rating: 4.8,
+    likeCount: 67,
     views: 2103,
   },
   {
@@ -37,15 +45,19 @@ export const MOCK_COMMUNITY_RECIPES = [
     title: 'קציצות עדשים בתנור',
     authorName: 'אורי מ.',
     category: 'parve',
+    recipeType: 'meal',
     rating: 4.5,
+    likeCount: 11,
     views: 534,
   },
   {
     id: 'mock-community-6',
-    title: 'צלי בקר ברוטב יין אדום',
+    title: 'עוגיות שוקולד שחיות',
     authorName: 'רוני ל.',
-    category: 'meat',
+    category: 'parve',
+    recipeType: 'dessert',
     rating: 4.9,
+    likeCount: 53,
     views: 1288,
   },
 ]

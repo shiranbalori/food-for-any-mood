@@ -306,6 +306,8 @@ export function applyRecipeIngredientParser(recipe, userIngredientsRaw = '', lan
     cookingTime: options.cookingTime,
     style: options.style,
     language,
+    recipeType: options.recipeType ?? 'meal',
+    category: options.category ?? 'dairy',
   })
   const quantified = applyRecipeQuantities(titled, {
     language,

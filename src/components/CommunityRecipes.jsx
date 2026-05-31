@@ -1,35 +1,56 @@
-import { useEffect, useState } from 'react'
-import { getTheme } from '../utils/themes'
+import { useCallback, useEffect, useState } from 'react'
+import { useAuth } from '../context/AuthContext'
 import { useLanguage } from '../i18n/useLanguage'
 import { fetchCommunityRecipes } from '../services/communityRecipeService'
+import AuthModal from './AuthModal'
+import UploadCommunityRecipeModal from './UploadCommunityRecipeModal'
+import CommunityRecipeCard from './CommunityRecipeCard'
 import './CommunityRecipes.css'
 
-function formatViews(count, language) {
-  try {
-    return new Intl.NumberFormat(language === 'he' ? 'he-IL' : 'en-US').format(count)
-  } catch {
-    return String(count)
-  }
-}
-
 export default function CommunityRecipes() {
-  const { t, language } = useLanguage()
+  const { t } = useLanguage()
+  const { user, isAuthenticated, isSupabaseReady, loading: authLoading } = useAuth()
   const [recipes, setRecipes] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [authOpen, setAuthOpen] = useState(false)
+  const [authMode, setAuthMode] = useState('login')
+  const [uploadOpen, setUploadOpen] = useState(false)
+
+  const loadRecipes = useCallback(async () => {
+    setLoading(true)
+    setError('')
+    try {
+      const items = await fetchCommunityRecipes(user?.id)
+      setRecipes(items)
+    } catch (err) {
+      console.error('[CommunityRecipes] load failed:', err)
+      setError(t('communityLoadError'))
+    } finally {
+      setLoading(false)
+    }
+  }, [user?.id, t])
 
   useEffect(() => {
-    let active = true
+    if (authLoading) return
+    loadRecipes()
+  }, [authLoading, loadRecipes])
 
-    fetchCommunityRecipes().then((items) => {
-      if (active) setRecipes(items)
-    })
-
-    return () => {
-      active = false
-    }
-  }, [])
+  const openAuth = (mode = 'login') => {
+    setAuthMode(mode)
+    setAuthOpen(true)
+  }
 
   const handleUploadClick = () => {
-    window.alert(t('communityUploadComingSoon'))
+    if (!isSupabaseReady) {
+      window.alert(t('authSupabaseMissing'))
+      return
+    }
+    if (!isAuthenticated) {
+      openAuth('login')
+      return
+    }
+    setUploadOpen(true)
   }
 
   return (
@@ -45,42 +66,44 @@ export default function CommunityRecipes() {
         </button>
       </div>
 
+      {!isSupabaseReady && (
+        <p className="community-recipes__notice">{t('communityMockNotice')}</p>
+      )}
+
+      {loading && <p className="community-recipes__status">{t('communityLoading')}</p>}
+      {error && <p className="community-recipes__error">{error}</p>}
+
+      {!loading && recipes.length === 0 && (
+        <div className="community-recipes__empty">
+          <span>👥</span>
+          <p>{t('communityEmpty')}</p>
+        </div>
+      )}
+
       <div className="community-recipes__grid">
-        {recipes.map((recipe) => {
-          const theme = getTheme(recipe.category ?? 'parve')
-          const categoryId = recipe.category ?? 'parve'
-
-          return (
-            <article
-              key={recipe.id}
-              className="community-card"
-              style={{
-                '--theme-accent': theme.accent,
-                '--theme-accent-light': theme.accentLight,
-              }}
-            >
-              <div className="community-card__top">
-                <span className="community-card__category">
-                  {theme.emoji} {t(`categories.${categoryId}`)}
-                </span>
-                <span className="community-card__rating">
-                  ⭐ {recipe.rating.toFixed(1)}
-                </span>
-              </div>
-
-              <h3 className="community-card__title">{recipe.title}</h3>
-
-              <p className="community-card__author">
-                {t('communityAuthor', { name: recipe.authorName })}
-              </p>
-
-              <div className="community-card__meta">
-                <span>{t('communityViews', { count: formatViews(recipe.views, language) })}</span>
-              </div>
-            </article>
-          )
-        })}
+        {recipes.map((recipe) => (
+          <CommunityRecipeCard
+            key={recipe.id}
+            recipe={recipe}
+            isAuthenticated={isAuthenticated}
+            userId={user?.id}
+            isSupabaseReady={isSupabaseReady}
+            onAuthRequired={() => openAuth('login')}
+            onUpdated={loadRecipes}
+          />
+        ))}
       </div>
+
+      <AuthModal open={authOpen} onClose={() => setAuthOpen(false)} initialMode={authMode} />
+
+      {isAuthenticated && (
+        <UploadCommunityRecipeModal
+          open={uploadOpen}
+          onClose={() => setUploadOpen(false)}
+          userId={user.id}
+          onUploaded={loadRecipes}
+        />
+      )}
     </section>
   )
 }

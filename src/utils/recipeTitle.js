@@ -1,4 +1,5 @@
-import { getIngredientLabel } from '../data/ingredientLabels'
+import { enforceRecipeTypeTitle, isValidDessertTitle, pickGuaranteedDessertTitle } from './recipeTypeGuard'
+import { isInvalidRecipeSelection } from './recipeCategoryGuard'
 import { canonicalIngredient } from '../data/ingredientKnowledge'
 import { ingredientAppearsInText } from './ingredientRelevance'
 
@@ -358,6 +359,16 @@ export function ensureDescriptiveDishTitle(title, ingredients = [], options = {}
 }
 
 export function applyDescriptiveDishTitle(recipe, options = {}) {
+  const recipeType = options.recipeType ?? 'meal'
+  const category = options.category ?? 'dairy'
+
+  if (recipeType === 'dessert') {
+    if (isInvalidRecipeSelection('dessert', category)) {
+      return { ...recipe, name: 'קציצות בשר ביתיות' }
+    }
+    return enforceRecipeTypeTitle(recipe, 'dessert', category)
+  }
+
   const name = ensureDescriptiveDishTitle(recipe.name, recipe.ingredients ?? [], {
     cookingTime: options.cookingTime,
     steps: recipe.steps ?? [],
@@ -368,6 +379,8 @@ export function applyDescriptiveDishTitle(recipe, options = {}) {
 
   return { ...recipe, name }
 }
+
+export { isValidDessertTitle, pickGuaranteedDessertTitle, enforceRecipeTypeTitle }
 
 export function validateDishTitle(title, ingredients = [], language = 'he') {
   const descriptive = titleDescribesDish(title, ingredients, language)
