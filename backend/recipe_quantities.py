@@ -5,13 +5,22 @@ from __future__ import annotations
 import re
 
 from ingredient_relevance import canonical_ingredient, normalize_ingredient
+from hebrew_step_wording import naturalize_recipe_steps, to_step_ingredient_reference
+from recipe_step_sanitize import light_sanitize_recipe_steps
+from nutrition_score import calculate_health_score_from_recipe
+from measurement_units import (
+    MEASURED_UNIT_TOKEN,
+    QUANTITY_UNIT_PREFIX,
+    format_hebrew_measurement,
+    parse_amount,
+    parse_leading_measurement,
+    strip_quantity_prefix,
+    UNIT_LABELS,
+)
 
 DEFAULT_SERVINGS = 2
 PANTRY_SUFFIX = re.compile(r"\s*\([^)]*\)\s*$")
-QTY_PREFIX = re.compile(
-    r"^[\d./]+\s*(?:כפית|כפיות|כף|כפות|גרם|מ\"ל|כוס|כוסות|tsp|tbsp|gram|grams|g|ml|cup|cups)?\s*",
-    re.IGNORECASE,
-)
+QTY_PREFIX = QUANTITY_UNIT_PREFIX
 
 STAPLE_PROFILE_KEYS = {
     "salt": "salt",
@@ -29,15 +38,7 @@ STAPLE_PROFILE_KEYS = {
     "ביצים": "eggs",
 }
 
-MEASURED_UNIT_PATTERN = re.compile(
-    r"(?:כפית|כפיות|כף|כפות|גרם|מ\"ל|כוס|כוסות|\btsp\b|\btbsp\b|\bgram\b|\bgrams\b|\bg\b|\bml\b|\bcup\b|\bcups\b)",
-    re.IGNORECASE,
-)
-
-UNIT_LABELS = {
-    "he": {"tsp": "כפית", "tbsp": "כף", "gram": "גרם", "ml": "מ\"ל", "cup": "כוס"},
-    "en": {"tsp": "tsp", "tbsp": "tbsp", "gram": "gram", "ml": "ml", "cup": "cup"},
-}
+MEASURED_UNIT_PATTERN = MEASURED_UNIT_TOKEN
 
 HEBREW_LABELS: dict[str, str] = {
     "egg": "ביצה",
@@ -73,6 +74,7 @@ HEBREW_LABELS: dict[str, str] = {
     "broth": "ציר",
     "tuna": "טונה",
     "yogurt": "יוגורט",
+    "coffee": "קפה",
 }
 
 QUANTITY_PROFILES: dict[str, dict] = {
@@ -132,12 +134,27 @@ QUANTITY_PROFILES: dict[str, dict] = {
     "quinoa": {"unit": "cup", "base": 0.5, "per_serving": True},
     "flour": {"unit": "cup", "base": 0.25, "per_serving": False},
     "sugar": {"unit": "tbsp", "base": 1, "per_serving": False},
+    "cinnamon": {"unit": "tsp", "base": 0.5, "per_serving": False},
     "honey": {"unit": "tbsp", "base": 1, "per_serving": False},
     "soy sauce": {"unit": "tbsp", "base": 2, "per_serving": False},
     "coconut milk": {"unit": "ml", "base": 200, "per_serving": True},
     "broth": {"unit": "ml", "base": 250, "per_serving": True},
     "tuna": {"unit": "gram", "base": 120, "per_serving": True},
     "yogurt": {"unit": "ml", "base": 120, "per_serving": True},
+    "strawberry": {
+        "unit": "whole",
+        "base": 8,
+        "per_serving": False,
+        "singular": "תות",
+        "plural": "תותים",
+    },
+    "strawberries": {
+        "unit": "whole",
+        "base": 8,
+        "per_serving": False,
+        "singular": "תות",
+        "plural": "תותים",
+    },
 }
 
 NUTRITION_PER_UNIT: dict[str, dict[str, dict[str, float]]] = {
@@ -201,10 +218,15 @@ def _round_amount(value: float, unit: str) -> float:
     return round(value, 2)
 
 
-def _strip_quantity(raw: str) -> tuple[str, str | None]:
+def _strip_quantity(raw: str) -> tuple[str, str | None, dict | None]:
     trimmed = PANTRY_SUFFIX.sub("", (raw or "").strip()).strip()
-    without_qty = QTY_PREFIX.sub("", trimmed).strip() or trimmed
-    return without_qty, canonical_ingredient(without_qty)
+    measured = parse_leading_measurement(trimmed)
+    if measured:
+        name = measured["name"]
+        return name, canonical_ingredient(name), measured
+
+    without_qty = strip_quantity_prefix(trimmed) or trimmed
+    return without_qty, canonical_ingredient(without_qty), None
 
 
 def _resolve_profile_key(canon: str | None, name: str) -> str:
@@ -279,6 +301,9 @@ def _format_item(canon: str, name: str, amount: float, profile: dict, language: 
         return f"{count} {noun}"
 
     display_name = HEBREW_LABELS.get(canon, name) if language == "he" else name
+    if language == "he":
+        return format_hebrew_measurement(amount, profile["unit"], display_name)
+
     unit_label = UNIT_LABELS.get(language, UNIT_LABELS["he"]).get(profile["unit"], profile["unit"])
     return f"{_format_fraction(amount)} {unit_label} {display_name}"
 
@@ -286,20 +311,41 @@ def _format_item(canon: str, name: str, amount: float, profile: dict, language: 
 def quantify_ingredient(raw: str, servings: int = DEFAULT_SERVINGS, language: str = "he") -> dict:
     pantry_match = PANTRY_SUFFIX.search(raw or "")
     pantry_note = pantry_match.group(0).strip() if pantry_match else ""
-    name, canon = _strip_quantity(raw)
+    trimmed = PANTRY_SUFFIX.sub("", (raw or "").strip()).strip()
+    existing = parse_leading_measurement(trimmed)
+
+    if existing and language == "he":
+        name, canon, _ = _strip_quantity(raw)
+        display_name = HEBREW_LABELS.get(canon or "", name) if canon else name
+        display = format_hebrew_measurement(existing["qty"], existing["unit"], display_name)
+        if pantry_note:
+            display = f"{display} {pantry_note}"
+        label = HEBREW_LABELS.get(canon or "", name) if canon else name
+        step_phrase = to_step_ingredient_reference(display_name, language)
+        return {
+            "canon": canon or name,
+            "name": label,
+            "amount": parse_amount(existing["qty"]),
+            "unit": existing["unit"],
+            "display": display,
+            "step_phrase": step_phrase,
+        }
+
+    name, canon, _ = _strip_quantity(raw)
     profile = _resolve_profile(canon, name)
     amount = _compute_amount(profile, servings)
     display = _format_item(profile["canon"], name, amount, profile, language)
     if pantry_note:
         display = f"{display} {pantry_note}"
     label = HEBREW_LABELS.get(profile["canon"], name) if language == "he" else name
+    step_phrase = to_step_ingredient_reference(label if language == "he" else name, language)
     return {
         "canon": profile["canon"],
         "name": label,
         "amount": amount,
         "unit": profile["unit"],
         "display": display,
-        "step_phrase": display,
+        "step_phrase": step_phrase,
     }
 
 
@@ -343,14 +389,13 @@ def compute_nutrition_from_quantities(quantified_items: list[dict], servings: in
     carbs = round(totals["carbs"])
     fat = round(totals["fat"])
 
-    health_score = 72
-    if protein / max(servings, 1) >= 20:
-        health_score += 6
-    if fat / max(servings, 1) > 28:
-        health_score -= 4
-    if calories / max(servings, 1) < 450:
-        health_score += 3
-    health_score = min(95, max(50, health_score))
+    health_score = calculate_health_score_from_recipe(
+        ingredients=[item.get("display") or item.get("name", "") for item in quantified_items],
+        calories=calories,
+        protein=protein,
+        carbs=carbs,
+        servings=servings,
+    )
 
     return {
         "calories": calories,
@@ -362,7 +407,13 @@ def compute_nutrition_from_quantities(quantified_items: list[dict], servings: in
     }
 
 
-def apply_recipe_quantities(recipe: dict, *, language: str = "he", servings: int | None = None) -> dict:
+def apply_recipe_quantities(
+    recipe: dict,
+    *,
+    language: str = "he",
+    servings: int | None = None,
+    preserve_original_steps: bool = False,
+) -> dict:
     current_servings = servings or (recipe.get("nutrition") or {}).get("servings") or DEFAULT_SERVINGS
     ingredients = recipe.get("ingredients") or []
     quantified_items = [quantify_ingredient(entry, current_servings, language) for entry in ingredients]
@@ -373,7 +424,15 @@ def apply_recipe_quantities(recipe: dict, *, language: str = "he", servings: int
         for item in quantified_items
     ]
     next_ingredients = [item["display"] for item in quantified_items]
-    next_steps = sync_steps_with_quantities(recipe.get("steps") or [], quantified_items)
+    if preserve_original_steps:
+        next_steps = light_sanitize_recipe_steps(recipe.get("steps") or [])
+    else:
+        synced_steps = sync_steps_with_quantities(recipe.get("steps") or [], quantified_items)
+        next_steps = naturalize_recipe_steps(
+            synced_steps,
+            [item["name"] for item in quantified_items],
+            language,
+        )
     nutrition = compute_nutrition_from_quantities(quantified_items, current_servings)
     health_score = nutrition.pop("health_score")
 

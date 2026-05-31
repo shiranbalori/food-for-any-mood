@@ -15,6 +15,7 @@ import { useLanguage } from './i18n/useLanguage'
 import { getTheme } from './utils/themes'
 import { generateAppRecipe } from './services/recipeService'
 import { fetchMoreRecipeIdeas } from './services/recipeIdeasService'
+import { detectCookingMethod, detectDessertCategory } from './utils/recipeDiversity'
 // Recipe source: FastAPI backend (default) — see .env.example
 import {
   getSavedRecipes,
@@ -52,8 +53,14 @@ export default function App() {
   const [savedRecipes, setSavedRecipes] = useState(getSavedRecipes)
   const [favoriteRecipes, setFavoriteRecipes] = useState(getFavoriteRecipes)
   const [usedTemplateKeys, setUsedTemplateKeys] = useState([])
+  const [regenerationHistory, setRegenerationHistory] = useState({
+    titles: [],
+    cookingMethods: [],
+    dessertCategories: [],
+  })
   const [saveError, setSaveError] = useState(false)
   const [backendNotice, setBackendNotice] = useState(null)
+  const [impossibleRecipe, setImpossibleRecipe] = useState(null)
   const [recipeIdeas, setRecipeIdeas] = useState(null)
   const [ideasLoading, setIdeasLoading] = useState(false)
   const [mealPlan, setMealPlan] = useState(getMealPlan)
@@ -68,20 +75,34 @@ export default function App() {
 
   const handleGenerate = useCallback(
     async (options = {}) => {
-      const { excludeKeys = [], regenerate = false } = options
+      const {
+        excludeKeys = [],
+        excludeTitles = [],
+        excludeCookingMethods = [],
+        excludeDessertCategories = [],
+        regenerate = false,
+      } = options
       setLoading(true)
       setRecipe(null)
       setRecipeIdeas(null)
+      setImpossibleRecipe(null)
       setSaveError(false)
       setBackendNotice(null)
 
       if (!regenerate) {
         setUsedTemplateKeys([])
+        setRegenerationHistory({ titles: [], cookingMethods: [], dessertCategories: [] })
       }
 
       try {
         const keysToExclude = regenerate ? excludeKeys : []
-        const { recipe: newRecipe, fallbackReason } = await generateAppRecipe(
+        const {
+          recipe: newRecipe,
+          fallbackReason,
+          recipePossible,
+          impossibleReason,
+          missingIngredients,
+        } = await generateAppRecipe(
           {
             category,
             ingredients: form.ingredients,
@@ -96,14 +117,42 @@ export default function App() {
             language,
             pantrySuffix: t('pantrySuffix'),
             excludeTemplateKeys: keysToExclude,
+            excludeTitles: regenerate ? excludeTitles : [],
+            excludeCookingMethods: regenerate ? excludeCookingMethods : [],
+            excludeDessertCategories: regenerate ? excludeDessertCategories : [],
           },
         )
+
+        if (recipePossible === false) {
+          setRecipe(null)
+          setImpossibleRecipe({
+            reason: impossibleReason,
+            missingIngredients: missingIngredients ?? [],
+          })
+          return
+        }
 
         setRecipe(newRecipe)
         setBackendNotice(fallbackReason)
         setUsedTemplateKeys((prev) =>
           regenerate ? [...prev, newRecipe.templateKey] : [newRecipe.templateKey],
         )
+        setRegenerationHistory((prev) => {
+          const cookingMethod = detectCookingMethod(newRecipe)
+          const dessertCategory = recipeType === 'dessert' ? detectDessertCategory(newRecipe) : null
+          return {
+            titles: regenerate ? [...prev.titles, newRecipe.name] : [newRecipe.name],
+            cookingMethods: regenerate
+              ? [...prev.cookingMethods, cookingMethod].filter(Boolean)
+              : [cookingMethod].filter(Boolean),
+            dessertCategories:
+              recipeType === 'dessert' && dessertCategory
+                ? regenerate
+                  ? [...prev.dessertCategories, dessertCategory]
+                  : [dessertCategory]
+                : [],
+          }
+        })
       } catch (error) {
         console.error('[App] Recipe generation failed:', error)
         setBackendNotice('error')
@@ -164,7 +213,13 @@ export default function App() {
 
   const handleRegenerate = () => {
     setRecipeIdeas(null)
-    handleGenerate({ excludeKeys: usedTemplateKeys, regenerate: true })
+    handleGenerate({
+      excludeKeys: usedTemplateKeys,
+      excludeTitles: regenerationHistory.titles,
+      excludeCookingMethods: regenerationHistory.cookingMethods,
+      excludeDessertCategories: regenerationHistory.dessertCategories,
+      regenerate: true,
+    })
   }
 
   const handleLoadMoreIdeas = useCallback(async () => {
@@ -261,6 +316,18 @@ export default function App() {
           <p className="app__backend-notice app__backend-notice--error" role="alert">
             {t('backendUnreachable')}
           </p>
+        )}
+
+        {impossibleRecipe && !loading && (
+          <div className="app__backend-notice app__backend-notice--error" role="alert">
+            <p>{impossibleRecipe.reason}</p>
+            {impossibleRecipe.missingIngredients?.length > 0 && (
+              <p>
+                {t('recipeMissingIngredients')}{' '}
+                {impossibleRecipe.missingIngredients.join(', ')}
+              </p>
+            )}
+          </div>
         )}
 
         {recipe && !loading && (

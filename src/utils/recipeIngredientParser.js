@@ -7,30 +7,39 @@ import {
 } from '../data/ingredientKnowledge'
 import {
   MIN_INGREDIENT_MATCH_RATIO,
+  computeUserIngredientMatchPercent,
   ingredientAppearsInText,
   parseUserIngredients,
   validateRecipeRelevance,
 } from './ingredientRelevance'
 import { applyDescriptiveDishTitle, validateDishTitle } from './recipeTitle'
 import { applyRecipeQuantities } from './recipeQuantities'
+import { sanitizeIngredientList, sanitizeRecipeSteps, stripIngredientBullets, isValidIngredientLine, lightSanitizeRecipeSteps } from './ingredientFormatting'
+import {
+  formatStepIngredientList,
+  hasUnnaturalStepPhrasing,
+  verifyStepIngredientAlignment,
+} from './recipeStepWording'
+import {
+  formatHebrewMeasurement,
+  parseAnyLeadingMeasurement,
+  stripQuantityPrefix,
+} from './measurementUnits'
+import {
+  stepHasMeaningfulAction,
+  validateRecipeBeforeReturn,
+} from './recipePreReturnValidation'
 
 const LATIN_PATTERN = /[a-z]/i
 
-/** Staples that may appear in the list without being named verbatim in steps. */
-const STAPLE_CANONICAL = new Set([
-  'salt',
-  'pepper',
-  'black pepper',
-  'oil',
-  'olive',
-  'olive oil',
-  'water',
-  'sugar',
-])
+import {
+  findUnauthorizedRecipeIngredients,
+  isRecipeIngredientAllowed,
+  isSystemPantryIngredient,
+  SYSTEM_PANTRY_CANONICAL,
+} from './ingredientAllowlist'
 
 const SPLIT_PATTERN = /\s*(?:,|;|\n|\+|\band\b|\&|\u05d5(?=\s[\u0590-\u05FFa-z]))\s*/i
-
-const QUANTITY_PREFIX = /^[\d./]+\s*(?:kg|g|gr|gram|grams|ml|l|cup|cups|tbsp|tsp|oz|lb|pcs|piece|pieces|יח|כף|כפות|כוס|כוסות|גרם|ק)?\s*/i
 
 const PAREN_SUFFIX = /\s*\([^)]*\)\s*$/
 
@@ -41,8 +50,7 @@ export function containsLatinText(text) {
 }
 
 function isStapleIngredient(name) {
-  const canon = canonicalIngredient(name)
-  return canon != null && STAPLE_CANONICAL.has(canon)
+  return isSystemPantryIngredient(name)
 }
 
 function findHebrewAlias(raw) {
@@ -71,16 +79,11 @@ function findHebrewAlias(raw) {
 }
 
 /**
- * Convert a single ingredient phrase to Hebrew. Never returns English for `language === 'he'`.
+ * Translate an ingredient name (without leading quantity/unit) to Hebrew.
  */
-export function toHebrewIngredient(raw, language = 'he') {
-  const trimmed = String(raw ?? '').trim()
-  if (!trimmed) return ''
-
-  if (language !== 'he') return trimmed
-
-  const withoutSuffix = trimmed.replace(PAREN_SUFFIX, '').trim()
-  const withoutQty = withoutSuffix.replace(QUANTITY_PREFIX, '').trim() || withoutSuffix
+function toHebrewIngredientName(raw) {
+  const withoutQty = stripQuantityPrefix(String(raw ?? '').trim())
+  if (!withoutQty) return ''
 
   if (/[\u0590-\u05FF]/.test(withoutQty) && !containsLatinText(withoutQty)) {
     return withoutQty
@@ -111,16 +114,34 @@ export function toHebrewIngredient(raw, language = 'he') {
 }
 
 /**
+ * Convert a single ingredient phrase to Hebrew. Never returns English for `language === 'he'`.
+ */
+export function toHebrewIngredient(raw, language = 'he') {
+  const trimmed = stripIngredientBullets(String(raw ?? '').trim())
+  if (!trimmed || !isValidIngredientLine(trimmed)) return ''
+
+  if (language !== 'he') return trimmed
+
+  const withoutSuffix = trimmed.replace(PAREN_SUFFIX, '').trim()
+  const measured = parseAnyLeadingMeasurement(withoutSuffix)
+  if (measured) {
+    return formatHebrewMeasurement(measured.qty, measured.unit, toHebrewIngredientName(measured.name))
+  }
+
+  return toHebrewIngredientName(withoutSuffix)
+}
+
+/**
  * Split a possibly merged ingredient string into separate items.
  */
 export function splitIngredientEntry(raw) {
-  const trimmed = String(raw ?? '').trim()
+  const trimmed = stripIngredientBullets(String(raw ?? '').trim())
   if (!trimmed) return []
 
   return trimmed
     .split(SPLIT_PATTERN)
-    .map((part) => part.replace(PAREN_SUFFIX, '').replace(QUANTITY_PREFIX, '').trim())
-    .filter(Boolean)
+    .map((part) => part.replace(PAREN_SUFFIX, '').trim())
+    .filter((part) => part && isValidIngredientLine(part))
 }
 
 function dedupeIngredients(list) {
@@ -173,34 +194,43 @@ function ingredientUsedInSteps(ingredient, steps) {
   return false
 }
 
-function ensureUserIngredientsPresent(userIngredients, ingredients, steps, language) {
-  let nextIngredients = [...ingredients]
-  let nextSteps = [...steps]
+function toLocalizedIngredient(raw, language = 'he') {
+  if (language === 'he') return toHebrewIngredient(raw, language)
+  const trimmed = stripIngredientBullets(String(raw ?? '').trim())
+  if (!trimmed || !isValidIngredientLine(trimmed)) return ''
+  const canon = canonicalIngredient(stripQuantityPrefix(trimmed))
+  return getIngredientLabel(canon ?? stripQuantityPrefix(trimmed), 'en') || trimmed
+}
+
+function ensureUserIngredientsInList(userIngredients, ingredients, language) {
+  const nextIngredients = [...ingredients]
 
   for (const userIng of userIngredients) {
-    const hebrewForm =
-      /[\u0590-\u05FF]/.test(userIng) && !containsLatinText(userIng)
+    const localized =
+      /[\u0590-\u05FF]/.test(userIng) && !containsLatinText(userIng) && language === 'he'
         ? userIng.trim()
-        : toHebrewIngredient(userIng, language)
+        : toLocalizedIngredient(userIng, language)
 
-    const inList = nextIngredients.some((item) => ingredientsMatch(item, hebrewForm))
-    if (!inList) {
-      nextIngredients.unshift(hebrewForm)
-    }
-
-    const inSteps = ingredientUsedInSteps(hebrewForm, nextSteps)
-    if (!inSteps && nextSteps.length > 0) {
-      nextSteps[0] = `${nextSteps[0]} (${hebrewForm})`
+    const inList = nextIngredients.some((item) => ingredientsMatch(item, localized))
+    if (!inList && localized) {
+      nextIngredients.unshift(localized)
     }
   }
 
-  return { ingredients: dedupeIngredients(nextIngredients), steps: nextSteps }
+  return dedupeIngredients(nextIngredients)
 }
 
-function filterIngredientsUsedInSteps(ingredients, steps) {
-  return ingredients.filter(
-    (item) => isStapleIngredient(item) || ingredientUsedInSteps(item, steps),
-  )
+function filterIngredientsUsedInSteps(ingredients, steps, userIngredients = [], language = 'he') {
+  return ingredients.filter((item) => {
+    if (userIngredients.length > 0 && !isRecipeIngredientAllowed(item, userIngredients)) {
+      return false
+    }
+    const isUserIngredient = userIngredients.some((userIng) =>
+      ingredientsMatch(item, toLocalizedIngredient(userIng, language)),
+    )
+    if (isUserIngredient) return true
+    return isStapleIngredient(item) || ingredientUsedInSteps(item, steps)
+  })
 }
 
 /**
@@ -211,47 +241,83 @@ export function normalizeRecipeIngredients(recipe, userIngredientsRaw = '', lang
   const rawEntries = Array.isArray(recipe.ingredients) ? recipe.ingredients : []
 
   const expanded = rawEntries.flatMap((entry) => splitIngredientEntry(entry))
-  const hebrewized = expanded
-    .map((entry) => toHebrewIngredient(entry, language))
+  const localized = expanded
+    .map((entry) => (language === 'he' ? toHebrewIngredient(entry, language) : toLocalizedIngredient(entry, language)))
     .filter(Boolean)
 
-  let ingredients = dedupeIngredients(hebrewized)
+  let ingredients = dedupeIngredients(localized)
   let steps = Array.isArray(recipe.steps) ? [...recipe.steps] : []
 
-  ;({ ingredients, steps } = ensureUserIngredientsPresent(
-    userIngredients,
-    ingredients,
-    steps,
-    language,
-  ))
-
+  ingredients = ensureUserIngredientsInList(userIngredients, ingredients, language)
   steps = hebrewizeSteps(steps, ingredients, language)
-  ingredients = filterIngredientsUsedInSteps(ingredients, steps)
-
-  ;({ ingredients, steps } = ensureUserIngredientsPresent(
-    userIngredients,
-    ingredients,
-    steps,
-    language,
-  ))
+  ingredients = filterIngredientsUsedInSteps(ingredients, steps, userIngredients, language)
+  ingredients = ensureUserIngredientsInList(userIngredients, ingredients, language)
 
   return {
     ...recipe,
-    ingredients: dedupeIngredients(ingredients),
-    steps,
+    ingredients: sanitizeIngredientList(dedupeIngredients(ingredients)),
+    steps: sanitizeRecipeSteps(steps),
   }
 }
 
 /**
- * Full quality validation including Hebrew-only ingredients and step usage.
+ * Full quality validation. Returns a detailed report; rules are advisory except
+ * invalid ingredients, language mix, and missing user ingredients in the list.
  */
+function buildSafeValidationReport(partial = {}) {
+  return {
+    ok: false,
+    checks: partial.checks ?? {},
+    ingredientRelevanceScore: partial.ingredientRelevanceScore ?? 0,
+    matchRatio: partial.matchRatio ?? 0,
+    titleHasIngredient: partial.titleHasIngredient ?? false,
+    matched: partial.matched ?? [],
+    unmatched: partial.unmatched ?? [],
+    englishIngredients: partial.englishIngredients ?? [],
+    hebrewIngredients: partial.hebrewIngredients ?? [],
+    unusedInSteps: partial.unusedInSteps ?? [],
+    userExplicitMissing: partial.userExplicitMissing ?? [],
+    userMissingFromSteps: partial.userMissingFromSteps ?? [],
+    titleValidation: partial.titleValidation ?? { ok: false },
+    relevance: partial.relevance ?? { ok: false, matchRatio: 0, matched: [], unmatched: [] },
+    invalidIngredients: partial.invalidIngredients ?? [],
+    unnaturalSteps: partial.unnaturalSteps ?? [],
+    weakSteps: partial.weakSteps ?? [],
+    preReturn: partial.preReturn ?? {
+      ok: false,
+      failures: ['validation_error'],
+      unauthorizedIngredients: [],
+    },
+    stepsAligned: partial.stepsAligned ?? true,
+    stepScore: partial.stepScore ?? 0,
+    unauthorizedIngredients: partial.unauthorizedIngredients ?? [],
+    validationError: partial.validationError ?? null,
+  }
+}
+
 export function validateRecipeQuality(userIngredients, recipe, language = 'he', options = {}) {
+  try {
+    return validateRecipeQualityCore(userIngredients, recipe, language, options)
+  } catch (error) {
+    console.warn('[recipeIngredientParser] validateRecipeQuality failed:', error)
+    return buildSafeValidationReport({
+      validationError: error instanceof Error ? error.message : String(error),
+      unauthorizedIngredients: [],
+    })
+  }
+}
+
+function validateRecipeQualityCore(userIngredients, recipe, language = 'he', options = {}) {
   const relevance = validateRecipeRelevance(userIngredients, recipe)
   const stepsText = (recipe.steps ?? []).join('\n')
-  const titleValidation = validateDishTitle(recipe.name, recipe.ingredients ?? [])
+  const titleValidation = validateDishTitle(recipe.name, recipe.ingredients ?? [], language)
 
   const englishIngredients = (recipe.ingredients ?? []).filter((item) =>
     containsLatinText(item),
+  )
+
+  const hebrewIngredients = (recipe.ingredients ?? []).filter(
+    (item) => /[\u0590-\u05FF]/.test(item) && !containsLatinText(item),
   )
 
   const unusedInSteps = (recipe.ingredients ?? []).filter(
@@ -259,9 +325,11 @@ export function validateRecipeQuality(userIngredients, recipe, language = 'he', 
   )
 
   const userExplicitMissing = userIngredients.filter(
-    (userIng) =>
-      !(recipe.ingredients ?? []).some((item) => ingredientsMatch(item, userIng)) ||
-      !ingredientAppearsInText(userIng, stepsText),
+    (userIng) => !(recipe.ingredients ?? []).some((item) => ingredientsMatch(item, userIng)),
+  )
+
+  const userMissingFromSteps = userIngredients.filter(
+    (userIng) => !ingredientAppearsInText(userIng, stepsText),
   )
 
   const stepScore =
@@ -270,37 +338,131 @@ export function validateRecipeQuality(userIngredients, recipe, language = 'he', 
       : 1
 
   const hebrewScore = englishIngredients.length === 0 ? 1 : 0
+  const englishScore = hebrewIngredients.length === 0 ? 1 : 0
+  const languageScore = language === 'en' ? englishScore : hebrewScore
 
-  const ingredientRelevanceScore = Math.round(
-    relevance.matchRatio * 70 + stepScore * 20 + hebrewScore * 10,
+  const ingredientRelevanceScore = computeUserIngredientMatchPercent(userIngredients, recipe)
+
+  const languageOk = language === 'he' ? englishIngredients.length === 0 : hebrewIngredients.length === 0
+
+  const invalidIngredients = (recipe.ingredients ?? []).filter(
+    (item) => !isValidIngredientLine(item),
   )
 
+  const unnaturalSteps = hasUnnaturalStepPhrasing(recipe.steps ?? [], language)
+  const weakSteps = (recipe.steps ?? []).filter((step) => !stepHasMeaningfulAction(step))
+  const preReturn = validateRecipeBeforeReturn(recipe, userIngredients.join(', '), { language })
+  const unauthorizedIngredients = preReturn?.unauthorizedIngredients ?? []
+  const unauthorizedOk = userIngredients.length === 0 || unauthorizedIngredients.length === 0
+  const stepsAligned = verifyStepIngredientAlignment(
+    recipe.ingredients ?? [],
+    recipe.steps ?? [],
+    language,
+    { staples: SYSTEM_PANTRY_CANONICAL },
+  )
+
+  const ingredientCount = recipe.ingredients?.length ?? 0
+  const maxUnusedNonStaples = Math.max(2, Math.ceil(ingredientCount * 0.4))
+  const relevanceOk =
+    userIngredients.length === 0 ||
+    relevance.matchRatio >= 0.4 ||
+    relevance.matched.length > 0
+  const unusedOk = unusedInSteps.length <= maxUnusedNonStaples
+  const invalidOk = invalidIngredients.length === 0
+  const userIngredientsOk = userExplicitMissing.length === 0
+
+  const checks = {
+    invalidIngredients: invalidOk,
+    languageOk,
+    relevanceOk,
+    unusedInStepsOk: unusedOk,
+    userIngredientsInList: userIngredientsOk,
+    titleOk: titleValidation.ok,
+    stepsAligned,
+    noUnnaturalSteps: unnaturalSteps.length === 0,
+    meaningfulStepActions: weakSteps.length === 0,
+    preReturnOk: preReturn.ok,
+    unauthorizedIngredientsOk: unauthorizedOk,
+  }
+
   const ok =
-    relevance.ok &&
-    englishIngredients.length === 0 &&
-    unusedInSteps.length === 0 &&
-    userExplicitMissing.length === 0 &&
-    titleValidation.ok
+    invalidOk &&
+    languageOk &&
+    relevanceOk &&
+    unusedOk &&
+    userIngredientsOk &&
+    preReturn.ok &&
+    unauthorizedOk
 
   return {
     ok,
+    checks,
     ingredientRelevanceScore,
     matchRatio: relevance.matchRatio,
     titleHasIngredient: relevance.titleHasIngredient,
     matched: relevance.matched,
     unmatched: relevance.unmatched,
     englishIngredients,
+    hebrewIngredients,
     unusedInSteps,
     userExplicitMissing,
+    userMissingFromSteps,
     titleValidation,
     relevance,
+    invalidIngredients,
+    unnaturalSteps,
+    weakSteps,
+    preReturn,
+    stepsAligned,
+    stepScore,
+    unauthorizedIngredients,
   }
+}
+
+/**
+ * Log every validation dimension to the console for debugging rejections.
+ */
+export function logRecipeValidationDetails(report, extra = {}) {
+  const failedChecks = Object.entries(report.checks ?? {})
+    .filter(([, passed]) => !passed)
+    .map(([name]) => name)
+
+  console.group('[aiRecipeService] Recipe validation details')
+  console.log('validationPassed:', report.ok)
+  console.log('failedChecks:', failedChecks.length ? failedChecks : '(none)')
+  console.log('checks:', report.checks)
+  console.log('invalidIngredients:', report.invalidIngredients ?? [])
+  console.log('unauthorizedIngredients:', report.unauthorizedIngredients ?? [])
+  console.log('unusedInSteps:', report.unusedInSteps ?? [])
+  console.log('userExplicitMissing (not in list):', report.userExplicitMissing ?? [])
+  console.log('userMissingFromSteps:', report.userMissingFromSteps ?? [])
+  console.log('unnaturalSteps:', report.unnaturalSteps ?? [])
+  console.log('stepsAligned:', report.stepsAligned)
+  console.log('titleMismatch:', report.titleValidation?.ok === false ? report.titleValidation : null)
+  console.log('relevance:', {
+    ok: report.relevance?.ok,
+    matchRatio: report.matchRatio,
+    matched: report.matched,
+    unmatched: report.unmatched,
+    titleHasIngredient: report.titleHasIngredient,
+  })
+  if (extra.categoryMismatch != null) {
+    console.log('categoryMismatch:', extra.categoryMismatch)
+  }
+  if (extra.languageMismatch != null) {
+    console.log('languageMismatch:', extra.languageMismatch)
+  }
+  if (extra.generatedTitle) {
+    console.log('generatedTitle:', extra.generatedTitle)
+  }
+  console.groupEnd()
 }
 
 /**
  * Parse, Hebrewize, and validate a generated recipe.
  */
 export function applyRecipeIngredientParser(recipe, userIngredientsRaw = '', language = 'he', options = {}) {
+  const preserveOriginalSteps = Boolean(options.preserveOriginalSteps)
   const normalized = normalizeRecipeIngredients(recipe, userIngredientsRaw, language)
   const titled = applyDescriptiveDishTitle(normalized, {
     cookingTime: options.cookingTime,
@@ -312,16 +474,39 @@ export function applyRecipeIngredientParser(recipe, userIngredientsRaw = '', lan
   const quantified = applyRecipeQuantities(titled, {
     language,
     servings: options.servings ?? titled.nutrition?.servings,
+    preserveOriginalSteps,
   })
   const userIngredients = parseUserIngredients(userIngredientsRaw)
-  const validation = validateRecipeQuality(userIngredients, quantified, language, options)
+  const ingredients = sanitizeIngredientList(
+    dedupeIngredients(quantified.ingredients ?? []),
+  )
+  const steps = preserveOriginalSteps
+    ? lightSanitizeRecipeSteps(quantified.steps ?? [])
+    : sanitizeRecipeSteps(quantified.steps ?? [])
+
+  const finalized = {
+    ...quantified,
+    ingredients,
+    steps,
+  }
+  const validation = validateRecipeQuality(userIngredients, finalized, language, options)
+  const safeValidation = {
+    ...validation,
+    unauthorizedIngredients: validation?.unauthorizedIngredients ?? [],
+  }
+
+  const hasUserIngredients = userIngredients.length > 0
 
   return {
     recipe: {
-      ...quantified,
-      matchPercentage: validation.ingredientRelevanceScore,
+      ...finalized,
+      matchPercentage: hasUserIngredients
+        ? computeUserIngredientMatchPercent(userIngredients, finalized)
+        : finalized.matchPercentage,
+      generatedFromPreferences: !hasUserIngredients,
+      optionalUpgrades: hasUserIngredients ? (finalized.optionalUpgrades ?? []) : [],
     },
-    validation,
+    validation: safeValidation,
   }
 }
 
@@ -329,6 +514,9 @@ export function isRecipeAcceptable(userIngredientsRaw, recipe, language = 'he') 
   const userIngredients = parseUserIngredients(userIngredientsRaw)
   if (!userIngredients.length) {
     const validation = validateRecipeQuality([], recipe, language)
+    if (language === 'en') {
+      return validation.ok
+    }
     return validation.ok && validation.englishIngredients.length === 0
   }
 

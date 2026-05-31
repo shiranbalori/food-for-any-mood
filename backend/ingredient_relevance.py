@@ -7,6 +7,8 @@ import re
 import unicodedata
 from typing import Literal
 
+from user_ingredient_steps import build_steps_from_user_ingredients
+
 MIN_INGREDIENT_MATCH_RATIO = 0.7
 
 Category = Literal["dairy", "meat", "parve"]
@@ -39,6 +41,11 @@ INGREDIENT_SYNONYMS: dict[str, list[str]] = {
     "yogurt": ["יוגורט"],
     "butter": ["חמאה"],
     "oil": ["שמן", "שמן זית", "olive oil"],
+    "baking powder": ["אבקת אפייה"],
+    "vanilla": ["vanilla extract", "תמצית וניל", "וניל"],
+    "milk": ["חלב"],
+    "strawberry": ["strawberries", "תות", "תותים"],
+    "strawberries": ["strawberry", "תות", "תותים"],
 }
 
 MOOD_DESCRIPTIONS: dict[Mood, str] = {
@@ -213,100 +220,162 @@ def build_ingredient_fallback_recipe(
     build_playlist,
     recipe_type: str = "meal",
     servings: int = 4,
+    language: str = "he",
+    exclude_titles: list[str] | None = None,
+    exclude_cooking_methods: list[str] | None = None,
+    exclude_dessert_categories: list[str] | None = None,
 ) -> dict:
-    """Build a Hebrew recipe centered on the user's ingredients."""
-    from recipe_title import build_guaranteed_dessert_title, build_descriptive_dish_title
+    """Build a localized recipe centered on the user's ingredients."""
+    from recipe_copy import get_recipe_copy
+    from recipe_diversity import pick_alternate_dessert_variant
+    from recipe_title import build_descriptive_dish_title, build_title_from_ingredients
+
+    copy = get_recipe_copy(language)
+    mood_text = copy["mood_flavor"].get(mood, copy["default_mood"])
 
     display = list(user_ingredients)
     if is_gluten_free:
-        display = [
-            item.replace("פסטה", "פסטה ללא גלוטן")
-            if "פסטה" in item and "ללא גלוטן" not in item
-            else item
-            for item in display
-        ]
+        if language == "en":
+            display = [
+                item.replace("pasta", "gluten-free pasta")
+                if "pasta" in item.lower() and "gluten-free" not in item.lower()
+                else item
+                for item in display
+            ]
+        else:
+            display = [
+                item.replace("פסטה", "פסטה ללא גלוטן")
+                if "פסטה" in item and "ללא גלוטן" not in item
+                else item
+                for item in display
+            ]
 
-    mood_text = MOOD_DESCRIPTIONS.get(mood, "טעימים")
     match_ratio = len(display) / max(len(user_ingredients), 1)
 
     mismatch_note = ""
     if len(user_ingredients) > 1 and match_ratio < MIN_INGREDIENT_MATCH_RATIO:
         mismatch_note = (
-            " שילוב המרכיבים לא לגמרי קלאסי — "
+            " The ingredient combo is not fully classic — the dish uses most of what you listed."
+            if language == "en"
+            else " שילוב המרכיבים לא לגמרי קלאסי — "
             "המנה משתמשת ברוב מה שציינתם ומתאימה את השאר בצורה פשוטה."
         )
     elif len(user_ingredients) >= 3 and match_ratio >= MIN_INGREDIENT_MATCH_RATIO:
-        mismatch_note = " המנה נבנתה סביב המרכיבים שציינתם."
+        mismatch_note = (
+            " Built around the ingredients you listed."
+            if language == "en"
+            else " המנה נבנתה סביב המרכיבים שציינתם."
+        )
 
-    description = (
-        f"קינוח שנבנה בעיקר מהמרכיבים שלכם, עם ניחוחות {mood_text}, "
-        f"מותאם לכ-{cooking_time} דקות הכנה.{mismatch_note}"
-        if recipe_type == "dessert"
-        else f"מנה שנבנתה בעיקר מהמרכיבים שלכם, עם ניחוחות {mood_text}, "
-        f"מותאמת לכ-{cooking_time} דקות בישול.{mismatch_note}"
-    )
-    if is_gluten_free:
-        description += " מותאמת במלואה לתזונה ללא גלוטן."
-
-    if recipe_type == "dessert":
-        ingredients = [*display, "סוכר", "וניל", "חמאה"]
-    else:
-        ingredients = [*display, "מלח", "פלפל שחור", "שמן זית"]
-    if is_gluten_free and not any("ללא גלוטן" in item for item in ingredients):
-        ingredients.append("מותאם ללא גלוטן")
-
-    ingredient_phrase = ", ".join(display[:4])
-    cook_minutes = min(cooking_time, max(15, cooking_time // 2))
-
-    if recipe_type == "dessert":
-        steps = [
-            f"מכינים ומסדרים את {ingredient_phrase} לקינוח.",
-            "מערבבים את המרכיבים המתוקים עם סוכר, וניל וחמאה עד תערובת אחידה.",
-            f"אופים או מקררים לפי סוג הקינוח — כ-{cook_minutes} דקות.",
-            "מקשטים בפירות, שוקולד או אבקת סוכר לפי הטעם.",
-            "מגישים קר או חם כקינוח.",
-        ]
-    else:
-        steps = [
-            f"מכינים ומסדרים את {ingredient_phrase}.",
-            "מחממים מחבת או סיר עם שמן זית על אש בינונית.",
-            f"מבשלים את המרכיבים העיקריים עד שהם מוכנים — כ-{cook_minutes} דקות.",
-            "מתבלים במלח ופלפל לפי הטעם ומערבבים בעדינות.",
-            "מגישים חם ונהנים מהמנה.",
-        ]
-
+    ingredients = list(display)
     tags: list[str] = ["quick"] if cooking_time <= 25 else []
     if category == "parve":
         tags.append("vegetarian")
 
-    if recipe_type == "dessert":
-        if category == "meat":
-            name = "קציצות בשר ביתיות"
-            steps = [
-                "מערבבים בשר, בצל, שום, ביצה, מלח ופלפל עד תערובת דביקה.",
-                "יוצרים קציצות בגודל אחיד.",
-                "מחממים שמן במחבת וצורבים את הקציצות מכל הצדדים.",
-                f"מבשלים על אש נמוכה כ-{cook_minutes} דקות עד שהן מוכנות.",
-                "מגישים חם — קינוח אינו מתאים לארוחה בשרית.",
-            ]
-            ingredients = [*display, "בשר בקר טחון", "בצל", "שום", "שמן זית", "מלח", "פלפל שחור"]
+    if recipe_type == "dessert" and category == "meat":
+        name = build_title_from_ingredients(
+            ingredients,
+            language=language,
+            recipe_type="meal",
+        )
+        steps = build_steps_from_user_ingredients(
+            display,
+            recipe_type="meal",
+            language=language,
+            cooking_time=cooking_time,
+        )
+    elif recipe_type == "dessert":
+        has_regeneration_constraints = bool(
+            (exclude_titles or [])
+            + (exclude_cooking_methods or [])
+            + (exclude_dessert_categories or [])
+        )
+        if has_regeneration_constraints:
+            variant = pick_alternate_dessert_variant(
+                ingredients=ingredients,
+                language=language,
+                cooking_time=cooking_time,
+                exclude_titles=exclude_titles,
+                exclude_cooking_methods=exclude_cooking_methods,
+                exclude_dessert_categories=exclude_dessert_categories,
+            )
+            name = variant["name"]
+            steps = variant["steps"]
         else:
-            name = build_guaranteed_dessert_title(
+            name = build_title_from_ingredients(
                 ingredients,
-                category=category,
-                ingredient_phrase=ingredient_phrase or None,
+                language=language,
+                recipe_type="dessert",
+            )
+            steps = build_steps_from_user_ingredients(
+                display,
+                recipe_type="dessert",
+                language=language,
+                cooking_time=cooking_time,
             )
     else:
-        name = build_descriptive_dish_title(
-            ingredients,
+        steps = build_steps_from_user_ingredients(
+            display,
+            recipe_type="meal",
+            language=language,
             cooking_time=cooking_time,
-            steps=steps,
-            style="quick",
-            tags=tags or ["comfortFood"],
         )
+        if language == "en":
+            name = build_descriptive_dish_title(
+                ingredients,
+                cooking_time=cooking_time,
+                steps=steps,
+                style="quick",
+                tags=tags or ["comfortFood"],
+                language=language,
+            )
+        else:
+            name = build_descriptive_dish_title(
+                ingredients,
+                cooking_time=cooking_time,
+                steps=steps,
+                style="quick",
+                tags=tags or ["comfortFood"],
+                language=language,
+            )
+
+    from chef_intro import build_chef_intro
+    from nutrition_score import calculate_health_score_from_recipe
+    from optional_upgrades import build_optional_upgrades
+
+    description = build_chef_intro(
+        ingredients,
+        chosen_name=name,
+        language=language,
+        recipe_type=recipe_type,
+        cooking_time=cooking_time,
+    )
+    if mismatch_note:
+        description += mismatch_note
+    if is_gluten_free:
+        description += copy["gf_suffix"]
 
     match_percentage = min(99, max(72, round(match_ratio * 100)))
     playlist = build_playlist(music_platform, match_percentage)
+    optional_upgrades = build_optional_upgrades(
+        user_ingredients,
+        language=language,
+        recipe_type=recipe_type,
+    )
+    nutrition = {
+        "calories": 360 + len(display) * 25,
+        "protein": 14 + len(display) * 2,
+        "carbs": 30 + len(display) * 3,
+        "fat": 16 + len(display),
+        "servings": servings,
+    }
+    health_score = calculate_health_score_from_recipe(
+        ingredients=ingredients,
+        calories=nutrition["calories"],
+        protein=nutrition["protein"],
+        carbs=nutrition["carbs"],
+        servings=servings,
+    )
 
     return {
         "name": name,
@@ -315,14 +384,9 @@ def build_ingredient_fallback_recipe(
         "steps": steps,
         "matchPercentage": match_percentage,
         "spiceLevel": 0 if recipe_type == "dessert" else (1 if category == "parve" else 0),
-        "nutrition": {
-            "calories": 360 + len(display) * 25,
-            "protein": 14 + len(display) * 2,
-            "carbs": 30 + len(display) * 3,
-            "fat": 16 + len(display),
-            "servings": servings,
-        },
-        "healthScore": min(92, 70 + len(display) * 3),
+        "nutrition": nutrition,
+        "healthScore": health_score,
         "tags": tags or ["comfortFood"],
         "playlist": playlist,
+        "optionalUpgrades": optional_upgrades,
     }

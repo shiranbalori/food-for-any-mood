@@ -1,7 +1,15 @@
 import { enforceRecipeTypeTitle, isValidDessertTitle, pickGuaranteedDessertTitle } from './recipeTypeGuard'
 import { isInvalidRecipeSelection } from './recipeCategoryGuard'
+import { getIngredientLabel } from '../data/ingredientLabels'
 import { canonicalIngredient } from '../data/ingredientKnowledge'
 import { ingredientAppearsInText } from './ingredientRelevance'
+import {
+  buildTitleFromIngredients,
+  isForbiddenGenericTitle,
+  isIngredientListTitle,
+  titleReflectsIngredients,
+} from './ingredientBasedTitle'
+import { countTitleWords } from './dessertDishTitle'
 
 const STAPLE_CANONICAL = new Set([
   'salt',
@@ -181,42 +189,37 @@ function buildTomatoEggTitle(mainCanon, cookingStyle, steps = []) {
   return 'חביתת עגבניות'
 }
 
-function buildPastaTitle(mainCanon, cookingStyle) {
+function buildPastaTitle(mainCanon, cookingStyle, ingredients = [], language = 'he') {
   const hasCream = mainCanon.includes('cream')
   const hasMushroom = mainCanon.includes('mushroom')
 
   if (hasCream && hasMushroom) return 'פסטה ברוטב שמנת ופטריות'
   if (hasCream) return 'פסטה ברוטב שמנת'
-  return cookingStyle === 'quick' ? 'פסטה מהירה' : 'פסטה ביתית'
+  return buildTitleFromIngredients(ingredients, { language, recipeType: 'meal' })
 }
 
-function buildOmeletteTitle(mainCanon) {
+function buildOmeletteTitle(mainCanon, ingredients = [], language = 'he') {
   if (mainCanon.includes('tomato')) return 'חביתת עגבניות'
   if (mainCanon.includes('spinach')) return 'חביתת תרד'
   if (mainCanon.includes('mushroom')) return 'חביתת פטריות'
   if (mainCanon.includes('cheese')) return 'חביתת גבינה'
-  return 'חביתה'
+  return buildTitleFromIngredients(ingredients, { language, recipeType: 'meal' })
 }
 
-function buildGenericDishTitle(mainCanon, cookingStyle, steps = []) {
+function buildGenericDishTitle(mainCanon, cookingStyle, steps = [], ingredients = [], language = 'he') {
   if (mainCanon.includes('tomato') && (mainCanon.includes('egg') || mainCanon.includes('eggs'))) {
     return buildTomatoEggTitle(mainCanon, cookingStyle, steps)
   }
-  if (mainCanon.includes('pasta')) return buildPastaTitle(mainCanon, cookingStyle)
+  if (mainCanon.includes('pasta')) return buildPastaTitle(mainCanon, cookingStyle, ingredients, language)
   if (mainCanon.includes('egg') || mainCanon.includes('eggs')) {
-    return buildOmeletteTitle(mainCanon)
+    return buildOmeletteTitle(mainCanon, ingredients, language)
   }
-  if (mainCanon.includes('chicken')) return 'עוף בתנור'
-  if (mainCanon.includes('beef') || mainCanon.includes('steak') || mainCanon.includes('lamb')) {
-    return 'תבשיל בשר'
-  }
-  if (cookingStyle === 'stirFry') return 'מוקפץ ירקות'
-  if (cookingStyle === 'salad' && ingredientsSupportSaladTitle(mainCanon)) return 'סלט טרי'
-  return 'תבשיל ביתי'
+  return buildTitleFromIngredients(ingredients, { language, recipeType: 'meal' })
 }
 
 function isGenericDishTitle(title, ingredients = []) {
   const text = String(title ?? '').trim()
+  if (isForbiddenGenericTitle(text)) return true
   if (!GENERIC_DISH_TITLES.has(text)) return false
   return toMainCanon(ingredients).length >= 1
 }
@@ -237,6 +240,8 @@ function titleMatchesIngredients(title, ingredients = []) {
  * Detect titles that simply list ingredients instead of naming a dish.
  */
 export function isLiteralIngredientTitle(title, ingredients = [], language = 'he') {
+  if (isIngredientListTitle(title, ingredients, language)) return true
+
   const text = String(title ?? '').trim()
   if (!text || hasDishNamePrefix(text)) return false
 
@@ -280,30 +285,27 @@ export function buildDescriptiveDishTitle(
     case 'tomatoEgg':
       return buildTomatoEggTitle(mainCanon, cookingStyle, steps)
     case 'pasta':
-      return buildPastaTitle(mainCanon, cookingStyle)
+      return buildPastaTitle(mainCanon, cookingStyle, ingredients, language)
     case 'rice':
-      return mainCanon.includes('chicken') ? 'אורז עם עוף' : 'אורז מוקפץ'
+      return buildTitleFromIngredients(ingredients, { language, recipeType: 'meal' })
     case 'omelette':
-      return buildOmeletteTitle(mainCanon)
+      return buildOmeletteTitle(mainCanon, ingredients, language)
     case 'tunaSalad':
       return 'סלט טונה וביצים'
     case 'curry':
       if (!ingredientsSupportCurryTitle(mainCanon)) break
       if (mainCanon.includes('lentils')) return 'קארי עדשים'
-      return 'קארי ביתי'
+      return buildTitleFromIngredients(ingredients, { language, recipeType: 'meal' })
     case 'stirFry':
-      return 'מוקפץ ירקות'
     case 'chicken':
-      return 'עוף בתנור'
     case 'meat':
-      return 'תבשיל בשר'
     case 'salad':
-      return 'סלט ירקות טרי'
+      return buildTitleFromIngredients(ingredients, { language, recipeType: 'meal' })
     default:
       break
   }
 
-  return buildGenericDishTitle(mainCanon, cookingStyle, steps)
+  return buildGenericDishTitle(mainCanon, cookingStyle, steps, ingredients, language)
 }
 
 export function isMoodBasedTitle(title) {
@@ -318,7 +320,21 @@ export function isMoodBasedTitle(title) {
 
 export function titleDescribesDish(title, ingredients = [], language = 'he') {
   const text = String(title ?? '').trim()
-  if (!text || isMoodBasedTitle(text) || isLiteralIngredientTitle(text, ingredients, language)) {
+  if (!text || isMoodBasedTitle(text) || isForbiddenGenericTitle(text)) {
+    return false
+  }
+  if (countTitleWords(text) > 4) {
+    return false
+  }
+  if (isIngredientListTitle(text, ingredients, language)) {
+    return false
+  }
+
+  if (titleReflectsIngredients(text, ingredients, language)) {
+    return true
+  }
+
+  if (isLiteralIngredientTitle(text, ingredients, language)) {
     return false
   }
 
@@ -347,7 +363,7 @@ export function ensureDescriptiveDishTitle(title, ingredients = [], options = {}
 
   if (
     isMoodBasedTitle(title) ||
-    isLiteralIngredientTitle(title, ingredients, language) ||
+    isForbiddenGenericTitle(title) ||
     isGenericDishTitle(title, ingredients) ||
     !titleMatchesIngredients(title, ingredients) ||
     !titleDescribesDish(title, ingredients, language)
@@ -361,12 +377,14 @@ export function ensureDescriptiveDishTitle(title, ingredients = [], options = {}
 export function applyDescriptiveDishTitle(recipe, options = {}) {
   const recipeType = options.recipeType ?? 'meal'
   const category = options.category ?? 'dairy'
+  const language = options.language ?? 'he'
 
   if (recipeType === 'dessert') {
     if (isInvalidRecipeSelection('dessert', category)) {
-      return { ...recipe, name: 'קציצות בשר ביתיות' }
+      const name = buildTitleFromIngredients(recipe.ingredients ?? [], { language, recipeType: 'meal' })
+      return { ...recipe, name }
     }
-    return enforceRecipeTypeTitle(recipe, 'dessert', category)
+    return enforceRecipeTypeTitle(recipe, 'dessert', category, language)
   }
 
   const name = ensureDescriptiveDishTitle(recipe.name, recipe.ingredients ?? [], {
@@ -374,7 +392,7 @@ export function applyDescriptiveDishTitle(recipe, options = {}) {
     steps: recipe.steps ?? [],
     style: options.style,
     tags: recipe.tags ?? [],
-    language: options.language ?? 'he',
+    language,
   })
 
   return { ...recipe, name }

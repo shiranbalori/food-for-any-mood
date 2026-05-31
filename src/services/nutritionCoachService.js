@@ -14,33 +14,36 @@ const FETCH_OPTIONS = {
  * @param {object} recipe
  * @returns {Promise<{ macroLevels: object, insights: object, nutritionScore: number, tips: string[], source: string }>}
  */
-export async function fetchNutritionAnalysis(recipe) {
+export async function fetchNutritionAnalysis(recipe, language = 'he') {
   try {
     const response = await fetch(NUTRITION_ANALYSIS_URL, {
       ...FETCH_OPTIONS,
       method: 'POST',
-      body: JSON.stringify(recipeToNutritionPayload(recipe)),
+      body: JSON.stringify(recipeToNutritionPayload(recipe, language)),
     })
 
     let data
     try {
       data = await response.json()
     } catch {
-      return buildLocalNutritionAnalysis(recipe)
+      return buildLocalNutritionAnalysis(recipe, language)
     }
 
     if (!response.ok || !data?.macroLevels) {
-      return buildLocalNutritionAnalysis(recipe)
+      return buildLocalNutritionAnalysis(recipe, language)
     }
 
     return {
       macroLevels: data.macroLevels,
       insights: data.insights ?? {},
-      nutritionScore: data.nutritionScore ?? buildLocalNutritionAnalysis(recipe).nutritionScore,
+      nutritionScore: data.nutritionScore ?? buildLocalNutritionAnalysis(recipe, language).nutritionScore,
+      nutritionScoreExplanation:
+        data.nutritionScoreExplanation
+        ?? buildLocalNutritionAnalysis(recipe, language).nutritionScoreExplanation,
       tips: Array.isArray(data.tips) ? data.tips : [],
       source: data.source ?? 'fallback',
     }
   } catch {
-    return buildLocalNutritionAnalysis(recipe)
+    return buildLocalNutritionAnalysis(recipe, language)
   }
 }

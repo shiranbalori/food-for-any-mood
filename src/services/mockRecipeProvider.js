@@ -21,7 +21,12 @@ import {
 } from '../utils/ingredientRelevance'
 import { applyRecipeIngredientParser } from '../utils/recipeIngredientParser'
 import { buildDescriptiveDishTitle } from '../utils/recipeTitle'
-import { pickGuaranteedDessertTitle } from '../utils/recipeTypeGuard'
+import { buildDessertDishTitle } from '../utils/dessertDishTitle'
+import { buildChefIntro } from '../utils/chefIntro'
+import { buildStepsFromUserIngredients } from '../utils/userIngredientSteps'
+import { buildOptionalUpgrades } from '../utils/optionalUpgrades'
+import { pickAlternateDessertVariant } from '../utils/recipeDiversity'
+import { calculateHealthScoreFromRecipe } from '../utils/nutritionScore'
 import { getEffectiveRecipeType, isInvalidRecipeSelection } from '../utils/recipeCategoryGuard'
 import {
   canonicalIngredient,
@@ -85,6 +90,68 @@ const DESSERT_MOCK_BY_CATEGORY = {
     healthScore: 55,
     tags: ['comfortFood', 'vegetarian'],
   },
+}
+
+const DESSERT_MOCK_BY_CATEGORY_EN = {
+  dairy: {
+    name: 'Cheesecake Dessert',
+    ingredients: ['cream cheese', 'sugar', 'eggs', 'vanilla', 'butter', 'cookies', 'sugar', 'vanilla'],
+    steps: [
+      'Crush cookies and mix with melted butter; press into a pan.',
+      'Beat cream cheese, sugar, eggs, and vanilla until smooth.',
+      'Pour over the crust and chill for at least 4 hours.',
+      'Top with berries or fruit sauce before serving.',
+      'Serve cold and sweet.',
+    ],
+    calories: 420,
+    protein: 9,
+    carbs: 38,
+    fat: 26,
+    spiceLevel: 0,
+    healthScore: 58,
+    tags: ['comfortFood'],
+  },
+  meat: {
+    name: 'Honey Baked Apples',
+    ingredients: ['apples', 'honey', 'cinnamon', 'lemon', 'sugar', 'vanilla'],
+    steps: [
+      'Halve apples and remove cores.',
+      'Mix honey, cinnamon, lemon juice, and sugar.',
+      'Arrange apples in a baking dish and pour the mixture over.',
+      'Bake at 350°F (180°C) for about 25 minutes until tender.',
+      'Serve warm as a parve dessert after a meat meal.',
+    ],
+    calories: 280,
+    protein: 2,
+    carbs: 52,
+    fat: 8,
+    spiceLevel: 0,
+    healthScore: 70,
+    tags: ['healthy'],
+  },
+  parve: {
+    name: 'Quick Chocolate Cookies',
+    ingredients: ['flour', 'sugar', 'cocoa powder', 'oil', 'vanilla', 'baking powder', 'sugar', 'vanilla'],
+    steps: [
+      'Whisk flour, sugar, cocoa, and baking powder in a bowl.',
+      'Add oil, vanilla, and a little water until a sticky dough forms.',
+      'Roll small balls and coat lightly in extra flour.',
+      'Bake at 350°F (175°C) for about 12 minutes.',
+      'Cool slightly and serve as a parve dessert.',
+    ],
+    calories: 190,
+    protein: 3,
+    carbs: 28,
+    fat: 8,
+    spiceLevel: 0,
+    healthScore: 55,
+    tags: ['comfortFood', 'vegetarian'],
+  },
+}
+
+function getDessertMockTemplate(category, language = 'he') {
+  const source = language === 'en' ? DESSERT_MOCK_BY_CATEGORY_EN : DESSERT_MOCK_BY_CATEGORY
+  return source[category] ?? source.parve
 }
 
 function parseIngredients(input) {
@@ -293,61 +360,42 @@ function buildIngredientList(
   glutenFree,
   language = 'he',
 ) {
-  const sourceTemplate = glutenFree ? adaptTemplateForGlutenFree(template) : template
-  const used = new Set()
+  if (userIngredients.length === 0) {
+    const sourceTemplate = glutenFree ? adaptTemplateForGlutenFree(template) : template
+    const list = [
+      ...sourceTemplate.baseIngredients.map((ing) => formatIngredient(ing, language, glutenFree)),
+    ]
+    return glutenFree ? applyGlutenFreeToIngredientList(list, language) : list
+  }
+
   const list = []
+  const used = new Set()
 
-  for (const ing of sourceTemplate.baseIngredients) {
-    const userHit = userIngredients.find(
-      (ui) => ingredientsMatch(ui, ing) && !used.has(ui) && !(glutenFree && isGlutenIngredient(ui)),
-    )
-    if (userHit) used.add(userHit)
-    list.push(
-      userHit
-        ? formatIngredient(userHit, language, false)
-        : formatIngredient(ing, language, glutenFree),
-    )
+  for (const ui of userIngredients) {
+    if (glutenFree && isGlutenIngredient(ui)) continue
+    used.add(ui)
+    list.push(formatIngredient(ui, language, false))
   }
 
-  for (const ing of sourceTemplate.optionalIngredients ?? []) {
-    const userHit = userIngredients.find(
-      (ui) => ingredientsMatch(ui, ing) && !used.has(ui) && !(glutenFree && isGlutenIngredient(ui)),
-    )
-    if (userHit) {
-      used.add(userHit)
-      list.push(formatIngredient(userHit, language, false))
+  const pantryStaples = ['water', 'salt', 'black pepper', 'olive oil', 'baking powder']
+  for (const staple of pantryStaples) {
+    if (!list.some((entry) => ingredientsMatch(entry, staple))) {
+      list.push(formatIngredient(staple, language, false))
     }
   }
 
-  const staples = ['salt', 'pepper', 'olive oil']
-  staples.forEach((item) => {
-    const alreadyListed = list.some(
-      (entry) =>
-        ingredientsMatch(entry, item) ||
-        canonicalIngredient(entry) === item ||
-        canonicalIngredient(item) === canonicalIngredient(entry),
-    )
-    if (!alreadyListed) {
-      list.push(formatIngredient(item, language, false))
-    }
-  })
-
-  const extras = userIngredients
-    .filter((ui) => !used.has(ui) && !(glutenFree && isGlutenIngredient(ui)))
-    .map((ui) => `${formatIngredient(ui, language, false)} ${pantrySuffix}`)
-
-  if (matchData.missing.length > 0) {
-    const adaptedMissing = glutenFree
-      ? adaptTemplateForGlutenFree(template).baseIngredients
-      : matchData.missing
-    adaptedMissing.slice(0, 2).forEach((ing) => {
-      const label = formatIngredient(ing, language, glutenFree)
-      if (!list.some((entry) => ingredientsMatch(entry, label))) list.push(label)
-    })
+  const userHasVanilla = userIngredients.some(
+    (ui) => ingredientsMatch(ui, 'vanilla') || canonicalIngredient(ui) === 'vanilla',
+  )
+  if (userHasVanilla && !list.some((entry) => ingredientsMatch(entry, 'vanilla'))) {
+    list.push(formatIngredient('vanilla extract', language, false))
   }
 
-  const combined = [...list, ...extras]
-  return glutenFree ? applyGlutenFreeToIngredientList(combined, language) : combined
+  void template
+  void pantrySuffix
+  void matchData
+
+  return glutenFree ? applyGlutenFreeToIngredientList(list, language) : list
 }
 
 function computeTimeVars(template, availableTime) {
@@ -616,7 +664,14 @@ export function buildIngredientFirstFallbackRecipe(
     servings = 4,
     recipeType = 'meal',
   },
-  { language = 'he', pantrySuffix = '(from your pantry)', validation = null } = {},
+  {
+    language = 'he',
+    pantrySuffix = '(from your pantry)',
+    validation = null,
+    excludeTitles = [],
+    excludeCookingMethods = [],
+    excludeDessertCategories = [],
+  } = {},
 ) {
   const rawUserList = parseUserIngredients(ingredients)
   const filteredUserIngredients = isGlutenFree
@@ -629,10 +684,18 @@ export function buildIngredientFirstFallbackRecipe(
 
   const copy = getRecipeCopy(language)
   const moodPhrase = copy.moodFlavor[mood] ?? copy.defaultMood
-  const cookMinutes = Math.min(cookingTime, Math.max(15, Math.round(cookingTime * 0.6)))
 
   let mismatchNote = ''
-  if (validation?.unmatched?.length) {
+  if (language === 'en') {
+    if (validation?.unmatched?.length) {
+      mismatchNote =
+        ' The ingredient combo is not fully classic — the dish uses most of what you listed.'
+    } else if (hasUnusualIngredientCombo(filteredUserIngredients)) {
+      mismatchNote = ' A varied ingredient combo — built around what you have on hand.'
+    } else if (filteredUserIngredients.length > 1) {
+      mismatchNote = ' Built around the ingredients you listed.'
+    }
+  } else if (validation?.unmatched?.length) {
     mismatchNote =
       ' שילוב המרכיבים לא לגמרי קלאסי — המנה משתמשת ברוב מה שציינתם ומתאימה את השאר בצורה פשוטה.'
   } else if (hasUnusualIngredientCombo(filteredUserIngredients)) {
@@ -642,62 +705,58 @@ export function buildIngredientFirstFallbackRecipe(
     mismatchNote = ' המנה נבנתה סביב המרכיבים שציינתם.'
   }
 
-  const description =
-    recipeType === 'dessert'
-      ? `קינוח ביתי${copy.descriptionJoiner}${moodPhrase}${copy.descriptionMiddle}${cookingTime}${copy.descriptionMinutes}${mismatchNote}`
-      : `${copy.defaultOpener}${copy.descriptionJoiner}${moodPhrase}${copy.descriptionMiddle}${cookingTime}${copy.descriptionMinutes}${mismatchNote}`
-
-  const ingredientList =
-    recipeType === 'dessert'
-      ? [
-          ...displayNames,
-          formatIngredient('sugar', language, false),
-          'וניל',
-          formatIngredient('butter', language, false),
-        ]
-      : [
-          ...displayNames,
-          formatIngredient('salt', language, false),
-          formatIngredient('pepper', language, false),
-          formatIngredient('olive oil', language, false),
-        ]
+  const ingredientList = [...displayNames]
   const finalIngredients = isGlutenFree
     ? applyGlutenFreeToIngredientList(ingredientList, language)
     : ingredientList
 
-  const ingredientPhrase = displayNames.slice(0, 4).join(', ')
-  const steps =
-    recipeType === 'dessert'
-      ? [
-          `מכינים ומסדרים את ${ingredientPhrase} לקינוח.`,
-          `מערבבים עם ${formatIngredient('sugar', language, false)}, וניל ו${formatIngredient('butter', language, false)} עד תערובת אחידה.`,
-          `אופים או מקררים לפי סוג הקינוח — כ-${cookMinutes} דקות.`,
-          'מקשטים בפירות, שוקולד או אבקת סוכר לפי הטעם.',
-          'מגישים קר או חם כקינוח.',
-        ]
-      : [
-          `מכינים ומסדרים את ${ingredientPhrase}.`,
-          `מחממים מחבת או סיר עם ${formatIngredient('olive oil', language, false)} על אש בינונית.`,
-          `מבשלים את המרכיבים העיקריים עד שהם מוכנים — כ-${cookMinutes} דקות.`,
-          `מתבלים ב${formatIngredient('salt', language, false)} ו${formatIngredient('pepper', language, false)} לפי הטעם.`,
-          'מגישים חם ונהנים מהמנה.',
-        ]
+  const steps = buildStepsFromUserIngredients(finalIngredients, {
+    recipeType,
+    language,
+    cookingTime,
+  })
 
   const effectiveRecipeType = getEffectiveRecipeType(recipeType, category)
+  const hasRegenerationConstraints =
+    excludeTitles.length > 0 ||
+    excludeCookingMethods.length > 0 ||
+    excludeDessertCategories.length > 0
 
   let name
-  if (effectiveRecipeType === 'dessert') {
-    name = pickGuaranteedDessertTitle(category) ?? 'קינוח גבינה'
+  let recipeSteps = steps
+  if (effectiveRecipeType === 'dessert' && hasRegenerationConstraints) {
+    const variant = pickAlternateDessertVariant({
+      ingredients: finalIngredients,
+      language,
+      cookingTime,
+      excludeTitles,
+      excludeCookingMethods,
+      excludeDessertCategories,
+    })
+    name = variant.name
+    recipeSteps = variant.steps
+  } else if (effectiveRecipeType === 'dessert') {
+    name = buildDessertDishTitle(finalIngredients, { language }).name
   } else if (category === 'meat') {
-    name = 'קציצות בשר ביתיות'
+    name = buildTitleFromIngredients(finalIngredients, { language, recipeType: 'meal' })
   } else {
     name = buildDescriptiveDishTitle(finalIngredients, {
       cookingTime,
-      steps,
+      steps: recipeSteps,
       style: 'quick',
       tags: cookingTime <= 25 ? ['quick'] : [],
       language,
     })
+  }
+
+  let description = buildChefIntro(finalIngredients, {
+    chosenName: name,
+    language,
+    recipeType: effectiveRecipeType,
+    cookingTime,
+  })
+  if (mismatchNote) {
+    description += mismatchNote
   }
 
   const matchRatio =
@@ -715,9 +774,10 @@ export function buildIngredientFirstFallbackRecipe(
     name,
     description,
     ingredients: finalIngredients,
-    steps,
+    steps: recipeSteps,
     matchPercentage,
     spiceLevel: recipeType === 'dessert' ? 0 : category === 'parve' ? 1 : 0,
+    optionalUpgrades: buildOptionalUpgrades(filteredUserIngredients, { language, recipeType }),
     nutrition: {
       calories: 360 + displayNames.length * 25,
       protein: 14 + displayNames.length * 2,
@@ -725,7 +785,13 @@ export function buildIngredientFirstFallbackRecipe(
       fat: 16 + displayNames.length,
       servings,
     },
-    healthScore: Math.min(92, 70 + displayNames.length * 3),
+    healthScore: calculateHealthScoreFromRecipe({
+      ingredients: finalIngredients,
+      calories: 360 + displayNames.length * 25,
+      protein: 14 + displayNames.length * 2,
+      carbs: 30 + displayNames.length * 3,
+      servings,
+    }),
     tags: cookingTime <= 25 ? ['quick'] : ['comfortFood'],
     playlist,
   }
@@ -748,7 +814,7 @@ export function buildIngredientFirstFallbackRecipe(
       cookingTime,
       style: 'quick',
       servings,
-      recipeType: 'dessert',
+      recipeType: effectiveRecipeType,
       category,
     }),
     meta,
@@ -765,7 +831,7 @@ function buildDessertMockRecipe(
     musicPlatform = 'spotify',
     servings = 4,
   },
-  { language = 'he', pantrySuffix = '(from your pantry)', validation = null } = {},
+  { language = 'he', pantrySuffix = '(from your pantry)', validation = null, excludeTitles = [], excludeCookingMethods = [], excludeDessertCategories = [] } = {},
 ) {
   if (isInvalidRecipeSelection('dessert', category)) {
     return buildMockRecipe(
@@ -779,7 +845,7 @@ function buildDessertMockRecipe(
         servings,
         recipeType: 'meal',
       },
-      { language, pantrySuffix, validation },
+      { language, pantrySuffix, validation, excludeTitles, excludeCookingMethods, excludeDessertCategories },
     )
   }
 
@@ -796,15 +862,25 @@ function buildDessertMockRecipe(
         servings,
         recipeType: 'dessert',
       },
-      { language, pantrySuffix, validation },
+      {
+        language,
+        pantrySuffix,
+        validation,
+        excludeTitles,
+        excludeCookingMethods,
+        excludeDessertCategories,
+      },
     )
   }
 
-  const template = DESSERT_MOCK_BY_CATEGORY[category] ?? DESSERT_MOCK_BY_CATEGORY.parve
+  const template = getDessertMockTemplate(category, language)
   const cookTime = Math.min(cookingTime, 45)
   const copy = getRecipeCopy(language)
   const moodPhrase = copy.moodFlavor[mood] ?? copy.defaultMood
-  const description = `קינוח מותאם${copy.descriptionJoiner}${moodPhrase}${copy.descriptionMiddle}${cookTime}${copy.descriptionMinutes}`
+  const description =
+    language === 'en'
+      ? `A dessert tailored with${copy.descriptionJoiner}${moodPhrase}${copy.descriptionMiddle}${cookTime}${copy.descriptionMinutes}`
+      : `קינוח מותאם${copy.descriptionJoiner}${moodPhrase}${copy.descriptionMiddle}${cookTime}${copy.descriptionMinutes}`
 
   const playlist = recommendPlaylist(
     { mood, category, style: 'comfort', cookTime, spiceLevel: 0, recipeName: template.name },
@@ -875,6 +951,9 @@ export function buildMockRecipe(
     language = 'he',
     pantrySuffix = '(from your pantry)',
     excludeTemplateKeys = [],
+    excludeTitles = [],
+    excludeCookingMethods = [],
+    excludeDessertCategories = [],
   } = {},
 ) {
   const effectiveRecipeType = getEffectiveRecipeType(recipeType, category)
@@ -882,7 +961,13 @@ export function buildMockRecipe(
   if (effectiveRecipeType === 'dessert') {
     return buildDessertMockRecipe(
       { category, ingredients, cookingTime, mood, isGlutenFree, musicPlatform, servings },
-      { language, pantrySuffix },
+      {
+        language,
+        pantrySuffix,
+        excludeTitles,
+        excludeCookingMethods,
+        excludeDessertCategories,
+      },
     )
   }
 
@@ -979,7 +1064,14 @@ export function buildMockRecipe(
           servings,
           recipeType,
         },
-        { language, pantrySuffix, validation: relevance },
+        {
+          language,
+          pantrySuffix,
+          validation: relevance,
+          excludeTitles,
+          excludeCookingMethods,
+          excludeDessertCategories,
+        },
       )
     }
   }

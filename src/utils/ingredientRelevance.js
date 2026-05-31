@@ -69,6 +69,15 @@ export function titleContainsUserIngredient(userIngredients, recipeName) {
 /**
  * @returns {{ ok: boolean, matchRatio: number, titleHasIngredient: boolean, matched: string[], unmatched: string[] }}
  */
+/**
+ * Authoritative match score: share of user ingredients used anywhere in the recipe.
+ */
+export function computeUserIngredientMatchPercent(userIngredients, recipe) {
+  if (!userIngredients.length) return 0
+  const { matchRatio } = countRecipeMatches(userIngredients, recipe)
+  return Math.round(matchRatio * 100)
+}
+
 export function validateRecipeRelevance(userIngredients, recipe) {
   if (!userIngredients.length) {
     return { ok: true, matchRatio: 1, titleHasIngredient: true, matched: [], unmatched: [] }

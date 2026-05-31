@@ -20,6 +20,9 @@ import { buildMockRecipe } from './mockRecipeProvider'
  * @property {string} [language='he']
  * @property {string} [pantrySuffix]
  * @property {string[]} [excludeTemplateKeys]
+ * @property {string[]} [excludeTitles]
+ * @property {string[]} [excludeCookingMethods]
+ * @property {string[]} [excludeDessertCategories]
  *
  * @typedef {Object} RecipeNutrition
  * @property {number} calories
@@ -39,10 +42,15 @@ import { buildMockRecipe } from './mockRecipeProvider'
  * @property {number} healthScore
  * @property {string[]} tags
  * @property {object} playlist
+ * @property {{ ingredient: string, reason: string }[]} [optionalUpgrades]
+ * @property {boolean} [generatedFromPreferences]
  *
  * @typedef {Object} AppRecipeResult
- * @property {object} recipe
+ * @property {object | null} recipe
  * @property {'fallback' | null} fallbackReason
+ * @property {boolean} [recipePossible=true]
+ * @property {string} [impossibleReason]
+ * @property {string[]} [missingIngredients]
  */
 
 /** @deprecated Use RECIPE_GENERATION_MODE from config/recipeProvider.js */
@@ -51,6 +59,9 @@ export const RECIPE_PROVIDER = RECIPE_GENERATION_MODE
 const DEFAULT_OPTIONS = {
   language: 'he',
   excludeTemplateKeys: [],
+  excludeTitles: [],
+  excludeCookingMethods: [],
+  excludeDessertCategories: [],
 }
 
 /**
@@ -100,9 +111,12 @@ async function generateWithMockProvider(params, options) {
 
 /** @param {GenerateRecipeParams} params @param {GenerateRecipeOptions} options */
 async function generateWithAiProvider(params, options) {
-  const { recipe, fallbackReason } = await generateAIRecipe({ ...params, ...options })
+  const result = await generateAIRecipe({ ...params, ...options })
+  if (result.recipePossible === false) {
+    return result
+  }
   const meta = buildAiRecipeMeta(params, options)
-  return { recipe, meta, fallbackReason }
+  return { recipe: result.recipe, meta, fallbackReason: result.fallbackReason, recipePossible: true }
 }
 
 /** @param {GenerateRecipeParams} params @param {GenerateRecipeOptions} options */
@@ -180,6 +194,8 @@ function toAppRecipe(recipe, meta) {
     spiceLevel: recipe.spiceLevel,
     tags: recipe.tags,
     playlist: recipe.playlist,
+    optionalUpgrades: recipe.optionalUpgrades ?? [],
+    generatedFromPreferences: Boolean(recipe.generatedFromPreferences),
     savedAt: null,
   }
 }
@@ -196,6 +212,17 @@ export async function generateAppRecipe(params, options = {}) {
   const normalized = normalizeGenerateParams(params)
   const mergedOptions = { ...DEFAULT_OPTIONS, ...options }
   const result = await generateWithActiveProvider(normalized, mergedOptions)
+
+  if (result.recipePossible === false) {
+    return {
+      recipe: null,
+      recipePossible: false,
+      impossibleReason: result.impossibleReason ?? '',
+      missingIngredients: result.missingIngredients ?? [],
+      fallbackReason: null,
+    }
+  }
+
   const recipe = result.recipe
   const meta = result.meta ?? buildAiRecipeMeta(normalized, mergedOptions)
   const fallbackReason = result.fallbackReason ?? null
@@ -204,8 +231,12 @@ export async function generateAppRecipe(params, options = {}) {
     throw new Error('Recipe provider returned an invalid recipe payload')
   }
 
+  const recipeForUI = toAppRecipe(recipe, meta)
+  console.log('RENDERED_RECIPE', recipeForUI)
+
   return {
-    recipe: toAppRecipe(recipe, meta),
+    recipe: recipeForUI,
+    recipePossible: true,
     fallbackReason,
   }
 }

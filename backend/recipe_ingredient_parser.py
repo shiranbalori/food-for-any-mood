@@ -16,29 +16,30 @@ from ingredient_relevance import (
 )
 from recipe_title import apply_descriptive_dish_title, validate_dish_title
 from recipe_quantities import apply_recipe_quantities
+from recipe_pre_return_validation import validate_recipe_before_return
+from recipe_step_sanitize import light_sanitize_recipe_steps
+from measurement_units import (
+    format_hebrew_measurement,
+    parse_leading_measurement,
+    QUANTITY_UNIT_PREFIX,
+    strip_quantity_prefix,
+)
 
 LATIN_PATTERN = re.compile(r"[a-z]", re.IGNORECASE)
 
-STAPLE_CANONICAL = {
-    "salt",
-    "pepper",
-    "black pepper",
-    "oil",
-    "olive",
-    "olive oil",
-    "water",
-    "sugar",
-}
+from ingredient_allowlist import (
+    find_unauthorized_recipe_ingredients,
+    is_recipe_ingredient_allowed,
+    is_system_pantry_ingredient,
+    SYSTEM_PANTRY_CANONICAL,
+)
 
 SPLIT_PATTERN = re.compile(
     r"\s*(?:,|;|\n|\+|\band\b|\&|\u05d5(?=\s[\u0590-\u05FFa-z]))\s*",
     re.IGNORECASE,
 )
 
-QUANTITY_PREFIX = re.compile(
-    r"^[\d./]+\s*(?:kg|g|gr|gram|grams|ml|l|cup|cups|tbsp|tsp|oz|lb|pcs|piece|pieces|יח|כף|כפות|כוס|כוסות|גרם|ק)?\s*",
-    re.IGNORECASE,
-)
+QUANTITY_PREFIX = QUANTITY_UNIT_PREFIX
 
 PAREN_SUFFIX = re.compile(r"\s*\([^)]*\)\s*$")
 
@@ -86,6 +87,7 @@ HEBREW_LABELS: dict[str, str] = {
     "chickpeas": "גרגרי חומוס",
     "lentils": "עדשים",
     "quinoa": "קינואה",
+    "tahini": "טחינה",
     "coconut milk": "חלב קוקוס",
     "bell pepper": "פלפל גמבה",
     "cilantro": "כוסברה",
@@ -94,6 +96,7 @@ HEBREW_LABELS: dict[str, str] = {
     "vinegar": "חומץ",
     "stock": "ציר",
     "broth": "ציר",
+    "coffee": "קפה",
 }
 
 HEBREW_SYNONYMS: dict[str, list[str]] = {
@@ -152,13 +155,10 @@ def _find_hebrew_synonym(raw: str) -> str | None:
     return None
 
 
-def to_hebrew_ingredient(raw: str) -> str:
-    trimmed = (raw or "").strip()
-    if not trimmed:
+def _to_hebrew_ingredient_name(raw: str) -> str:
+    without_qty = strip_quantity_prefix((raw or "").strip())
+    if not without_qty:
         return ""
-
-    without_suffix = PAREN_SUFFIX.sub("", trimmed).strip()
-    without_qty = QUANTITY_PREFIX.sub("", without_suffix).strip() or without_suffix
 
     if re.search(r"[\u0590-\u05FF]", without_qty) and not contains_latin_text(without_qty):
         return without_qty
@@ -183,6 +183,23 @@ def to_hebrew_ingredient(raw: str) -> str:
     return from_syn or without_qty
 
 
+def to_hebrew_ingredient(raw: str) -> str:
+    trimmed = (raw or "").strip()
+    if not trimmed:
+        return ""
+
+    without_suffix = PAREN_SUFFIX.sub("", trimmed).strip()
+    measured = parse_leading_measurement(without_suffix)
+    if measured:
+        return format_hebrew_measurement(
+            measured["qty"],
+            measured["unit"],
+            _to_hebrew_ingredient_name(measured["name"]),
+        )
+
+    return _to_hebrew_ingredient_name(without_suffix)
+
+
 def split_ingredient_entry(raw: str) -> list[str]:
     trimmed = (raw or "").strip()
     if not trimmed:
@@ -205,8 +222,7 @@ def _dedupe_ingredients(items: list[str]) -> list[str]:
 
 
 def _is_staple(name: str) -> bool:
-    canon = canonical_ingredient(name)
-    return canon in STAPLE_CANONICAL if canon else False
+    return is_system_pantry_ingredient(name)
 
 
 def _ingredient_used_in_steps(ingredient: str, steps: list[str]) -> bool:
@@ -239,47 +255,68 @@ def _hebrewize_steps(steps: list[str], ingredient_labels: list[str]) -> list[str
     return result
 
 
-def _ensure_user_ingredients_present(
+def _ensure_user_ingredients_in_list(
     user_ingredients: list[str],
     ingredients: list[str],
-    steps: list[str],
-) -> tuple[list[str], list[str]]:
+    language: str = "he",
+) -> list[str]:
     next_ingredients = list(ingredients)
-    next_steps = list(steps)
 
     for user_ing in user_ingredients:
-        hebrew = (
+        localized = (
             user_ing.strip()
-            if re.search(r"[\u0590-\u05FF]", user_ing) and not contains_latin_text(user_ing)
-            else to_hebrew_ingredient(user_ing)
+            if re.search(r"[\u0590-\u05FF]", user_ing) and not contains_latin_text(user_ing) and language == "he"
+            else to_display_ingredient(user_ing, language)
         )
 
-        if not any(ingredients_match(item, hebrew) for item in next_ingredients):
-            next_ingredients.insert(0, hebrew)
+        if localized and not any(ingredients_match(item, localized) for item in next_ingredients):
+            next_ingredients.insert(0, localized)
 
-        if not _ingredient_used_in_steps(hebrew, next_steps) and next_steps:
-            next_steps[0] = f"{next_steps[0]} ({hebrew})"
-
-    return _dedupe_ingredients(next_ingredients), next_steps
+    return _dedupe_ingredients(next_ingredients)
 
 
-def normalize_recipe_ingredients(recipe: dict, user_ingredients_raw: str = "") -> dict:
+def to_display_ingredient(raw: str, language: str = "he") -> str:
+    trimmed = (raw or "").strip()
+    if not trimmed:
+        return ""
+
+    without_suffix = PAREN_SUFFIX.sub("", trimmed).strip()
+    without_qty = QUANTITY_PREFIX.sub("", without_suffix).strip() or without_suffix
+
+    if language == "en":
+        canon = canonical_ingredient(without_qty)
+        if canon:
+            return canon.replace("-", " ")
+        return without_qty
+
+    return to_hebrew_ingredient(raw)
+
+
+def normalize_recipe_ingredients(
+    recipe: dict,
+    user_ingredients_raw: str = "",
+    language: str = "he",
+) -> dict:
     user_ingredients = parse_user_ingredients(user_ingredients_raw)
     raw_entries = recipe.get("ingredients") or []
 
     expanded = [part for entry in raw_entries for part in split_ingredient_entry(str(entry))]
-    hebrewized = [to_hebrew_ingredient(entry) for entry in expanded if entry]
-    ingredients = _dedupe_ingredients(hebrewized)
+    localized = [to_display_ingredient(entry, language) for entry in expanded if entry]
+    ingredients = _dedupe_ingredients(localized)
     steps = list(recipe.get("steps") or [])
 
-    ingredients, steps = _ensure_user_ingredients_present(user_ingredients, ingredients, steps)
-    steps = _hebrewize_steps(steps, ingredients)
+    ingredients = _ensure_user_ingredients_in_list(user_ingredients, ingredients, language)
+    if language == "he":
+        steps = _hebrewize_steps(steps, ingredients)
     ingredients = [
         item
         for item in ingredients
-        if _is_staple(item) or _ingredient_used_in_steps(item, steps)
+        if _is_staple(item)
+        or _ingredient_used_in_steps(item, steps)
+        or any(ingredients_match(item, user_ing) for user_ing in user_ingredients)
+        or is_recipe_ingredient_allowed(item, user_ingredients)
     ]
-    ingredients, steps = _ensure_user_ingredients_present(user_ingredients, ingredients, steps)
+    ingredients = _ensure_user_ingredients_in_list(user_ingredients, ingredients, language)
 
     return {
         **recipe,
@@ -288,12 +325,23 @@ def normalize_recipe_ingredients(recipe: dict, user_ingredients_raw: str = "") -
     }
 
 
-def validate_recipe_quality(user_ingredients: list[str], recipe: dict) -> dict:
+def validate_recipe_quality(
+    user_ingredients: list[str],
+    recipe: dict,
+    language: str = "he",
+    *,
+    user_ingredients_raw: str = "",
+) -> dict:
     relevance = validate_recipe_relevance(user_ingredients, recipe)
     steps_text = "\n".join(recipe.get("steps") or [])
 
     english_ingredients = [
         item for item in (recipe.get("ingredients") or []) if contains_latin_text(item)
+    ]
+    hebrew_ingredients = [
+        item
+        for item in (recipe.get("ingredients") or [])
+        if re.search(r"[\u0590-\u05FF]", item) and not contains_latin_text(item)
     ]
     unused_in_steps = [
         item
@@ -307,18 +355,22 @@ def validate_recipe_quality(user_ingredients: list[str], recipe: dict) -> dict:
         or not ingredient_appears_in_text(user_ing, steps_text)
     ]
 
-    ingredient_count = len(recipe.get("ingredients") or [])
-    step_score = 1 - (len(unused_in_steps) / ingredient_count) if ingredient_count else 1
-    hebrew_score = 1 if not english_ingredients else 0
-    ingredient_relevance_score = round(relevance["match_ratio"] * 70 + step_score * 20 + hebrew_score * 10)
+    ingredient_relevance_score = round(relevance["match_ratio"] * 100)
     title_validation = validate_dish_title(recipe.get("name", ""), recipe.get("ingredients") or [])
+
+    language_ok = not english_ingredients if language == "he" else not hebrew_ingredients
+
+    pre_return = validate_recipe_before_return(recipe, user_ingredients_raw, language=language)
+    unauthorized = find_unauthorized_recipe_ingredients(recipe, user_ingredients_raw)
+    unauthorized_ok = not user_ingredients or not unauthorized
 
     ok = (
         relevance["ok"]
-        and not english_ingredients
+        and language_ok
         and not unused_in_steps
         and not user_explicit_missing
-        and title_validation["ok"]
+        and pre_return["ok"]
+        and unauthorized_ok
     )
 
     return {
@@ -332,6 +384,8 @@ def validate_recipe_quality(user_ingredients: list[str], recipe: dict) -> dict:
         "unused_in_steps": unused_in_steps,
         "user_explicit_missing": user_explicit_missing,
         "title_validation": title_validation,
+        "pre_return": pre_return,
+        "unauthorized_ingredients": unauthorized,
     }
 
 
@@ -344,28 +398,48 @@ def apply_recipe_ingredient_parser(
     servings: int | None = None,
     recipe_type: str | None = None,
     category: str | None = None,
+    language: str = "he",
+    preserve_original_steps: bool = False,
 ) -> tuple[dict, dict]:
-    normalized = normalize_recipe_ingredients(recipe, user_ingredients_raw)
+    normalized = normalize_recipe_ingredients(recipe, user_ingredients_raw, language)
     titled = apply_descriptive_dish_title(
         normalized,
         cooking_time=cooking_time,
         style=style,
         recipe_type=recipe_type,
         category=category,
+        language=language,
     )
     quantified = apply_recipe_quantities(
         titled,
         servings=servings or (titled.get("nutrition") or {}).get("servings"),
+        language=language,
+        preserve_original_steps=preserve_original_steps,
     )
     user_ingredients = parse_user_ingredients(user_ingredients_raw)
-    validation = validate_recipe_quality(user_ingredients, quantified)
-    quantified["matchPercentage"] = validation["ingredient_relevance_score"]
+    quantified["ingredients"] = _dedupe_ingredients(list(quantified.get("ingredients") or []))
+    if preserve_original_steps:
+        quantified["steps"] = light_sanitize_recipe_steps(quantified.get("steps") or [])
+    validation = validate_recipe_quality(
+        user_ingredients,
+        quantified,
+        language,
+        user_ingredients_raw=user_ingredients_raw,
+    )
+    if user_ingredients:
+        quantified["matchPercentage"] = round(validation["match_ratio"] * 100)
+        quantified["generatedFromPreferences"] = False
+    else:
+        quantified["generatedFromPreferences"] = True
+        quantified["optionalUpgrades"] = []
     return quantified, validation
 
 
-def is_recipe_acceptable(user_ingredients_raw: str, recipe: dict) -> bool:
+def is_recipe_acceptable(user_ingredients_raw: str, recipe: dict, language: str = "he") -> bool:
     user_ingredients = parse_user_ingredients(user_ingredients_raw)
-    validation = validate_recipe_quality(user_ingredients, recipe)
+    validation = validate_recipe_quality(user_ingredients, recipe, language)
     if not user_ingredients:
+        if language == "en":
+            return validation["ok"]
         return validation["ok"] and not validation["english_ingredients"]
     return validation["ok"] and validation["match_ratio"] >= MIN_INGREDIENT_MATCH_RATIO

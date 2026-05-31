@@ -9,7 +9,15 @@ from typing import Literal
 from google import genai
 from pydantic import BaseModel, Field, ValidationError
 
+from nutrition_score import (
+    build_nutrition_score_explanation,
+    calculate_health_score_from_recipe,
+    get_nutrition_score_classification,
+)
+from recipe_health_tips import build_recipe_specific_tips
+
 MacroLevel = Literal["high", "medium", "low"]
+Language = Literal["he", "en"]
 
 FIBER_KEYWORDS = (
     "ברוקולי",
@@ -70,12 +78,15 @@ class NutritionAnalysisRequest(BaseModel):
     cookTime: int = Field(default=30, ge=5, le=180)
     spiceLevel: int = Field(default=0, ge=0, le=3)
     healthScore: int = Field(default=70, ge=0, le=100)
+    language: Language = "he"
 
 
 class NutritionAnalysisResponse(BaseModel):
     macroLevels: MacroLevels
     insights: HealthInsights
     nutritionScore: int = Field(ge=0, le=100)
+    nutritionClassification: str = "moderatelyBalanced"
+    nutritionScoreExplanation: str = ""
     tips: list[str] = Field(default_factory=list)
     source: Literal["gemini", "fallback"]
 
@@ -134,35 +145,16 @@ def calculate_nutrition_score(
     fat_per: float,
     calories_per: float,
 ) -> int:
-    """Rule-based nutrition score 0–100."""
-    score = float(payload.healthScore or 70)
-
-    if protein_per >= 20:
-        score += 5
-    elif protein_per < 10:
-        score -= 4
-
-    if fiber_level == "high":
-        score += 8
-    elif fiber_level == "medium":
-        score += 4
-    else:
-        score -= 2
-
-    if fat_per > 35:
-        score -= 8
-    elif fat_per <= 18:
-        score += 3
-
-    if calories_per > 650:
-        score -= 10
-    elif calories_per <= 450:
-        score += 4
-
-    if payload.spiceLevel >= 3:
-        score -= 2
-
-    return int(min(100, max(0, round(score))))
+    """Rule-based nutrition score 0–100 (starts at 100, adjusted by macros and ingredients)."""
+    void = (fiber_level, fat_per, calories_per, protein_per)
+    del void
+    return calculate_health_score_from_recipe(
+        ingredients=payload.ingredients,
+        calories=payload.calories,
+        protein=payload.protein,
+        carbs=payload.carbs,
+        servings=payload.servings,
+    )
 
 
 def build_fallback_tips(
@@ -170,33 +162,16 @@ def build_fallback_tips(
     macro_levels: MacroLevels,
     insights: HealthInsights,
 ) -> list[str]:
-    tips: list[str] = []
-
-    if macro_levels.protein == "low":
-        tips.append("כדאי להוסיף מקור חלבון — ביצה, טופו, עוף או קטנייה — לאיזון המנה.")
-    elif insights.suitableForPostWorkout:
-        tips.append("שילוב חלבון ופחמימות במנה הזו מתאים לשיקום אחרי אימון.")
-
-    if macro_levels.fiber == "low":
-        tips.append("הוסיפו ירק עלה ירוק או קטנייה לצד המנה כדי להעלות סיבים תזונתיים.")
-    elif macro_levels.fiber == "high":
-        tips.append("המנה עשירה בירקות/קטניות — מצוין לשובע ולעיכול.")
-
-    if macro_levels.fat == "high":
-        tips.append("שימו לב לכמות השומן — אפשר להקטין שמן/חמאה בחצי לגרסה קלה יותר.")
-    elif insights.suitableForDiet:
-        tips.append("המנה מאוזנת יחסית — מתאימה לשמירה על דיאטה עם מנות בינוניות.")
-
-    if insights.suitableForKids and payload.spiceLevel <= 1:
-        tips.append("רמת התיבול עדינה — מתאימה גם לילדים.")
-
-    if insights.suitableForDinner and len(tips) < 3:
-        tips.append("מנה נוחה לערב — לא כבדה מדי וקלה לעיכול.")
-
-    if not tips:
-        tips.append("הקפידו על מנות מגוונות עם ירקות, חלבון ומעט שומן איכותי.")
-
-    return tips[:3]
+    void = insights
+    del void
+    return build_recipe_specific_tips(
+        name=payload.name,
+        ingredients=payload.ingredients,
+        protein_level=macro_levels.protein,
+        fat_level=macro_levels.fat,
+        fiber_level=macro_levels.fiber,
+        language=payload.language or "he",
+    )
 
 
 def build_nutrition_analysis(payload: NutritionAnalysisRequest) -> NutritionAnalysisResponse:
@@ -227,28 +202,65 @@ def build_nutrition_analysis(payload: NutritionAnalysisRequest) -> NutritionAnal
         calories_per=calories_per,
     )
     tips = build_fallback_tips(payload, macro_levels, insights)
+    score_explanation = build_nutrition_score_explanation(
+        score=nutrition_score,
+        ingredients=payload.ingredients,
+        calories=payload.calories,
+        protein=payload.protein,
+        carbs=payload.carbs,
+        servings=servings,
+        language=payload.language or "he",
+    )
 
     return NutritionAnalysisResponse(
         macroLevels=macro_levels,
         insights=insights,
         nutritionScore=nutrition_score,
+        nutritionClassification=str(get_nutrition_score_classification(nutrition_score)["id"]),
+        nutritionScoreExplanation=score_explanation,
         tips=tips,
         source="fallback",
     )
 
 
 def _build_gemini_tips_prompt(payload: NutritionAnalysisRequest, analysis: NutritionAnalysisResponse) -> str:
-    ingredients = ", ".join(payload.ingredients[:12]) or "לא צוינו"
-    return f"""אתה מאמן תזונה ישראלי. תן 2–3 טיפים בריאותיים קצרים בעברית למנה:
+    ingredients = ", ".join(payload.ingredients[:12]) or ("Not specified" if payload.language == "en" else "לא צוינו")
+    language = payload.language or "he"
+
+    if language == "en":
+        return f"""You are a nutritionist reviewing THIS specific recipe. Give 2–3 short, practical health tips in English:
+Name: {payload.name}
+Ingredients: {ingredients}
+Per serving (~{payload.servings} servings): {payload.calories} cal, protein {payload.protein}g, carbs {payload.carbs}g, fat {payload.fat}g
+Nutrition score: {analysis.nutritionScore}/100
+
+Return JSON only: {{"tips": ["...", "..."]}}
+
+RULES — tips must reference THIS recipe's ingredients and dish type:
+- Write as if you reviewed this exact dish, not generic nutrition advice
+- NEVER suggest "add protein", "add vegetables", or "add legumes" unless it naturally fits the dish (e.g. pasta, salad)
+- Desserts: reduce sugar, use dark chocolate, Greek yogurt instead of cream, reduce marshmallows
+- Pasta: whole wheat pasta, add vegetables to the sauce, reduce cream/butter
+- Salads: add a protein that fits (cheese, chicken, tuna), reduce dressing/oil
+- Mention specific ingredients from the list when possible
+- 2–3 practical sentences, English only, no medical diagnoses"""
+
+    return f"""אתה dietitian שבודק את המתכון הספציפי הזה. תן 2–3 טיפים בריאותיים קצרים בעברית:
 שם: {payload.name}
 מרכיבים: {ingredients}
 למנה (כ-{payload.servings} מנות): {payload.calories} קלוריות, חלבון {payload.protein}g, פחמימות {payload.carbs}g, שומן {payload.fat}g
 ציון תזונה: {analysis.nutritionScore}/100
 
 החזר JSON בלבד: {{"tips": ["...", "..."]}}
-- 2–3 משפטים מעשיים
-- בעברית בלבד
-- ללא אבחנות רפואיות"""
+
+כללים — הטיפים חייבים להתייחס למתכון הזה, לא לעצות כלליות:
+- כתוב כאילו בדקת את המנה הזו, לא עצות תזונה גנריות
+- לעולם אל תציע "הוסיפו חלבון", "הוסיפו ירקות" או "הוסיפו קטניות" אלא אם זה מתאים טבעית למנה (למשל פסטה, סלט)
+- קינוחים: הקטנת סוכר, שוקולד מריר, יוגורט יווני, הקטנת מרשמלו
+- פסטה: פסטה מקמח מלא, ירקות ברוטב, הקטנת שמנת/חמאה
+- סלטים: חלבון שמתאים (גבינה, עוף, טונה), הקטנת רוטב/שמן
+- ציינו מרכיבים מהרשימה כשאפשר
+- 2–3 משפטים מעשיים, בעברית בלבד, ללא אבחנות רפואיות"""
 
 
 def _clean_tips(raw_tips: list[str]) -> list[str]:
@@ -292,6 +304,8 @@ def enrich_with_gemini_tips(
         macroLevels=analysis.macroLevels,
         insights=analysis.insights,
         nutritionScore=analysis.nutritionScore,
+        nutritionClassification=analysis.nutritionClassification,
+        nutritionScoreExplanation=analysis.nutritionScoreExplanation,
         tips=tips,
         source="gemini",
     )

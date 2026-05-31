@@ -6,6 +6,7 @@ import re
 from dataclasses import dataclass, field
 from typing import Literal
 
+from ingredient_allowlist import find_unauthorized_recipe_ingredients
 from ingredient_relevance import MIN_INGREDIENT_MATCH_RATIO, validate_recipe_relevance
 
 RecipeType = Literal["meal", "dessert"]
@@ -57,6 +58,13 @@ DESSERT_TITLE_REQUIRED = STRONG_DESSERT_NAME_SIGNALS + (
     "שוקולד",
     "קרם",
     "וופל",
+    "cake",
+    "cookie",
+    "brownie",
+    "muffin",
+    "dessert",
+    "cheesecake",
+    "chocolate",
 )
 
 SAVORY_BLOCKED_FOR_DESSERT = (
@@ -95,6 +103,13 @@ MEAL_DESSERT_BLOCKED_IN_TITLE = (
     "מתוק",
     "שוקולד",
     "עוג",
+    "cake",
+    "cookie",
+    "cookies",
+    "brownie",
+    "dessert",
+    "cheesecake",
+    "chocolate",
 )
 
 SAVORY_MEAL_SIGNALS = (
@@ -129,6 +144,14 @@ MEAT_PATTERNS = (
     r"כבד",
     r"מרג(?:ז|ע)",
     r"צלי(?:ה|ת)?",
+    r"chicken",
+    r"beef",
+    r"\bmeat\b",
+    r"steak",
+    r"turkey",
+    r"lamb",
+    r"pork",
+    r"ground beef",
 )
 
 DAIRY_PATTERNS = (
@@ -142,6 +165,14 @@ DAIRY_PATTERNS = (
     r"פרמז",
     r"ריקוט",
     r"מסקרפונ",
+    r"\bmilk\b",
+    r"cheese",
+    r"cream",
+    r"butter",
+    r"yogurt",
+    r"ricotta",
+    r"parmesan",
+    r"cream cheese",
 )
 
 
@@ -247,7 +278,10 @@ def is_dairy_dessert_valid(recipe: dict) -> bool:
     if not recipe_has_dairy(recipe):
         return False
     text = recipe_text_blob(recipe)
-    dairy_dessert_signals = ("עוג", "קינוח", "עוגיות", "בראונ", "מאפין", "גבינ", "שוקולד", "קרם")
+    dairy_dessert_signals = (
+        "עוג", "קינוח", "עוגיות", "בראונ", "מאפין", "גבינ", "שוקולד", "קרם",
+        "cake", "cookie", "brownie", "muffin", "cheese", "chocolate", "cream",
+    )
     return any(signal in text for signal in dairy_dessert_signals)
 
 
@@ -398,6 +432,10 @@ def validate_gemini_recipe_quality(
     if violates_kosher_category(category, recipe):
         reasons.append("kosher_violation")
 
+    unauthorized = find_unauthorized_recipe_ingredients(recipe, ",".join(user_ingredients))
+    if user_ingredients and unauthorized:
+        reasons.append("unauthorized_ingredients")
+
     return RecipeQualityResult(ok=len(reasons) == 0, reasons=reasons)
 
 
@@ -413,6 +451,14 @@ def log_quality_rejections(reasons: list[str]) -> None:
             print("[FOOD FOR ANY MOOD] Gemini recipe rejected: time mismatch")
         elif reason == "kosher_violation":
             print("[FOOD FOR ANY MOOD] Gemini recipe rejected: kosher category violation")
+        elif reason == "unauthorized_ingredients":
+            print("[FOOD FOR ANY MOOD] Gemini recipe rejected: unauthorized ingredients")
+        elif reason == "duplicate_title":
+            print("[FOOD FOR ANY MOOD] Gemini recipe rejected: duplicate title")
+        elif reason == "duplicate_cooking_method":
+            print("[FOOD FOR ANY MOOD] Gemini recipe rejected: duplicate cooking method")
+        elif reason == "duplicate_dessert_category":
+            print("[FOOD FOR ANY MOOD] Gemini recipe rejected: duplicate dessert category")
 
 
 def log_recipe_validation(

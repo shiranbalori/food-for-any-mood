@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { getTheme } from '../utils/themes'
 import { useLanguage } from '../i18n/useLanguage'
+import { sanitizeIngredientList } from '../utils/ingredientFormatting'
 import {
   incrementRecipeViews,
   rateCommunityRecipe,
@@ -41,6 +42,7 @@ export default function CommunityRecipeCard({
 
   const theme = getTheme(recipe.category ?? 'parve')
   const categoryId = recipe.category ?? 'parve'
+  const displayIngredients = sanitizeIngredientList(recipe.ingredients ?? [])
 
   const handleExpand = async () => {
     const next = !expanded
@@ -153,11 +155,11 @@ export default function CommunityRecipeCard({
       {expanded && (
         <div className="community-card__details">
           {recipe.description && <p>{recipe.description}</p>}
-          {recipe.ingredients?.length > 0 && (
+          {displayIngredients.length > 0 && (
             <>
               <h4>{t('ingredients')}</h4>
               <ul>
-                {recipe.ingredients.map((item) => (
+                {displayIngredients.map((item) => (
                   <li key={item}>{item}</li>
                 ))}
               </ul>

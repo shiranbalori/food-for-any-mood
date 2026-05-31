@@ -20,6 +20,7 @@ import concurrent.futures
 import logging
 import os
 import random
+import time
 from typing import Literal
 
 from dotenv import load_dotenv
@@ -49,6 +50,12 @@ from recipe_ingredient_parser import (
     apply_recipe_ingredient_parser,
     is_recipe_acceptable,
 )
+from recipe_pre_return_validation import (
+    assess_ingredient_feasibility,
+    build_validation_failure_message,
+    validate_recipe_before_return,
+)
+from recipe_diversity import build_regeneration_prompt_section, validate_recipe_diversity
 from recipe_quality import (
     is_invalid_recipe_selection,
     log_quality_rejections,
@@ -56,7 +63,13 @@ from recipe_quality import (
     validateRecipeCategory,
     validateRecipeType,
     validate_gemini_recipe_quality,
+    violates_kosher_category,
 )
+from chef_prompt_rules import get_chef_rules_en, get_chef_rules_he
+from chef_intro import build_chef_intro
+from nutrition_score import calculate_health_score_from_recipe
+from recipe_copy import get_recipe_copy
+from recipe_templates import get_category_templates, get_playlist_presets
 from pydantic import BaseModel, Field, ValidationError
 
 load_dotenv()
@@ -69,6 +82,42 @@ logger = logging.getLogger(__name__)
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "").strip()
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.0-flash").strip()
 GEMINI_TIMEOUT_SECONDS = 15
+
+
+class _StageTimer:
+    def __init__(self, label: str) -> None:
+        self.label = label
+        self._started = time.perf_counter()
+        self._last = self._started
+        self.rows: list[dict[str, str | int]] = []
+
+    def mark(self, stage: str, status: str = "Success", detail: str = "") -> int:
+        now = time.perf_counter()
+        duration_ms = int((now - self._last) * 1000)
+        self.rows.append(
+            {
+                "Stage": stage,
+                "Duration (ms)": duration_ms,
+                "Status": status,
+                "Detail": detail,
+            }
+        )
+        self._last = now
+        print(
+            f"[FOOD FOR ANY MOOD][timing] {stage} | {duration_ms}ms | {status}"
+            + (f" | {detail}" if detail else "")
+        )
+        return duration_ms
+
+    def print_table(self) -> None:
+        total_ms = int((time.perf_counter() - self._started) * 1000)
+        print(f"[FOOD FOR ANY MOOD][timing] {self.label} TOTAL | {total_ms}ms")
+        for row in self.rows:
+            print(
+                "[FOOD FOR ANY MOOD][timing] "
+                f"{row['Stage']} | {row['Duration (ms)']}ms | {row['Status']} | {row['Detail']}"
+            )
+
 
 gemini_client: genai.Client | None = None
 if GEMINI_API_KEY and GEMINI_API_KEY != "your_api_key_here":
@@ -158,6 +207,7 @@ MusicPlatform = Literal["spotify", "youtube"]
 Mood = Literal["happy", "cozy", "energetic", "relaxed", "adventurous", "comfort"]
 ServingsCount = Literal[1, 2, 4, 6, 8]
 RecipeType = Literal["meal", "dessert"]
+Language = Literal["he", "en"]
 
 
 class GenerateRecipeRequest(BaseModel):
@@ -169,6 +219,10 @@ class GenerateRecipeRequest(BaseModel):
     musicPlatform: MusicPlatform = "spotify"
     servings: ServingsCount = 4
     recipeType: RecipeType = "meal"
+    language: Language = "he"
+    excludeTitles: list[str] = Field(default_factory=list)
+    excludeCookingMethods: list[str] = Field(default_factory=list)
+    excludeDessertCategories: list[str] = Field(default_factory=list)
 
 
 class Nutrition(BaseModel):
@@ -190,6 +244,11 @@ class Playlist(BaseModel):
     matchPercent: int
 
 
+class OptionalUpgrade(BaseModel):
+    ingredient: str
+    reason: str
+
+
 class GeneratedRecipe(BaseModel):
     name: str
     description: str
@@ -201,11 +260,17 @@ class GeneratedRecipe(BaseModel):
     healthScore: int
     tags: list[str]
     playlist: Playlist
+    optionalUpgrades: list[OptionalUpgrade] = Field(default_factory=list)
+    generatedFromPreferences: bool = False
 
 
 class GenerateRecipeResponse(BaseModel):
-    recipe: GeneratedRecipe
-    source: Literal["gemini", "mock"]
+    recipe: GeneratedRecipe | None = None
+    recipePossible: bool = True
+    impossibleReason: str | None = None
+    missingIngredients: list[str] = Field(default_factory=list)
+    source: Literal["gemini", "mock", "none"] = "gemini"
+    fallbackUsed: bool = False
     geminiError: str | None = None
 
 
@@ -237,6 +302,7 @@ class GeminiRecipeOutput(BaseModel):
     healthScore: int
     tags: list[str]
     playlist: GeminiPlaylistOutput
+    optionalUpgrades: list[OptionalUpgrade] = Field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------
@@ -402,8 +468,13 @@ PLAYLIST_PRESETS: dict[MusicPlatform, dict] = {
 
 
 
-def _build_playlist(platform: MusicPlatform, match_percent: int | None = None) -> Playlist:
-    preset = PLAYLIST_PRESETS[platform]
+def _build_playlist(
+    platform: MusicPlatform,
+    match_percent: int | None = None,
+    *,
+    language: Language = "he",
+) -> Playlist:
+    preset = get_playlist_presets(language)[platform]
     encoded = preset["query"].replace(" ", "%20")
     if platform == "youtube":
         url = f"https://www.youtube.com/results?search_query={encoded}"
@@ -415,7 +486,7 @@ def _build_playlist(platform: MusicPlatform, match_percent: int | None = None) -
         name=preset["name"],
         description=preset["description"],
         energy="medium",
-        energyLabel="אנרגיה בינונית",
+        energyLabel=preset["energyLabel"],
         platform=platform,
         url=url,
         matchPercent=match_percent if match_percent is not None else random.randint(82, 96),
@@ -423,6 +494,13 @@ def _build_playlist(platform: MusicPlatform, match_percent: int | None = None) -
 
 
 def _build_gemini_prompt(payload: GenerateRecipeRequest, *, strict: bool = False) -> str:
+    language = payload.language or "he"
+    if language == "en":
+        return _build_gemini_prompt_en(payload, strict=strict)
+    return _build_gemini_prompt_he(payload, strict=strict)
+
+
+def _build_gemini_prompt_he(payload: GenerateRecipeRequest, *, strict: bool = False) -> str:
     category_label = CATEGORY_LABELS[payload.category]
     mood_label = MOOD_LABELS[payload.mood]
     gluten_note = "כן — המתכון חייב להיות ללא גלוטן" if payload.isGlutenFree else "לא"
@@ -449,10 +527,17 @@ def _build_gemini_prompt(payload: GenerateRecipeRequest, *, strict: bool = False
                 "⚠️ המתכון הקודם נדחה — סוג מתכון: ארוחה בלבד.\n"
                 "- אסור: עוגה, עוגיות, קינוח, מוס, בראוניז, מאפינים, גלידה, מתוקים.\n"
             )
+        if strict:
+            strict_note += (
+                "⚠️ המתכון הקודם נדחה — כלול רק מרכיבי משתמש + מצרכי מזוון: מים, מלח, פלפל שחור, שמן, אבקת אפייה.\n"
+                "- אסור (אלא אם המשתמש הזין): פירות, עוגיות, שוקולד, אגוזים, גבינת שמנת, יוגורט, חלב, חמאה.\n"
+            )
         ingredient_rules = f"""
 {strict_note}כללי מרכיבים (חובה מוחלטת — עדיפות על קטגוריה ומצב רוח):
 - המשתמש ציין מרכיבים: {ingredient_list}
 - לפחות {threshold}% מהמרכיבים האלה חייבים להופיע ברשימת המרכיבים של המתכון.
+- השתמש אך ורק במרכיבים שהמשתמש הזין, ובמצרכי מזוון מערכתיים בלבד: מים, מלח, פלפל שחור, שמן, אבקת אפייה; תמצית וניל רק אם המשתמש ציין וניל.
+- אסור בהחלט (אלא אם המשתמש הזין): פירות/berries, עוגיות, שוקולד, אגוזים, גבינת שמנת, יוגורט, חלב, חמאה.
 - שם המנה חייב לכלול לפחות אחד מהמרכיבים שציין המשתמש (בעברית, כפי שהזין או בניסוח קרוב).
 - אל תציע מנה גנרית לפי קטגוריה/מצב רוח בלבד — המרכיבים הם הבסיס למנה.
 - אם השילוב לא מתאים לחלוטין, הסבר בקצרה בתיאור והשתמש ברוב המרכיבים האפשריים.
@@ -461,22 +546,32 @@ def _build_gemini_prompt(payload: GenerateRecipeRequest, *, strict: bool = False
 - כל מרכיב ברשימה חייב להופיע במפורש באחד משלבי ההכנה.
 - הפרד מרכיבים לפריטים נפרדים — אל תמזג כמה מרכיבים לשורה אחת.
 """
+    else:
+        ingredient_rules = """
+כללי יצירה לפי העדפות (המשתמש לא ציין מרכיבים):
+- צור מתכון מלא המתאים לקטגוריה, סוג המתכון, מצב הרוח, זמן ההכנה, מספר המנות והעדפת הגלוטן.
+- אתה רשאי לכלול את כל המרכיבים הנדרשים למנה — בסיסי מטבח (מלח, שמן, תבלינים) מותרים.
+- optionalUpgrades: מערך ריק [] — אין שדרוגים במצב זה.
+- matchPercentage: 0 — לא רלוונטי (נוצר לפי העדפות).
+"""
 
     title_rules = """
 כללי שם המנה (חובה — שם מנה אמיתית בלבד):
-- שם המנה מתאר את האוכל: מרכיבים עיקריים וסגנון בישול.
+- שם המנה חייב להישמע כמו מנה אמיתית — לא רשימת מרכיבים.
+- מקסימום 4 מילים בשם.
+- אסור לחלוטין: "קינוח שמנת סוכר וביצים", "מתכון וניל ביתי", "קינוח גבינת שמנת ביצים".
+- דוגמאות טובות: "קרם וניל אפוי", "מוס וניל קטיפתי", "פודינג וניל ביתי", "קינוח כוסות וניל", "קרם ברולה ביתי".
+- השתמש בסוג מנה (קרם, מוס, פודינג, עוגה, פנקייק) + טעם עיקרי אחד + תיאור קצר (אפוי, ביתי, קטיפתי).
+- אסור לחזור על שמות גנריים ללא מנה: "תבשיל ביתי", "קינוח גבינה", "עוגה ביתית".
 - מצב רוח משפיע רק על התיאור, התיבול והפלייליסט — לעולם לא על שם המנה.
-- דוגמאות טובות: "שקשוקה מהירה", "חביתת עגבניות", "פסטה ברוטב שמנת", "סלט טונה וביצים".
-- דוגמאות אסורות: "ארוחת נרות", "ארוחת נוחות", "ערב רומנטי", "וייב חמים", "מנה נעימה".
 - אסור: ארוחת, ערב, וייב, נוחות, רומנטי, נעים, אנרגטי, רגוע, מצב רוח — בשם המנה.
 """
 
     quantity_rules = f"""
 כללי כמויות (חובה):
-- לכל מרכיב חייבת להיות כמות ריאלית ויחידת מידה: whole item, tsp, tbsp, gram, ml, cup.
-- הכמויות חייבות להתאים בדיוק ל-{payload.servings} מנות.
-- שלבי ההכנה חייבים להזכיר את אותן כמויות כמו ברשימת המרכיבים.
-- דוגמה ל-{payload.servings} מנות: כמויות מוגדלות/מוקטנות בהתאם (למשל 6 מנות — כ-600g פסטה, 6 עגבניות).
+- לכל מרכיב חייבת להיות כמות ריאלית ויחידת מידה (כף, כפית, גרם, מ"ל, כוס, יחידה).
+- הכמויות חייבות להתאים ל-{payload.servings} מנות.
+- הכמויות מופיעות רק ברשימת המרכיבים — בשלבים השתמש בשמות המרכיבים בלי לחזור על המספרים.
 """
 
     recipe_type_label = RECIPE_TYPE_LABELS[payload.recipeType]
@@ -498,16 +593,27 @@ def _build_gemini_prompt(payload: GenerateRecipeRequest, *, strict: bool = False
 
     dessert_rules = ""
     if payload.recipeType == "dessert":
-        dessert_rules = """
+        if user_ingredients:
+            dessert_rules = """
 כללי קינוח (חובה — סוג מתכון: קינוח):
 - המתכון חייב להיות קינוח בלבד — לא מנה עיקרית, לא ארוחה מלוחה, לא שקשוקה, לא סלט, לא מרק.
 - אסור: שקשוקה, פסטה מלוחה, עוף בתנור, סלט, מוקפץ, תבשיל עיקרי.
-- השתמש במרכיבים מתוקים: סוכר, דבש, שוקולד, פירות, קמח, שמנת, חמאה, וניל, קינמון.
-- שלבי ההכנה בסגנון קינוח: ערבוב, אפייה מתוקה, קירור, קישוט, הגשה.
+- השתמש אך ורק במרכיבים שהמשתמש ציין — אל תוסיף וניל, חמאה, שוקולד, פירות, אבקת סוכר או קמח אלא אם המשתמש הזין אותם.
+- שלבי ההכנה חייבים להיות ספציפיים למרכיבים שהמשתמש הזין — לא טקסט גנרי.
+- אסור שלבים גנריים כמו: "מסדרים על מגש הכנה", "מקשטים בפירות ושוקולד", "מגישים קר או חם".
+- ביטוי מרכיבים בעברית: "הקוקוס, המרשמלו והסוכר" (פסיקים ו-"ו" לפני המרכיב האחרון).
 - spiceLevel חייב להיות 0 (קינוחים אינם חריפים).
-- שם המנה חייב לשקף קינוח (עוגה, עוגיות, מוס, טרifle, סורבה, פנקייק מתוק וכו').
-- אם המשתמש ציין מרכיבים — שלב אותם בהקשר מתוק ומתאים לקינוח.
-- אל תמציא קינוח שלא קשור למרכיבים או לדרישות המשתמש.
+- שם המנה חייב לשקף את המרכיבים שהמשתמש הזין.
+- אל תמציא קינוח שלא מבוסס על המרכיבים שהמשתמש הזין.
+"""
+        else:
+            dessert_rules = """
+כללי קינוח (חובה — סוג מתכון: קינוח):
+- המתכון חייב להיות קינוח בלבד — לא מנה עיקרית, לא ארוחה מלוחה, לא שקשוקה, לא סלט, לא מרק.
+- אסור: שקשוקה, פסטה מלוחה, עוף בתנור, סלט, מוקפץ, תבשיל עיקרי.
+- שלבי ההכנה חייבים להיות ספציפיים למנה — לא טקסט גנרי.
+- spiceLevel חייב להיות 0 (קינוחים אינם חריפים).
+- שם המנה חייב לשקף את הקינוח (עוגה, עוגיות, מוס, בראוניז וכו').
 """
 
     kosher_rules = f"""
@@ -525,8 +631,42 @@ def _build_gemini_prompt(payload: GenerateRecipeRequest, *, strict: bool = False
 - מספר מנות: {payload.servings} — כמויות חייבות להתאים בדיוק.
 """
 
-    return f"""אתה שף ישראלי שמייצר מתכונים לאפליקציה FOOD FOR ANY MOOD.
-צור מתכון אחד מקורי בעברית בלבד (שם המנה, תיאור, מרכיבים, שלבים, תגיות, פלייליסט).
+    match_note = (
+        "- matchPercentage: 0–100 לפי התאמה למרכיבי המשתמש (ראה כללי שף)."
+        if user_ingredients
+        else "- matchPercentage: 0 (נוצר לפי העדפות — לא לחשב התאמת מרכיבים)."
+    )
+    content_fit_note = (
+        "- התאם את המנה לקטגוריה, למצב הרוח ולזמן ההכנה — אך כשיש מרכיבים, הם קודמים לכל השאר."
+        if user_ingredients
+        else "- התאם את המנה לקטגוריה, למצב הרוח, לזמן ההכנה ולמספר המנות."
+    )
+    upgrades_note = (
+        '- optionalUpgrades: מערך של עד 3 אובייקטים {{"ingredient": "...", "reason": "..."}} — מרכיבים אופציונליים בלבד, לא ברשימת ingredients.'
+        if user_ingredients
+        else "- optionalUpgrades: מערך ריק []."
+    )
+    regeneration_rules = build_regeneration_prompt_section(
+        language="he",
+        exclude_titles=payload.excludeTitles,
+        exclude_cooking_methods=payload.excludeCookingMethods,
+        exclude_dessert_categories=payload.excludeDessertCategories,
+    )
+
+    description_rules = ""
+    if user_ingredients:
+        description_rules = """
+כללי תיאור / הקדמת שף (חובה — שדה description):
+- לפני המתכון, כתוב/י הקדמה ידידותית בעברית טבעית.
+- מבנה: "עם המרכיבים שיש לך אפשר להכין:" + 2–4 שורות עם • (מנות אפשריות) + שורה ריקה + משפט למה name היא הבחירה הטובה.
+- חשוב/י קודם, כתוב/י אחר כך — אל תקפוץ/י ישר למתכון.
+- אסור שילובים לא ריאליים; אסור מתכון שלא קשור למרכיבים.
+"""
+
+    return f"""אתה שף/ית ידידותי/ת שעוזר/ת במטבח הבית — FOOD FOR ANY MOOD.
+צור מתכון אחד מקורי בעברית בלבד (שם המנה, תיאור, מרכיבים, שלבים, תגיות, פלייליסט, optionalUpgrades).
+
+{get_chef_rules_he()}
 
 {type_priority}
 
@@ -539,21 +679,126 @@ def _build_gemini_prompt(payload: GenerateRecipeRequest, *, strict: bool = False
 - מרכיבים זמינים (בסיס המנה): {ingredients_note}
 - מספר מנות: {payload.servings}
 - פלטפורמת מוזיקה לפלייליסט: {payload.musicPlatform}
-{ingredient_rules}{title_rules}{quantity_rules}{meal_rules}{dessert_rules}{kosher_rules}{mood_time_rules}
+{ingredient_rules}{title_rules}{description_rules}{quantity_rules}{meal_rules}{dessert_rules}{kosher_rules}{mood_time_rules}
 כללי תוכן:
 - כל טקסט המתכון חייב להיות בעברית.
 - שמות המרכיבים בשלבים וברשימה — בעברית בלבד, ללא מילים באנגלית.
 - שם האפליקציה FOOD FOR ANY MOOD נשאר באנגלית — אל תתרגם אותו.
-- התאם את המנה לקטגוריה, למצב הרוח ולזמן ההכנה — אך כשיש מרכיבים, הם קודמים לכל השאר.
-- matchPercentage: 70–99 לפי התאמה למרכיבים ולהעדפות.
+{content_fit_note}
+{match_note}
+{upgrades_note}
 - spiceLevel: 0–3 (0=לא חריף, 3=חריף).
 - nutrition: הערכה סבירה ל-{payload.servings} מנות; nutrition.servings חייב להיות {payload.servings}.
-- healthScore: 0–100.
+- healthScore: 0–100 — computed from calories/protein/sugar/fiber per portion and ingredient quality (system may recalculate).
 - tags: מערך קצר של תגיות (מחרוזות בעברית או מפתחות קצרים באנגלית).
 - playlist.title ו-playlist.description בעברית; playlist.platform = "{payload.musicPlatform}";
   playlist.url = קישור חיפוש אמיתי ל-Spotify או YouTube המתאים למצב הרוח.
-
+{regeneration_rules}
 החזר JSON בלבד לפי הסכימה — ללא markdown וללא טקסט נוסף."""
+
+
+def _build_gemini_prompt_en(payload: GenerateRecipeRequest, *, strict: bool = False) -> str:
+    category_labels = {"dairy": "Dairy", "meat": "Meat", "parve": "Parve"}
+    mood_labels = {
+        "happy": "Happy",
+        "cozy": "Cozy",
+        "energetic": "Energetic",
+        "relaxed": "Relaxed",
+        "adventurous": "Adventurous",
+        "comfort": "Comfort",
+    }
+    category_label = category_labels[payload.category]
+    mood_label = mood_labels[payload.mood]
+    recipe_type_label = "Dessert" if payload.recipeType == "dessert" else "Meal"
+    gluten_note = "Yes — recipe must be gluten-free" if payload.isGlutenFree else "No"
+    user_ingredients = parse_user_ingredients(payload.ingredients)
+    ingredients_note = payload.ingredients.strip() or "Not specified — suggest suitable ingredients"
+
+    strict_note = (
+        "\n⚠️ Previous attempt failed validation — you MUST follow every rule below with no exceptions:\n"
+        if strict
+        else ""
+    )
+
+    if user_ingredients:
+        ingredient_rules = """
+INGREDIENT RULES:
+- Base recipe ingredients array: ONLY user-provided ingredients plus system pantry: water, salt, black pepper, oil, baking powder; vanilla extract ONLY if the user listed vanilla.
+- NEVER add unless the user provided them: berries, cookies, chocolate, fruits, nuts, cream cheese, yogurt, milk, butter.
+- optionalUpgrades: up to 3 optional improvements with ingredient + reason — never in the main ingredients list.
+"""
+        match_note = "- matchPercentage: 0–100 based on user ingredient match."
+        upgrades_note = "- optionalUpgrades: up to 3 optional improvements with ingredient + reason."
+    else:
+        ingredient_rules = """
+PREFERENCE-BASED GENERATION (user did not list ingredients):
+- Create a complete recipe matching category, recipe type, mood, cooking time, servings, and gluten-free preference.
+- You may include all ingredients needed for the dish, including pantry staples (salt, oil, spices).
+- optionalUpgrades: empty array [].
+- matchPercentage: 0 — not applicable (generated from preferences).
+"""
+        match_note = "- matchPercentage: 0 (generated from preferences — do not score ingredient match)."
+        upgrades_note = "- optionalUpgrades: empty array []."
+
+    regeneration_rules = build_regeneration_prompt_section(
+        language="en",
+        exclude_titles=payload.excludeTitles,
+        exclude_cooking_methods=payload.excludeCookingMethods,
+        exclude_dessert_categories=payload.excludeDessertCategories,
+    )
+
+    description_rules = ""
+    if user_ingredients:
+        description_rules = """
+DESCRIPTION / CHEF INTRO (mandatory — description field):
+- Before the recipe, write a friendly natural intro.
+- Structure: "With the ingredients you have, you could make:" + 2–4 bullet lines with • + blank line + one sentence why name is the best pick.
+- Think first, write second — do not jump straight to the recipe.
+- No unrealistic combinations; no generic dishes unrelated to the ingredients.
+"""
+
+    return f"""You are a friendly home chef helping someone cook — FOOD FOR ANY MOOD.
+Return exactly one recipe as structured JSON in English only.
+
+{get_chef_rules_en()}
+
+LANGUAGE (mandatory):
+- The entire recipe MUST be in English only (name, description, ingredients, steps, tags, playlist, optionalUpgrades).
+- Do NOT use Hebrew in the JSON output.
+- The app name FOOD FOR ANY MOOD stays in English.
+
+RECIPE TYPE (mandatory): {recipe_type_label} ({payload.recipeType})
+
+USER PREFERENCES:
+- Category: {category_label} ({payload.category}) — kosher rules apply
+- Mood: {mood_label} ({payload.mood})
+- Max cooking time: {payload.cookingTime} minutes
+- Gluten-free: {gluten_note}
+- Available ingredients (base recipe): {ingredients_note}
+- Servings: {payload.servings}
+- Music platform for playlist: {payload.musicPlatform}
+{strict_note}{ingredient_rules}{description_rules}
+STEP RULES:
+- Minimum 4 steps; prefer 5–8 detailed, natural steps.
+- Quantities in ingredient list only — not repeated in steps.
+- Each step: action, technique, time when relevant, expected result.
+
+CATEGORY RULES:
+- dairy: no meat or poultry; dairy ingredients allowed.
+- meat: no dairy; meat-based savory meals only.
+- parve: no meat and no dairy; vegetarian-friendly.
+
+CONTENT:
+- Dish name must sound like a real dish — never an ingredient list. Maximum 4 words.
+- NEVER: "cream sugar eggs dessert", "vanilla homemade recipe", ingredient chains as titles.
+- GOOD: "Baked Vanilla Custard", "Silky Vanilla Mousse", "Homemade Vanilla Pudding".
+- NEVER generic titles: "Homemade Stew", "Quick Dish", "Cheesecake Dessert".
+{match_note}
+{upgrades_note}
+- spiceLevel: 0–3; nutrition.servings must be {payload.servings}; healthScore: 0–100.
+- playlist.platform = "{payload.musicPlatform}"; playlist.url = real Spotify or YouTube search URL.
+{regeneration_rules}
+Return JSON only — no markdown, no extra text."""
 
 
 def _normalize_gemini_recipe(
@@ -570,6 +815,8 @@ def _normalize_gemini_recipe(
     if not playlist_url.startswith("http"):
         playlist_url = _build_playlist(platform).url
 
+    energy_label = "Medium energy" if payload.language == "en" else "אנרגיה בינונית"
+
     return GeneratedRecipe(
         name=gemini_recipe.name,
         description=gemini_recipe.description,
@@ -584,14 +831,21 @@ def _normalize_gemini_recipe(
             fat=max(0, gemini_recipe.nutrition.fat),
             servings=payload.servings,
         ),
-        healthScore=max(0, min(100, gemini_recipe.healthScore)),
+        healthScore=calculate_health_score_from_recipe(
+            ingredients=gemini_recipe.ingredients,
+            calories=max(0, gemini_recipe.nutrition.calories),
+            protein=max(0, gemini_recipe.nutrition.protein),
+            carbs=max(0, gemini_recipe.nutrition.carbs),
+            servings=payload.servings,
+        ),
         tags=gemini_recipe.tags,
+        optionalUpgrades=(gemini_recipe.optionalUpgrades or [])[:3],
         playlist=Playlist(
             id="gemini-playlist",
             name=gemini_recipe.playlist.title,
             description=gemini_recipe.playlist.description,
             energy="medium",
-            energyLabel="אנרגיה בינונית",
+            energyLabel=energy_label,
             platform=platform,
             url=playlist_url,
             matchPercent=max(0, min(100, gemini_recipe.matchPercentage)),
@@ -640,9 +894,43 @@ def _recipe_to_validation_dict(recipe: GeneratedRecipe) -> dict:
     }
 
 
+def _has_chef_intro(description: str, language: str = "he") -> bool:
+    text = (description or "").strip()
+    if "•" in text:
+        return True
+    if language == "he":
+        return "עם המרכיבים שיש לך" in text or "אפשר להכין:" in text
+    return "With the ingredients you have" in text or "you could make:" in text.lower()
+
+
+def _ensure_chef_description(
+    description: str,
+    *,
+    ingredients: list[str],
+    chosen_name: str,
+    language: str,
+    recipe_type: str,
+    cooking_time: int,
+    has_user_ingredients: bool,
+) -> str:
+    if not has_user_ingredients or not ingredients:
+        return description
+    if _has_chef_intro(description, language):
+        return description
+    return build_chef_intro(
+        ingredients,
+        chosen_name=chosen_name,
+        language=language,
+        recipe_type=recipe_type,
+        cooking_time=cooking_time,
+    )
+
+
 def _post_process_recipe(
     recipe: GeneratedRecipe,
     payload: GenerateRecipeRequest,
+    *,
+    preserve_original_steps: bool = False,
 ) -> GeneratedRecipe:
     """Hebrewize ingredients, split merged entries, and validate step usage."""
     raw = _recipe_to_validation_dict(recipe)
@@ -654,6 +942,18 @@ def _post_process_recipe(
         servings=payload.servings,
         recipe_type=payload.recipeType,
         category=payload.category,
+        language=payload.language,
+        preserve_original_steps=preserve_original_steps,
+    )
+
+    print(
+        "[FOOD FOR ANY MOOD] PARSED_RECIPE",
+        {
+            "name": processed["name"],
+            "ingredients": processed["ingredients"],
+            "steps": processed["steps"],
+            "preserveOriginalSteps": preserve_original_steps,
+        },
     )
 
     print(
@@ -663,9 +963,21 @@ def _post_process_recipe(
         validation["ok"],
     )
 
+    preference_based = not parse_user_ingredients(payload.ingredients)
+    user_ingredients = parse_user_ingredients(payload.ingredients)
+    description = _ensure_chef_description(
+        recipe.description,
+        ingredients=processed["ingredients"],
+        chosen_name=processed["name"],
+        language=payload.language or "he",
+        recipe_type=payload.recipeType,
+        cooking_time=payload.cookingTime,
+        has_user_ingredients=bool(user_ingredients),
+    )
+
     return GeneratedRecipe(
         name=processed["name"],
-        description=recipe.description,
+        description=description,
         ingredients=processed["ingredients"],
         steps=processed["steps"],
         matchPercentage=processed["matchPercentage"],
@@ -674,6 +986,8 @@ def _post_process_recipe(
         healthScore=processed.get("healthScore", recipe.healthScore),
         tags=recipe.tags,
         playlist=recipe.playlist,
+        optionalUpgrades=[] if preference_based else (recipe.optionalUpgrades or []),
+        generatedFromPreferences=processed.get("generatedFromPreferences", preference_based),
     )
 
 
@@ -710,9 +1024,15 @@ def _fallback_recipe_from_ingredients(payload: GenerateRecipeRequest) -> Generat
         cooking_time=payload.cookingTime,
         is_gluten_free=payload.isGlutenFree,
         music_platform=payload.musicPlatform,
-        build_playlist=_build_playlist,
+        build_playlist=lambda platform, match_percent: _build_playlist(
+            platform, match_percent, language=payload.language
+        ),
         recipe_type=payload.recipeType,
         servings=payload.servings,
+        language=payload.language,
+        exclude_titles=payload.excludeTitles,
+        exclude_cooking_methods=payload.excludeCookingMethods,
+        exclude_dessert_categories=payload.excludeDessertCategories,
     )
     processed, _ = apply_recipe_ingredient_parser(
         raw,
@@ -721,6 +1041,7 @@ def _fallback_recipe_from_ingredients(payload: GenerateRecipeRequest) -> Generat
         servings=payload.servings,
         recipe_type=payload.recipeType,
         category=payload.category,
+        language=payload.language,
     )
     return GeneratedRecipe(
         name=processed["name"],
@@ -733,6 +1054,9 @@ def _fallback_recipe_from_ingredients(payload: GenerateRecipeRequest) -> Generat
         healthScore=processed.get("healthScore", raw["healthScore"]),
         tags=processed["tags"],
         playlist=processed["playlist"],
+        optionalUpgrades=[
+            OptionalUpgrade(**item) for item in (raw.get("optionalUpgrades") or [])[:3]
+        ],
     )
 
 
@@ -764,24 +1088,63 @@ def _passes_gemini_quality(recipe: GeneratedRecipe, payload: GenerateRecipeReque
         log_quality_rejections(quality.reasons)
         return False
 
-    if user_ingredients and not is_recipe_acceptable(payload.ingredients, recipe_dict):
-        print("[FOOD FOR ANY MOOD] Gemini recipe rejected: parser quality check failed")
+    if not is_recipe_acceptable(payload.ingredients, recipe_dict, payload.language):
+        print("[FOOD FOR ANY MOOD] Gemini recipe rejected: language or parser quality check failed")
+        return False
+
+    diversity = validate_recipe_diversity(
+        recipe_dict,
+        recipe_type=payload.recipeType,
+        exclude_titles=payload.excludeTitles,
+        exclude_cooking_methods=payload.excludeCookingMethods,
+        exclude_dessert_categories=payload.excludeDessertCategories,
+    )
+    if not diversity["ok"]:
+        log_quality_rejections(diversity["failures"])
         return False
 
     return True
 
 
-def _try_gemini_recipe(payload: GenerateRecipeRequest, *, strict: bool) -> GeneratedRecipe | None:
-    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
-        future = pool.submit(generate_recipe_with_gemini, payload, strict=strict)
-        raw = future.result(timeout=GEMINI_TIMEOUT_SECONDS)
-    return _post_process_recipe(raw, payload)
+def _try_gemini_recipe(
+    payload: GenerateRecipeRequest,
+    *,
+    strict: bool,
+    timer: _StageTimer | None = None,
+) -> GeneratedRecipe | None:
+    stage = "gemini:strict" if strict else "gemini:first"
+    try:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+            future = pool.submit(generate_recipe_with_gemini, payload, strict=strict)
+            raw = future.result(timeout=GEMINI_TIMEOUT_SECONDS)
+        if timer:
+            timer.mark(stage, "Success")
+    except concurrent.futures.TimeoutError:
+        if timer:
+            timer.mark(stage, "Failed", f"timeout after {GEMINI_TIMEOUT_SECONDS}s")
+        raise
+    except Exception as exc:
+        if timer:
+            timer.mark(stage, "Failed", str(exc))
+        raise
+    print(
+        "[FOOD FOR ANY MOOD] RAW_GEMINI",
+        {
+            "name": raw.name,
+            "ingredients": raw.ingredients,
+            "steps": raw.steps,
+        },
+    )
+    if timer:
+        timer.mark(f"{stage}:postProcess")
+    return _post_process_recipe(raw, payload, preserve_original_steps=True)
 
 
 def generate_recipe_with_ingredient_validation(
     payload: GenerateRecipeRequest,
-) -> GeneratedRecipe:
-    """Up to 2 Gemini attempts with validation, then category-specific fallback."""
+) -> tuple[GeneratedRecipe, Literal["gemini", "mock"]]:
+    """One Gemini attempt within 15s, then category-specific fallback."""
+    timer = _StageTimer("generate_recipe_with_ingredient_validation")
     log_recipe_validation(
         selected_recipe_type=payload.recipeType,
         selected_category=payload.category,
@@ -789,29 +1152,45 @@ def generate_recipe_with_ingredient_validation(
         validation_passed=False,
         fallback_used=False,
     )
+    print(f"[FOOD FOR ANY MOOD] selectedLanguage: {payload.language}")
+    timer.mark("init")
 
-    for attempt, strict in ((1, False), (2, True)):
-        try:
-            recipe = _try_gemini_recipe(payload, strict=strict)
+    try:
+        recipe = _try_gemini_recipe(payload, strict=False, timer=timer)
+        passed = _passes_gemini_quality(recipe, payload)
+        timer.mark("quality:first", "Success" if passed else "Failed")
+        if not passed:
+            print("[FOOD FOR ANY MOOD] First Gemini attempt failed — retrying with strict prompt")
+            recipe = _try_gemini_recipe(payload, strict=True, timer=timer)
             passed = _passes_gemini_quality(recipe, payload)
-            log_recipe_validation(
-                selected_recipe_type=payload.recipeType,
-                selected_category=payload.category,
-                generated_title=recipe.name,
-                validation_passed=passed,
-                fallback_used=False,
-            )
-            if passed:
-                return recipe
-            print(f"[FOOD FOR ANY MOOD] Gemini attempt {attempt} failed validation")
-        except concurrent.futures.TimeoutError:
-            print(f"[FOOD FOR ANY MOOD] Gemini timeout after {GEMINI_TIMEOUT_SECONDS}s (attempt {attempt})")
-            break
-        except Exception as exc:
-            print(f"[FOOD FOR ANY MOOD] Gemini failed (attempt {attempt}): {exc}")
-            break
+            timer.mark("quality:strict", "Success" if passed else "Failed")
+        log_recipe_validation(
+            selected_recipe_type=payload.recipeType,
+            selected_category=payload.category,
+            generated_title=recipe.name,
+            validation_passed=passed,
+            fallback_used=False,
+        )
+        if passed:
+            print(f"[FOOD FOR ANY MOOD] recipeLanguageUsed: {payload.language}")
+            timer.mark("complete", "Success", "gemini")
+            timer.print_table()
+            return recipe, "gemini"
+
+        recipe_dict = _recipe_to_validation_dict(recipe)
+        if violates_kosher_category(payload.category, recipe_dict):
+            print("[FOOD FOR ANY MOOD] Gemini rejected: kosher category violation")
+        else:
+            print("[FOOD FOR ANY MOOD] Gemini attempt failed validation — using fallback")
+    except concurrent.futures.TimeoutError:
+        print(f"[FOOD FOR ANY MOOD] Gemini timeout after {GEMINI_TIMEOUT_SECONDS}s")
+        timer.mark("gemini", "Failed", "timeout")
+    except Exception as exc:
+        print(f"[FOOD FOR ANY MOOD] Gemini failed: {exc}")
+        timer.mark("gemini", "Failed", str(exc))
 
     recipe = _category_fallback_recipe(payload)
+    timer.mark("mockFallback", "Success")
     log_recipe_validation(
         selected_recipe_type=payload.recipeType,
         selected_category=payload.category,
@@ -819,11 +1198,64 @@ def generate_recipe_with_ingredient_validation(
         validation_passed=True,
         fallback_used=True,
     )
-    return recipe
+    print(f"[FOOD FOR ANY MOOD] recipeLanguageUsed: {payload.language}")
+    timer.mark("complete", "Success", "mock")
+    timer.print_table()
+    return recipe, "mock"
+
+
+def _build_mock_description(payload: GenerateRecipeRequest, template: dict) -> str:
+    copy = get_recipe_copy(payload.language)
+    mood_text = copy["mood_flavor"].get(payload.mood, copy["default_mood"])
+    if payload.recipeType == "dessert":
+        description = copy["dessert_description"].format(
+            mood=mood_text,
+            minutes=payload.cookingTime,
+            name=template["name"],
+        )
+    else:
+        description = copy["meal_description"].format(
+            mood=mood_text,
+            minutes=payload.cookingTime,
+            name=template["name"],
+        )
+    if payload.isGlutenFree:
+        description += copy["gf_suffix"]
+    return description
+
+
+def _append_fallback_extras(ingredients: list[str], payload: GenerateRecipeRequest) -> list[str]:
+    """Only append gluten-free tag — do not inject pantry staples."""
+    items = list(ingredients)
+    if payload.isGlutenFree:
+        if payload.language == "en":
+            if not any("gluten-free" in item.lower() for item in items):
+                items.append("gluten-free adapted")
+        elif not any("ללא גלוטן" in item for item in items):
+            items.append("מותאם ללא גלוטן")
+    return items
+
+
+def _apply_gluten_free_ingredients(ingredients: list[str], language: Language) -> list[str]:
+    if language == "en":
+        return [
+            item.replace("pasta", "gluten-free pasta")
+            .replace("soy sauce", "gluten-free soy sauce")
+            .replace("flour", "gluten-free flour")
+            .replace("cookies", "gluten-free cookies")
+            for item in ingredients
+        ]
+    return [
+        item.replace("פסטה", "פסטה ללא גלוטן")
+        .replace("רוטב סויה", "רוטב סויה ללא גלוטן")
+        .replace("קמח", "קמח ללא גלוטן")
+        .replace("עוגיות", "עוגיות ללא גלוטן")
+        for item in ingredients
+    ]
 
 
 def generate_mock_recipe(payload: GenerateRecipeRequest) -> GeneratedRecipe:
-    """Hebrew mock fallback when Gemini fails or is not configured."""
+    """Localized mock fallback when Gemini fails or is not configured."""
     if is_invalid_recipe_selection(payload.recipeType, payload.category):
         payload = payload.model_copy(update={"recipeType": "meal"})
 
@@ -832,41 +1264,15 @@ def generate_mock_recipe(payload: GenerateRecipeRequest) -> GeneratedRecipe:
     if user_ingredients:
         return _fallback_recipe_from_ingredients(payload)
 
-    template_source = (
-        DESSERT_CATEGORY_RECIPES if payload.recipeType == "dessert" else CATEGORY_RECIPES
-    )
+    template_source = get_category_templates(payload.language, payload.recipeType)
     template = template_source[payload.category]
 
     ingredients = list(template["base_ingredients"])
     if payload.isGlutenFree:
-        ingredients = [
-            item.replace("פסטה", "פסטה ללא גלוטן")
-            .replace("רוטב סויה", "רוטב סויה ללא גלוטן")
-            .replace("קמח", "קמח ללא גלוטן")
-            .replace("עוגיות", "עוגיות ללא גלוטן")
-            for item in ingredients
-        ]
-        if "ללא גלוטן" not in " ".join(ingredients):
-            ingredients.append("מותאם ללא גלוטן")
+        ingredients = _apply_gluten_free_ingredients(ingredients, payload.language)
 
-    if payload.recipeType == "dessert":
-        ingredients.extend(["סוכר", "וניל"])
-    else:
-        ingredients.extend(["מלח", "פלפל שחור", "שמן זית"])
-
-    mood_text = MOOD_DESCRIPTIONS.get(payload.mood, "טעימים")
-    if payload.recipeType == "dessert":
-        description = (
-            f"קינוח מותאם ל{mood_text}, בזמן הכנה של כ-{payload.cookingTime} דקות. "
-            f"{template['name']} — מתוק ומפנק."
-        )
-    else:
-        description = (
-            f"מנה מותאמת ל{mood_text}, בזמן הכנה של כ-{payload.cookingTime} דקות. "
-            f"{template['name']} — ארוחה ביתית מלאת טעם ונוחות."
-        )
-    if payload.isGlutenFree:
-        description += " מותאמת במלואה לתזונה ללא גלוטן."
+    ingredients = _append_fallback_extras(ingredients, payload)
+    description = _build_mock_description(payload, template)
 
     match_percentage = random.randint(72, 94)
 
@@ -891,7 +1297,11 @@ def generate_mock_recipe(payload: GenerateRecipeRequest) -> GeneratedRecipe:
             ),
             healthScore=template["healthScore"],
             tags=tags,
-            playlist=_build_playlist(payload.musicPlatform, match_percentage),
+            playlist=_build_playlist(
+                payload.musicPlatform,
+                match_percentage,
+                language=payload.language,
+            ),
         ),
         payload,
     )
@@ -907,11 +1317,17 @@ async def generate_recipe_with_fallback(
         return generate_mock_recipe(payload), "mock", error
 
     try:
-        recipe = await asyncio.to_thread(
+        recipe, source = await asyncio.to_thread(
             generate_recipe_with_ingredient_validation, payload
         )
-        print(f"[FOOD FOR ANY MOOD] Gemini success: {recipe.name}")
-        return recipe, "gemini", None
+        if source == "gemini":
+            print(f"[FOOD FOR ANY MOOD] Gemini success: {recipe.name}")
+        else:
+            print(
+                "[FOOD FOR ANY MOOD] Returning mock fallback after Gemini validation failure:",
+                recipe.name,
+            )
+        return recipe, source, None if source == "gemini" else "Gemini validation failed or unavailable"
     except (ValidationError, RuntimeError, ValueError) as exc:
         error = str(exc)
         print(f"[FOOD FOR ANY MOOD] Gemini error: {error}")
@@ -940,8 +1356,11 @@ async def generate_recipe(payload: GenerateRecipeRequest):
 
     Falls back to a local Hebrew mock if the API key is missing or Gemini fails.
     """
+    timer = _StageTimer("POST /generate-recipe")
     print("[FOOD FOR ANY MOOD] Generate recipe endpoint called")
+    timer.mark("requestReceived")
     print(f"[FOOD FOR ANY MOOD] recipeType received: {payload.recipeType}")
+    print(f"[FOOD FOR ANY MOOD] selectedLanguage: {payload.language}")
     print(
         "[FOOD FOR ANY MOOD] Received request body:",
         {
@@ -953,9 +1372,71 @@ async def generate_recipe(payload: GenerateRecipeRequest):
             "musicPlatform": payload.musicPlatform,
             "servings": payload.servings,
             "recipeType": payload.recipeType,
+            "language": payload.language,
         },
     )
+    feasibility = assess_ingredient_feasibility(
+        payload.ingredients,
+        recipe_type=payload.recipeType,
+        category=payload.category,
+        language=payload.language or "he",
+    )
+    timer.mark("assessIngredientFeasibility", "Success" if feasibility["recipe_possible"] else "Failed")
+    if not feasibility["recipe_possible"]:
+        reason, missing = build_validation_failure_message({}, feasibility, language=payload.language or "he")
+        print(f"[FOOD FOR ANY MOOD] Recipe not possible: {reason}")
+        timer.print_table()
+        return GenerateRecipeResponse(
+            recipe=None,
+            recipePossible=False,
+            impossibleReason=reason,
+            missingIngredients=missing,
+            source="none",
+        )
+
     recipe, source, gemini_error = await generate_recipe_with_fallback(payload)
+    timer.mark(
+        "generate_recipe_with_fallback",
+        "Success" if recipe is not None else "Failed",
+        f"source={source} geminiError={gemini_error or 'none'}",
+    )
+
+    if recipe is None:
+        return GenerateRecipeResponse(
+            recipe=None,
+            recipePossible=False,
+            impossibleReason=(
+                "לא הצלחנו ליצור מתכון מהמרכיבים שסיפקתם."
+                if payload.language == "he"
+                else "We could not create a recipe from the ingredients you provided."
+            ),
+            source="none",
+            geminiError=gemini_error,
+        )
+
+    pre_return = validate_recipe_before_return(
+        _recipe_to_validation_dict(recipe),
+        payload.ingredients,
+        language=payload.language or "he",
+    )
+    timer.mark("validateRecipeBeforeReturn", "Success" if pre_return["ok"] else "Failed", ",".join(pre_return["failures"]))
+    if not pre_return["ok"]:
+        reason, missing = build_validation_failure_message(
+            pre_return,
+            None,
+            language=payload.language or "he",
+        )
+        print("[FOOD FOR ANY MOOD] Recipe failed pre-return validation:", pre_return["failures"])
+        timer.print_table()
+        return GenerateRecipeResponse(
+            recipe=None,
+            recipePossible=False,
+            impossibleReason=reason,
+            missingIngredients=missing,
+            source="none",
+            geminiError=gemini_error,
+        )
+
     if source == "gemini":
         print(f"[FOOD FOR ANY MOOD] Returning Gemini recipe: {recipe.name}")
     else:
@@ -963,7 +1444,15 @@ async def generate_recipe(payload: GenerateRecipeRequest):
             "[FOOD FOR ANY MOOD] Returning mock fallback recipe "
             f"(Gemini error: {gemini_error})"
         )
-    return GenerateRecipeResponse(recipe=recipe, source=source, geminiError=gemini_error)
+    timer.mark("response", "Success", f"source={source}")
+    timer.print_table()
+    return GenerateRecipeResponse(
+        recipe=recipe,
+        recipePossible=True,
+        source=source,
+        fallbackUsed=source == "mock",
+        geminiError=gemini_error,
+    )
 
 
 @app.post("/recipes/generate", response_model=GenerateRecipeResponse, include_in_schema=True)

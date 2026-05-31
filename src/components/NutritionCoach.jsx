@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useLanguage } from '../i18n/useLanguage'
 import { fetchNutritionAnalysis } from '../services/nutritionCoachService'
+import { getNutritionScoreClassification } from '../utils/nutritionScore'
 import './NutritionCoach.css'
 
 function LevelBadge({ level, t }) {
@@ -22,7 +23,7 @@ function InsightRow({ active, label }) {
 }
 
 export default function NutritionCoach({ recipe }) {
-  const { t, dir, isRtl } = useLanguage()
+  const { t, dir, isRtl, language } = useLanguage()
   const textDir = isRtl ? 'rtl' : dir
   const [analysis, setAnalysis] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -32,7 +33,7 @@ export default function NutritionCoach({ recipe }) {
 
     async function load() {
       setLoading(true)
-      const result = await fetchNutritionAnalysis(recipe)
+      const result = await fetchNutritionAnalysis(recipe, language)
       if (!cancelled) {
         setAnalysis(result)
         setLoading(false)
@@ -43,10 +44,12 @@ export default function NutritionCoach({ recipe }) {
     return () => {
       cancelled = true
     }
-  }, [recipe?.id, recipe?.name])
+  }, [recipe?.id, recipe?.name, language])
 
   const score = analysis?.nutritionScore ?? 0
-  const scoreColor = score >= 80 ? '#059669' : score >= 60 ? '#d97706' : '#dc2626'
+  const classification = getNutritionScoreClassification(score)
+  const scoreColor = classification.color
+  const scoreExplanation = analysis?.nutritionScoreExplanation ?? ''
 
   return (
     <section className="nutrition-coach animate-in stagger-4" dir={textDir}>
@@ -65,6 +68,9 @@ export default function NutritionCoach({ recipe }) {
               <span>{t('nutritionScoreLabel')}</span>
               <strong style={{ color: scoreColor }}>{score}/100</strong>
             </div>
+            <p className="nutrition-coach__classification" style={{ color: scoreColor }}>
+              {scoreExplanation}
+            </p>
             <div className="nutrition-coach__score-track">
               <div
                 className="nutrition-coach__score-fill"

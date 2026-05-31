@@ -1,17 +1,23 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import PlaylistCard from './PlaylistCard'
 import SpiceLevel from './SpiceLevel'
 import ShoppingListModal from './ShoppingListModal'
 import MealPlanPickerModal from './MealPlanPickerModal'
 import NutritionCoach from './NutritionCoach'
 import { useLanguage } from '../i18n/useLanguage'
+import { getNutritionScoreClassification, buildNutritionScoreExplanationFromRecipe } from '../utils/nutritionScore'
+import { sanitizeIngredientList } from '../utils/ingredientFormatting'
 import './RecipeCard.css'
 
-function HealthBar({ score }) {
-  const { t } = useLanguage()
+function HealthBar({ score, recipe }) {
+  const { t, language } = useLanguage()
   const safeScore = Math.min(100, Math.max(0, score ?? 0))
-  const color =
-    safeScore >= 80 ? '#059669' : safeScore >= 60 ? '#d97706' : '#dc2626'
+  const classification = getNutritionScoreClassification(safeScore)
+  const color = classification.color
+  const explanation = buildNutritionScoreExplanationFromRecipe(
+    { ...recipe, healthScore: safeScore },
+    language,
+  )
 
   return (
     <div className="health-bar animate-in stagger-4">
@@ -19,6 +25,9 @@ function HealthBar({ score }) {
         <span>{t('healthScore')}</span>
         <strong style={{ color }}>{safeScore}/100</strong>
       </div>
+      <p className="health-bar__classification" style={{ color }}>
+        {explanation}
+      </p>
       <div className="health-bar__track">
         <div
           className="health-bar__fill"
@@ -79,8 +88,14 @@ export default function RecipeCard({
   const { t, dir, isRtl } = useLanguage()
   const [shoppingOpen, setShoppingOpen] = useState(false)
   const [mealPlanOpen, setMealPlanOpen] = useState(false)
+  const preferenceBased = Boolean(recipe.generatedFromPreferences)
   const matchPercent = Math.min(100, Math.max(0, recipe.matchPercent ?? 0))
   const textDir = isRtl ? 'rtl' : dir
+  const displayIngredients = sanitizeIngredientList(recipe.ingredients ?? [])
+
+  useEffect(() => {
+    console.log('RENDERED_RECIPE', recipe)
+  }, [recipe])
 
   return (
     <article
@@ -97,22 +112,28 @@ export default function RecipeCard({
       <div className="recipe-card__glow" aria-hidden="true" />
 
       <div className="recipe-card__header animate-in">
-        <div className="recipe-card__match">
-          <svg viewBox="0 0 36 36" className="match-ring">
-            <path
-              className="match-ring__bg"
-              d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-            />
-            <path
-              className="match-ring__fill"
-              strokeDasharray={`${matchPercent}, 100`}
-              d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-            />
-            <text x="18" y="20.35" className="match-ring__text">
-              {matchPercent}%
-            </text>
-          </svg>
-          <span>{t('match')}</span>
+        <div className={`recipe-card__match${preferenceBased ? ' recipe-card__match--preferences' : ''}`}>
+          {preferenceBased ? (
+            <p className="recipe-card__preferences-label">{t('matchFromPreferences')}</p>
+          ) : (
+            <>
+              <svg viewBox="0 0 36 36" className="match-ring">
+                <path
+                  className="match-ring__bg"
+                  d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                />
+                <path
+                  className="match-ring__fill"
+                  strokeDasharray={`${matchPercent}, 100`}
+                  d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                />
+                <text x="18" y="20.35" className="match-ring__text">
+                  {matchPercent}%
+                </text>
+              </svg>
+              <span>{t('match')}</span>
+            </>
+          )}
         </div>
         <div className="recipe-card__title-block">
           <div className="recipe-card__badges">
@@ -126,7 +147,7 @@ export default function RecipeCard({
             )}
           </div>
           <h2>{recipe.name}</h2>
-          <p>{recipe.description}</p>
+          <p className="recipe-card__chef-intro">{recipe.description}</p>
           <RecipeTags tags={recipe.tags} />
         </div>
       </div>
@@ -165,18 +186,33 @@ export default function RecipeCard({
         spiceLevel={recipe.spiceLevel}
       />
 
-      <HealthBar score={recipe.healthScore} />
+      <HealthBar score={recipe.healthScore} recipe={recipe} />
 
       <NutritionCoach recipe={recipe} />
 
       <div className="recipe-card__section animate-in stagger-4">
         <h3>{t('ingredients')}</h3>
         <ul dir={textDir}>
-          {(recipe.ingredients ?? []).map((item, i) => (
+          {displayIngredients.map((item, i) => (
             <li key={i}>{item}</li>
           ))}
         </ul>
       </div>
+
+      {!preferenceBased && recipe.optionalUpgrades?.length > 0 && (
+        <div className="recipe-card__section recipe-card__upgrades animate-in stagger-4">
+          <h3>{t('optionalUpgrades')}</h3>
+          <ul dir={textDir} className="recipe-card__upgrades-list">
+            {recipe.optionalUpgrades.map((upgrade, i) => (
+              <li key={i}>
+                <strong>{upgrade.ingredient}</strong>
+                <span className="recipe-card__optional-badge">{t('optionalBadge')}</span>
+                <p>{upgrade.reason}</p>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       <div className="recipe-card__section animate-in stagger-5">
         <h3>{t('cookingSteps')}</h3>
@@ -270,7 +306,7 @@ export default function RecipeCard({
         onClose={() => setShoppingOpen(false)}
         recipeId={recipe.id}
         recipeName={recipe.name}
-        ingredients={recipe.ingredients ?? []}
+        ingredients={displayIngredients}
       />
 
       <MealPlanPickerModal

@@ -1,5 +1,22 @@
 import { getIngredientLabel } from '../data/ingredientLabels'
 import { canonicalIngredient, normalizeIngredient } from '../data/ingredientKnowledge'
+import {
+  isNumericOnlyText,
+  isValidIngredientLine,
+  sanitizeIngredientList,
+  sanitizeRecipeSteps,
+  toReadableIngredientLine,
+} from './ingredientFormatting'
+import { alignStepsWithIngredientList, naturalizeRecipeSteps, toStepIngredientReference } from './recipeStepWording'
+import { calculateHealthScoreFromRecipe } from './nutritionScore'
+import {
+  formatHebrewMeasurement,
+  MEASURED_UNIT_TOKEN,
+  parseAmount,
+  parseAnyLeadingMeasurement,
+  stripQuantityPrefix,
+  UNIT_LABELS,
+} from './measurementUnits'
 
 export const DEFAULT_SERVINGS = 2
 
@@ -21,13 +38,7 @@ const STAPLE_PROFILE_KEYS = {
   ביצים: 'eggs',
 }
 
-const MEASURED_UNIT_PATTERN =
-  /(?:כפית|כפיות|כף|כפות|גרם|מ"ל|כוס|כוסות|\btsp\b|\btbsp\b|\bgram\b|\bgrams\b|\bg\b|\bml\b|\bcup\b|\bcups\b)/i
-
-const UNIT_LABELS = {
-  he: { tsp: 'כפית', tbsp: 'כף', gram: 'גרם', ml: 'מ"ל', cup: 'כוס' },
-  en: { tsp: 'tsp', tbsp: 'tbsp', gram: 'gram', ml: 'ml', cup: 'cup' },
-}
+const MEASURED_UNIT_PATTERN = MEASURED_UNIT_TOKEN
 
 /** @type {Record<string, { unit: string, base: number, perServing?: boolean, wholeSingular?: string, wholePlural?: string }>} */
 const QUANTITY_PROFILES = {
@@ -91,7 +102,14 @@ const QUANTITY_PROFILES = {
   quinoa: { unit: 'cup', base: 0.5, perServing: true },
   flour: { unit: 'cup', base: 0.25, perServing: false },
   sugar: { unit: 'tbsp', base: 1, perServing: false },
+  cinnamon: { unit: 'tsp', base: 0.5, perServing: false },
   honey: { unit: 'tbsp', base: 1, perServing: false },
+  coffee: { unit: 'cup', base: 1, perServing: false },
+  tahini: { unit: 'tbsp', base: 2, perServing: false },
+  marshmallow: { unit: 'whole', base: 4, perServing: false, wholeSingular: 'מרשמלו', wholePlural: 'מרשמלו' },
+  marshmallows: { unit: 'whole', base: 4, perServing: false, wholeSingular: 'מרשמלו', wholePlural: 'מרשמלו' },
+  strawberry: { unit: 'whole', base: 4, perServing: false, wholeSingular: 'תות', wholePlural: 'תותים' },
+  strawberries: { unit: 'whole', base: 4, perServing: false, wholeSingular: 'תות', wholePlural: 'תותים' },
   'soy sauce': { unit: 'tbsp', base: 2, perServing: false },
   'coconut milk': { unit: 'ml', base: 200, perServing: true },
   broth: { unit: 'ml', base: 250, perServing: true },
@@ -188,14 +206,13 @@ function computeAmount(profile, servings, baseServings = DEFAULT_SERVINGS) {
 
 function stripQuantity(raw) {
   const trimmed = String(raw ?? '').trim().replace(PANTRY_SUFFIX, '').trim()
-  const withoutQty =
-    trimmed
-      .replace(
-        /^[\d./]+\s*(?:כפית|כפיות|כף|כפות|גרם|מ"ל|כוס|כוסות|tsp|tbsp|gram|grams|g|ml|cup|cups)?\s*/i,
-        '',
-      )
-      .trim() || trimmed
-  return { name: withoutQty, canonical: canonicalIngredient(withoutQty) }
+  const measured = parseAnyLeadingMeasurement(trimmed)
+  if (measured) {
+    return { name: measured.name, canonical: canonicalIngredient(measured.name), measured }
+  }
+
+  const withoutQty = stripQuantityPrefix(trimmed) || trimmed
+  return { name: withoutQty, canonical: canonicalIngredient(withoutQty), measured: null }
 }
 
 function resolveProfileKey(canon, name) {
@@ -248,7 +265,7 @@ function resolveProfile(canon, name, language) {
  */
 export function isValidQuantifiedDisplay(display, unit) {
   const text = String(display ?? '').trim()
-  if (!text) return false
+  if (!text || !isValidIngredientLine(text)) return false
 
   if (unit === 'whole') {
     if (MEASURED_UNIT_PATTERN.test(text)) return false
@@ -271,25 +288,36 @@ function formatWholeDisplay(amount, profile, language) {
 }
 
 function formatMeasuredDisplay(amount, unit, name, language) {
+  if (language === 'he') {
+    return formatHebrewMeasurement(amount, unit, name)
+  }
+
   const qty = formatFraction(amount)
-  const unitLabel = UNIT_LABELS[language]?.[unit] ?? unit
+  const unitLabel = UNIT_LABELS.en[unit] ?? unit
   return `${qty} ${unitLabel} ${name}`
 }
 
-function formatQuantifiedItem(canon, name, amount, profile, language) {
-  const displayName =
-    language === 'he'
-      ? profile.wholeSingular && profile.unit === 'whole'
-        ? amount === 1
-          ? profile.wholeSingular
-          : profile.wholePlural ?? profile.wholeSingular
-        : getIngredientLabel(canon ?? name, 'he') || name
-      : getIngredientLabel(canon ?? name, 'en') || name
+function buildReadableQuantifiedItem(raw, language, pantryNote = '') {
+  const readable = toReadableIngredientLine(raw, language)
+  if (!readable) return null
 
-  if (profile.unit === 'whole') {
-    return formatWholeDisplay(amount, { ...profile, canon }, language)
+  const { name, canonical: canon } = stripQuantity(readable)
+  if (!name || isNumericOnlyText(name)) return null
+
+  const displayName = getIngredientLabel(canon ?? name, language) || name
+  const display = pantryNote ? `${readable} ${pantryNote}` : readable
+  const stepPhrase =
+    language === 'he' ? toStepIngredientReference(displayName, language) : displayName
+
+  return {
+    raw,
+    canon: canon ?? name,
+    name: displayName,
+    amount: 1,
+    unit: 'whole',
+    display,
+    stepPhrase,
   }
-  return formatMeasuredDisplay(amount, profile.unit, displayName, language)
 }
 
 function getNutritionForItem(canon, unit, amount) {
@@ -305,7 +333,54 @@ function getNutritionForItem(canon, unit, amount) {
 
 export function quantifyIngredient(raw, servings = DEFAULT_SERVINGS, language = 'he') {
   const pantryNote = String(raw ?? '').match(PANTRY_SUFFIX)?.[0]?.trim() ?? ''
+  const trimmed = String(raw ?? '')
+    .trim()
+    .replace(PANTRY_SUFFIX, '')
+    .trim()
+
+  if (!trimmed || !isValidIngredientLine(trimmed)) {
+    return buildReadableQuantifiedItem(raw, language, pantryNote)
+  }
+
+  const existing = parseAnyLeadingMeasurement(trimmed)
+
+  if (existing && language === 'he') {
+    const { name, canonical: canon } = stripQuantity(trimmed)
+    if (!name || isNumericOnlyText(name)) {
+      return buildReadableQuantifiedItem(raw, language, pantryNote)
+    }
+
+    const displayName = getIngredientLabel(canon ?? name, language) || name
+    const display = formatHebrewMeasurement(existing.qty, existing.unit, displayName)
+    const stepPhrase = toStepIngredientReference(displayName, language)
+    const result = {
+      raw,
+      canon: canon ?? name,
+      name: displayName,
+      amount: parseAmount(existing.qty),
+      unit: existing.unit,
+      display: pantryNote ? `${display} ${pantryNote}` : display,
+      stepPhrase: pantryNote ? `${stepPhrase} ${pantryNote}` : stepPhrase,
+    }
+
+    if (!isValidQuantifiedDisplay(result.display, result.unit)) {
+      return buildReadableQuantifiedItem(raw, language, pantryNote)
+    }
+    return result
+  }
+
   const { name, canonical: canon } = stripQuantity(raw)
+  if (!name || isNumericOnlyText(name)) {
+    return buildReadableQuantifiedItem(raw, language, pantryNote)
+  }
+
+  const profileKey = resolveProfileKey(canon, name)
+  const hasKnownProfile = Boolean(profileKey && QUANTITY_PROFILES[profileKey])
+
+  if (!hasKnownProfile) {
+    return buildReadableQuantifiedItem(raw, language, pantryNote)
+  }
+
   const profile = resolveProfile(canon, name, language)
   const amount = computeAmount(profile, servings)
   const displayName = getIngredientLabel(profile.canon, language) || name
@@ -313,9 +388,9 @@ export function quantifyIngredient(raw, servings = DEFAULT_SERVINGS, language = 
     profile.unit === 'whole'
       ? formatWholeDisplay(amount, { ...profile, canon: profile.canon }, language)
       : formatMeasuredDisplay(amount, profile.unit, displayName, language)
-  const stepPhrase = display
-
-  return {
+  const stepPhrase =
+    language === 'he' ? toStepIngredientReference(displayName, language) : displayName
+  const result = {
     raw,
     canon: profile.canon,
     name: displayName,
@@ -324,6 +399,11 @@ export function quantifyIngredient(raw, servings = DEFAULT_SERVINGS, language = 
     display: pantryNote ? `${display} ${pantryNote}` : display,
     stepPhrase: pantryNote ? `${stepPhrase} ${pantryNote}` : stepPhrase,
   }
+
+  if (!isValidQuantifiedDisplay(result.display, result.unit)) {
+    return buildReadableQuantifiedItem(raw, language, pantryNote)
+  }
+  return result
 }
 
 export function syncStepsWithQuantities(steps, quantifiedItems) {
@@ -333,7 +413,14 @@ export function syncStepsWithQuantities(steps, quantifiedItems) {
       stepPhrase: item.stepPhrase,
       display: item.display,
     }))
-    .filter((item) => item.bare && item.stepPhrase)
+    .filter(
+      (item) =>
+        item.bare &&
+        item.stepPhrase &&
+        isValidIngredientLine(item.stepPhrase) &&
+        !isNumericOnlyText(item.bare) &&
+        item.bare.length > 1,
+    )
     .sort((a, b) => b.bare.length - a.bare.length)
 
   return steps.map((step) => {
@@ -365,11 +452,13 @@ export function computeNutritionFromQuantities(quantifiedItems, servings = DEFAU
   const carbs = Math.round(totals.carbs)
   const fat = Math.round(totals.fat)
 
-  let healthScore = 72
-  if (protein / servings >= 20) healthScore += 6
-  if (fat / servings > 28) healthScore -= 4
-  if (calories / servings < 450) healthScore += 3
-  healthScore = Math.min(95, Math.max(50, healthScore))
+  const healthScore = calculateHealthScoreFromRecipe({
+    ingredients: quantifiedItems.map((item) => item.display || item.name),
+    calories,
+    protein,
+    carbs,
+    servings,
+  })
 
   return { calories, protein, carbs, fat, servings, healthScore }
 }
@@ -381,15 +470,32 @@ export function applyRecipeQuantities(recipe, options = {}) {
   const language = options.language ?? 'he'
   const servings = recipe.nutrition?.servings ?? options.servings ?? DEFAULT_SERVINGS
   const ingredients = Array.isArray(recipe.ingredients) ? recipe.ingredients : []
-  let quantifiedItems = ingredients.map((entry) => quantifyIngredient(entry, servings, language))
+  let quantifiedItems = ingredients
+    .map((entry) => quantifyIngredient(entry, servings, language))
+    .filter(Boolean)
 
-  quantifiedItems = quantifiedItems.map((item) => {
-    if (isValidQuantifiedDisplay(item.display, item.unit)) return item
-    const bare = stripQuantity(item.raw).name
-    return quantifyIngredient(bare, servings, language)
-  })
-  const nextIngredients = quantifiedItems.map((item) => item.display)
-  const nextSteps = syncStepsWithQuantities(recipe.steps ?? [], quantifiedItems)
+  quantifiedItems = quantifiedItems
+    .map((item) => {
+      if (isValidQuantifiedDisplay(item.display, item.unit)) return item
+      return buildReadableQuantifiedItem(item.raw, language) ?? null
+    })
+    .filter(Boolean)
+
+  const nextIngredients = sanitizeIngredientList(quantifiedItems.map((item) => item.display))
+  const preserveOriginalSteps = Boolean(options.preserveOriginalSteps)
+  const nextSteps = preserveOriginalSteps
+    ? lightSanitizeRecipeSteps(recipe.steps ?? [])
+    : sanitizeRecipeSteps(
+        alignStepsWithIngredientList(
+          naturalizeRecipeSteps(
+            syncStepsWithQuantities(recipe.steps ?? [], quantifiedItems),
+            quantifiedItems.map((item) => item.name),
+            language,
+          ),
+          quantifiedItems.map((item) => item.display),
+          language,
+        ),
+      )
   const nutrition = computeNutritionFromQuantities(quantifiedItems, servings)
   const { healthScore, ...macroNutrition } = nutrition
 

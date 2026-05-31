@@ -120,6 +120,11 @@ export const INGREDIENT_LABELS_HE = {
     salmon: 'סלמון',
     tuna: 'טונה',
     hummus: 'חומוס',
+    coffee: 'קפה',
+    marshmallow: 'מרשמלו',
+    marshmallows: 'מרשמלו',
+    strawberry: 'תות',
+    strawberries: 'תותים',
 }
 
 const LABELS = {

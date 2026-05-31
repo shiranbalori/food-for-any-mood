@@ -1,5 +1,13 @@
 /** Hard guards so dessert requests never get savory fallback titles. */
 
+import {
+  buildTitleFromIngredients,
+  isForbiddenGenericTitle,
+  isIngredientListTitle,
+  titleReflectsIngredients,
+} from './ingredientBasedTitle'
+import { buildDessertDishTitle } from './dessertDishTitle'
+
 export const DESSERT_BLOCKED_TITLE_WORDS = [
   'תבשיל ביתי',
   'תבשיל',
@@ -8,14 +16,6 @@ export const DESSERT_BLOCKED_TITLE_WORDS = [
   'פסטה',
   'סלט',
   'מרק',
-]
-
-export const DESSERT_FALLBACK_TITLES = [
-  'עוגת שוקולד ביתית',
-  'עוגיות מהירות',
-  'מאפינס וניל',
-  'קינוח גבינה',
-  'בראוניז מהיר',
 ]
 
 const DESSERT_TITLE_KEYWORDS = [
@@ -31,12 +31,14 @@ const DESSERT_TITLE_KEYWORDS = [
   'מתוק',
   'שוקולד',
   'קרם',
+  'cake',
+  'cookie',
+  'brownie',
+  'muffin',
+  'dessert',
+  'cheesecake',
+  'chocolate',
 ]
-
-const DESSERT_TITLE_BY_CATEGORY = {
-  dairy: 'קינוח גבינה',
-  parve: 'עוגיות מהירות',
-}
 
 export function isBlockedSavoryTitleForDessert(title) {
   const text = String(title ?? '').trim().toLowerCase()
@@ -44,30 +46,41 @@ export function isBlockedSavoryTitleForDessert(title) {
   return DESSERT_BLOCKED_TITLE_WORDS.some((word) => text.includes(word.toLowerCase()))
 }
 
-export function isValidDessertTitle(title) {
-  const text = String(title ?? '').trim().toLowerCase()
-  if (!text || isBlockedSavoryTitleForDessert(text)) return false
-  if (DESSERT_TITLE_KEYWORDS.some((keyword) => text.includes(keyword))) return true
-  return DESSERT_FALLBACK_TITLES.some(
-    (fallback) => text === fallback.toLowerCase() || text.includes(fallback.toLowerCase()),
-  )
+export function isValidDessertTitle(title, ingredients = [], language = 'he') {
+  const text = String(title ?? '').trim()
+  if (!text || isBlockedSavoryTitleForDessert(text) || isForbiddenGenericTitle(text)) {
+    return false
+  }
+  if (isIngredientListTitle(text, ingredients, language)) {
+    return false
+  }
+
+  if (ingredients.length > 0 && !titleReflectsIngredients(text, ingredients, language)) {
+    return false
+  }
+
+  return DESSERT_TITLE_KEYWORDS.some((keyword) => text.toLowerCase().includes(keyword))
 }
 
-export function pickGuaranteedDessertTitle(category = 'dairy') {
+export function pickGuaranteedDessertTitle(category = 'dairy', language = 'he', ingredients = []) {
   if (category === 'meat') return null
-  return DESSERT_TITLE_BY_CATEGORY[category] ?? DESSERT_FALLBACK_TITLES[0]
+  return buildDessertDishTitle(ingredients, { language }).name
 }
 
 /**
- * @param {{ name?: string }} recipe
+ * @param {{ name?: string, ingredients?: string[] }} recipe
  * @param {'meal' | 'dessert'} recipeType
  * @param {'dairy' | 'meat' | 'parve'} [category='dairy']
  */
-export function enforceRecipeTypeTitle(recipe, recipeType, category = 'dairy') {
+export function enforceRecipeTypeTitle(recipe, recipeType, category = 'dairy', language = 'he') {
   if (recipeType !== 'dessert') return recipe
   if (category === 'meat') return recipe
-  if (isValidDessertTitle(recipe?.name)) return recipe
-  const name = pickGuaranteedDessertTitle(category)
-  if (!name) return recipe
+
+  const ingredients = recipe?.ingredients ?? []
+  if (isValidDessertTitle(recipe?.name, ingredients, language)) {
+    return recipe
+  }
+
+  const name = buildDessertDishTitle(ingredients, { language }).name
   return { ...recipe, name }
 }

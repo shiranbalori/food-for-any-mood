@@ -51,6 +51,21 @@
   letter-spacing: 0.04em;
 }
 
+.recipe-card__match--preferences {
+  max-width: 7.5rem;
+  text-align: center;
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+.recipe-card__preferences-label {
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--theme-accent);
+}
+
 .match-ring {
   width: 76px;
   height: 76px;
@@ -165,10 +180,12 @@
   border: 1px solid rgba(148, 163, 184, 0.12);
 }
 
-.recipe-card__title-block p {
+.recipe-card__title-block p,
+.recipe-card__chef-intro {
   color: var(--text-muted);
   font-size: 0.92rem;
   line-height: 1.65;
+  white-space: pre-line;
 }
 
 .recipe-card__macros {
@@ -246,7 +263,14 @@
   justify-content: space-between;
   font-size: 0.82rem;
   font-weight: 600;
-  margin-bottom: 0.55rem;
+  margin-bottom: 0.35rem;
+}
+
+.health-bar__classification {
+  margin: 0 0 0.55rem;
+  font-size: 0.88rem;
+  font-weight: 600;
+  line-height: 1.35;
 }
 
 .health-bar__track {
@@ -276,6 +300,35 @@
   letter-spacing: -0.01em;
 }
 
+.recipe-card__upgrades-list li {
+  margin-bottom: 0.85rem;
+  padding: 0.75rem 0.9rem;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--theme-accent-light) 35%, transparent);
+  border: 1px solid color-mix(in srgb, var(--theme-accent) 18%, transparent);
+}
+
+.recipe-card__upgrades-list li p {
+  margin: 0.35rem 0 0;
+  font-size: 0.9rem;
+  line-height: 1.45;
+  opacity: 0.9;
+}
+
+.recipe-card__optional-badge {
+  display: inline-block;
+  margin-inline-start: 0.45rem;
+  padding: 0.1rem 0.45rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--theme-accent) 12%, white);
+  color: var(--theme-accent);
+  vertical-align: middle;
+}
+
 .recipe-card__section ul,
 .recipe-card__title-block h2,
 .recipe-card__title-block p {
@@ -289,6 +342,7 @@ html[dir='rtl'] .recipe-card__section li {
   text-align: right;
 }
 
+.recipe-card__section ul,
 .recipe-card__section ol {
   padding-left: 0;
   list-style: none;

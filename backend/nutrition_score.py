@@ -1,0 +1,493 @@
+"""Nutrition health score (0-100) from macros and ingredient analysis."""
+
+from __future__ import annotations
+
+import re
+
+from ingredient_relevance import canonical_ingredient, normalize_ingredient
+
+VEG_FRUIT_CANONICAL = {
+    "tomato",
+    "tomatoes",
+    "potato",
+    "carrot",
+    "pepper",
+    "spinach",
+    "broccoli",
+    "mushroom",
+    "mushrooms",
+    "zucchini",
+    "cucumber",
+    "avocado",
+    "kale",
+    "blueberry",
+    "blueberries",
+    "strawberry",
+    "strawberries",
+    "corn",
+    "lemon",
+    "lime",
+    "apple",
+    "banana",
+    "onion",
+    "garlic",
+}
+
+HIGH_FIBER_CANONICAL = {
+    "broccoli",
+    "lentils",
+    "lentil",
+    "chickpeas",
+    "chickpea",
+    "quinoa",
+    "beans",
+    "bean",
+    "spinach",
+    "kale",
+    "oats",
+}
+
+ULTRA_PROCESSED_HIGH = {
+    "marshmallow",
+    "marshmallows",
+    "candy",
+    "candies",
+    "chocolate bar",
+    "cookies",
+    "cookie",
+    "chips",
+    "nutella",
+    "snack",
+    "מרשמלו",
+    "סוכריות",
+    "חטיף",
+    "עוגיות",
+}
+
+ULTRA_PROCESSED_MODERATE = {
+    "sugar",
+    "flour",
+    "butter",
+    "cream",
+    "sweet spread",
+    "processed",
+    "סוכר",
+    "קמח",
+    "חמאה",
+    "ממרח",
+}
+
+SUGAR_GRAMS_BY_CANON: dict[str, float] = {
+    "sugar": 12.0,
+    "honey": 17.0,
+    "marshmallow": 18.0,
+    "marshmallows": 18.0,
+    "chocolate": 12.0,
+    "cookies": 10.0,
+    "cookie": 10.0,
+    "candy": 15.0,
+    "candies": 15.0,
+}
+
+FIBER_GRAMS_BY_CANON: dict[str, float] = {
+    "broccoli": 2.5,
+    "lentils": 8.0,
+    "lentil": 8.0,
+    "chickpeas": 6.0,
+    "chickpea": 6.0,
+    "quinoa": 3.0,
+    "beans": 5.0,
+    "bean": 5.0,
+    "spinach": 2.0,
+    "kale": 2.5,
+    "carrot": 2.0,
+    "blueberry": 2.0,
+    "blueberries": 2.0,
+    "strawberry": 2.0,
+    "strawberries": 2.0,
+    "avocado": 3.0,
+    "oats": 4.0,
+}
+
+
+def _ingredient_text_hits(text: str, keywords: set[str]) -> int:
+    normalized = normalize_ingredient(text)
+    hits = 0
+    for keyword in keywords:
+        key = normalize_ingredient(keyword)
+        if key and (key in normalized or normalized in key):
+            hits += 1
+    return hits
+
+
+def _collect_canonicals(ingredients: list[str]) -> list[str]:
+    canon_list: list[str] = []
+    for item in ingredients or []:
+        canon = canonical_ingredient(str(item))
+        if canon:
+            canon_list.append(canon)
+        else:
+            canon_list.append(normalize_ingredient(str(item)))
+    return canon_list
+
+
+def estimate_sugar_per_serving(ingredients: list[str], servings: int, carbs_per_serving: float = 0) -> float:
+    servings = max(1, servings)
+    total = 0.0
+
+    for item in ingredients or []:
+        canon = canonical_ingredient(str(item)) or ""
+        text = normalize_ingredient(str(item))
+
+        if canon in SUGAR_GRAMS_BY_CANON:
+            total += SUGAR_GRAMS_BY_CANON[canon]
+        elif "sugar" in text or "סוכר" in str(item):
+            total += 12.0
+        elif "honey" in text or "דבש" in str(item):
+            total += 14.0
+        elif "marshmallow" in text or "מרשמלו" in str(item):
+            total += 18.0
+        elif "chocolate" in text or "שוקולד" in str(item):
+            total += 10.0
+
+    estimated = total / servings
+    if estimated <= 0 and carbs_per_serving >= 40:
+        estimated = carbs_per_serving * 0.35
+    return round(estimated, 1)
+
+
+def estimate_fiber_per_serving(ingredients: list[str], servings: int) -> float:
+    servings = max(1, servings)
+    total = 0.0
+
+    for item in ingredients or []:
+        canon = canonical_ingredient(str(item)) or ""
+        if canon in FIBER_GRAMS_BY_CANON:
+            total += FIBER_GRAMS_BY_CANON[canon]
+        elif _ingredient_text_hits(str(item), {"broccoli", "lentil", "chickpea", "quinoa", "spinach", "bean", "ברוקולי", "עדש", "חומוס", "קינוא", "תרד", "שעועית"}):
+            total += 2.0
+        elif _ingredient_text_hits(str(item), {"carrot", "tomato", "pepper", "cucumber", "zucchini", "גזר", "עגבנ", "פלפל", "מלפפון", "קישוא"}):
+            total += 1.5
+
+    return round(total / servings, 1)
+
+
+def is_rich_in_vegetables_or_fruit(ingredients: list[str]) -> bool:
+    canon_list = _collect_canonicals(ingredients)
+    veg_fruit_hits = sum(
+        1
+        for canon in canon_list
+        if canon in VEG_FRUIT_CANONICAL
+        or any(token in canon for token in ("tomato", "carrot", "pepper", "berry", "apple", "banana", "onion"))
+        or re.search(r"עגבנ|גזר|פלפל|תות|תפוח|בצל|ירק", canon)
+    )
+    return veg_fruit_hits >= 2
+
+
+def detect_ultra_processed_level(ingredients: list[str]) -> str | None:
+    high_hits = 0
+    moderate_hits = 0
+
+    for item in ingredients or []:
+        text = str(item)
+        canon = canonical_ingredient(text) or ""
+        normalized = normalize_ingredient(text)
+
+        if canon in ULTRA_PROCESSED_HIGH or _ingredient_text_hits(text, ULTRA_PROCESSED_HIGH):
+            high_hits += 1
+        if canon in ULTRA_PROCESSED_MODERATE or _ingredient_text_hits(text, ULTRA_PROCESSED_MODERATE):
+            moderate_hits += 1
+        if "marshmallow" in normalized or "מרשמלו" in text:
+            high_hits += 2
+        if re.search(r"חטיף|סוכריות|ממתק", text):
+            high_hits += 1
+
+    if high_hits >= 1:
+        return "high"
+    if moderate_hits >= 2:
+        return "moderate"
+    if moderate_hits == 1 and high_hits == 0:
+        return "moderate"
+    return None
+
+
+def calculate_nutrition_score(
+    *,
+    calories_per_serving: float,
+    protein_per_serving: float,
+    sugar_per_serving: float,
+    fiber_per_serving: float,
+    rich_in_veg_fruit: bool = False,
+    ultra_processed_level: str | None = None,
+) -> int:
+    """Start at 100 and adjust per portion. Clamped 0-100."""
+    score = 100.0
+
+    if calories_per_serving < 250:
+        score += 10
+    elif calories_per_serving <= 450:
+        pass
+    elif calories_per_serving <= 650:
+        score -= 10
+    else:
+        score -= 20
+
+    if protein_per_serving > 20:
+        score += 15
+    elif protein_per_serving >= 10:
+        score += 5
+    else:
+        score -= 10
+
+    if sugar_per_serving < 10:
+        score += 10
+    elif sugar_per_serving <= 20:
+        pass
+    elif sugar_per_serving <= 35:
+        score -= 10
+    else:
+        score -= 20
+
+    if fiber_per_serving > 8:
+        score += 10
+    elif fiber_per_serving >= 4:
+        score += 5
+
+    if rich_in_veg_fruit:
+        score += 10
+
+    if ultra_processed_level == "moderate":
+        score -= 10
+    elif ultra_processed_level == "high":
+        score -= 20
+
+    return int(max(0, min(100, round(score))))
+
+
+def calculate_health_score_from_recipe(
+    *,
+    ingredients: list[str],
+    calories: int,
+    protein: int,
+    carbs: int,
+    servings: int,
+) -> int:
+    servings = max(1, servings)
+    calories_per = calories / servings
+    protein_per = protein / servings
+    carbs_per = carbs / servings
+    sugar_per = estimate_sugar_per_serving(ingredients, servings, carbs_per)
+    fiber_per = estimate_fiber_per_serving(ingredients, servings)
+
+    return calculate_nutrition_score(
+        calories_per_serving=calories_per,
+        protein_per_serving=protein_per,
+        sugar_per_serving=sugar_per,
+        fiber_per_serving=fiber_per,
+        rich_in_veg_fruit=is_rich_in_vegetables_or_fruit(ingredients),
+        ultra_processed_level=detect_ultra_processed_level(ingredients),
+    )
+
+
+NUTRITION_SCORE_CLASSIFICATIONS: list[dict[str, int | str]] = [
+    {"id": "dietFriendly", "min": 90, "max": 100},
+    {"id": "balancedHealthy", "min": 75, "max": 89},
+    {"id": "moderatelyBalanced", "min": 60, "max": 74},
+    {"id": "moderateTreat", "min": 40, "max": 59},
+    {"id": "indulgent", "min": 0, "max": 39},
+]
+
+
+def get_nutrition_score_classification(score: int | float) -> dict[str, int | str]:
+    safe = int(max(0, min(100, round(float(score or 0)))))
+    for band in NUTRITION_SCORE_CLASSIFICATIONS:
+        if safe >= band["min"] and safe <= band["max"]:
+            return band
+    return NUTRITION_SCORE_CLASSIFICATIONS[-1]
+
+
+NOTABLE_INGREDIENT_PATTERNS: list[tuple[re.Pattern[str], str, str]] = [
+    (re.compile(r"סוכר|sugar", re.I), "סוכר", "sugar"),
+    (re.compile(r"מרשמלו|marshmallow", re.I), "מרשמלו", "marshmallows"),
+    (re.compile(r"שוקולד|chocolate", re.I), "שוקולד", "chocolate"),
+    (re.compile(r"דבש|honey", re.I), "דבש", "honey"),
+    (re.compile(r"חמאה|butter", re.I), "חמאה", "butter"),
+    (re.compile(r"קמח|flour", re.I), "קמח", "flour"),
+    (re.compile(r"עוגיות|cookies?", re.I), "עוגיות", "cookies"),
+    (re.compile(r"חטיף|snack|chips", re.I), "חטיף", "snack food"),
+    (re.compile(r"קוקוס|coconut", re.I), "קוקוס", "coconut"),
+    (re.compile(r"שמנת|cream", re.I), "שמנת", "cream"),
+]
+
+
+def _extract_notable_ingredient_names(ingredients: list[str], language: str = "he") -> list[str]:
+    names: list[str] = []
+    for item in ingredients or []:
+        text = str(item)
+        for pattern, he_label, en_label in NOTABLE_INGREDIENT_PATTERNS:
+            if not pattern.search(text):
+                continue
+            label = he_label if language == "he" else en_label
+            if label not in names:
+                names.append(label)
+    return names
+
+
+def _join_hebrew_clauses(items: list[str]) -> str:
+    if len(items) == 1:
+        return items[0]
+    if len(items) == 2:
+        return f"{items[0]} ו{items[1]}"
+    return f"{', '.join(items[:-1])} ו{items[-1]}"
+
+
+def _join_english_clauses(items: list[str]) -> str:
+    if len(items) == 1:
+        return items[0]
+    if len(items) == 2:
+        return f"{items[0]} and {items[1]}"
+    return f"{', '.join(items[:-1])}, and {items[-1]}"
+
+
+def _select_explanation_factors(factors: list[dict], score: int) -> list[dict]:
+    sorted_factors = sorted(factors, key=lambda item: item["weight"], reverse=True)
+    neg = [item for item in sorted_factors if item["type"] == "neg"]
+    neu = [item for item in sorted_factors if item["type"] == "neutral"]
+    pos = [item for item in sorted_factors if item["type"] == "pos"]
+
+    if score >= 85:
+        picked = [*pos[:2], *neu[:1]]
+    elif score >= 70:
+        picked = [*neu[:1], *pos[:1], *neg[:1]]
+    elif score >= 55:
+        picked = [*neu[:1], *neg[:2]]
+    else:
+        picked = neg[:3]
+
+    if len(picked) < 2:
+        seen = set(id(item) for item in picked)
+        for factor in sorted_factors:
+            if len(picked) >= 3:
+                break
+            if id(factor) not in seen:
+                picked.append(factor)
+                seen.add(id(factor))
+
+    return picked[:3]
+
+
+def _compose_score_explanation(score: int, items: list[dict], language: str = "he") -> str:
+    if not items:
+        return f"המתכון קיבל ציון {score}." if language == "he" else f"This recipe scored {score}/100."
+
+    texts = [item["text"] for item in items]
+
+    if language == "he":
+        if len(texts) == 1:
+            return f"המתכון קיבל ציון {score} משום שהוא מכיל {texts[0]}."
+        first_type = items[0]["type"]
+        has_contrast = any(
+            (first_type in {"pos", "neutral"}) and item["type"] == "neg"
+            for item in items[1:]
+        )
+        rest = _join_hebrew_clauses(texts[1:])
+        if has_contrast:
+            return f"המתכון קיבל ציון {score} משום שהוא מכיל {texts[0]} אך גם {rest}."
+        return f"המתכון קיבל ציון {score} משום שהוא מכיל {texts[0]} ו{rest}."
+
+    if len(texts) == 1:
+        return f"This recipe scored {score}/100 because it contains {texts[0]}."
+    first_type = items[0]["type"]
+    has_contrast = any(
+        (first_type in {"pos", "neutral"}) and item["type"] == "neg"
+        for item in items[1:]
+    )
+    rest = _join_english_clauses(texts[1:])
+    if has_contrast:
+        return f"This recipe scored {score}/100 because it has {texts[0]}, but also {rest}."
+    return f"This recipe scored {score}/100 because it has {texts[0]} and {rest}."
+
+
+def build_nutrition_score_explanation(
+    *,
+    score: int | float,
+    ingredients: list[str],
+    calories: int,
+    protein: int,
+    carbs: int,
+    servings: int,
+    language: str = "he",
+) -> str:
+    safe_score = int(max(0, min(100, round(float(score or 0)))))
+    servings = max(1, servings)
+    calories_per = calories / servings
+    protein_per = protein / servings
+    carbs_per = carbs / servings
+    sugar_per = estimate_sugar_per_serving(ingredients, servings, carbs_per)
+    fiber_per = estimate_fiber_per_serving(ingredients, servings)
+    rich_in_veg_fruit = is_rich_in_vegetables_or_fruit(ingredients)
+    ultra_level = detect_ultra_processed_level(ingredients)
+    is_he = language == "he"
+    factors: list[dict] = []
+
+    if calories_per < 250:
+        factors.append({"weight": 3, "type": "pos", "text": "כמות נמוכה של קלוריות למנה" if is_he else "a low calorie count per serving"})
+    elif calories_per <= 450:
+        factors.append({"weight": 2, "type": "neutral", "text": "כמות בינונית של קלוריות" if is_he else "a moderate calorie count"})
+    elif calories_per <= 650:
+        factors.append({"weight": 3, "type": "neg", "text": "כמות גבוהה יחסית של קלוריות למנה" if is_he else "a relatively high calorie count per serving"})
+    else:
+        factors.append({"weight": 4, "type": "neg", "text": "כמות קלוריות גבוהה למנה" if is_he else "a high calorie count per serving"})
+
+    if protein_per > 20:
+        factors.append({"weight": 4, "type": "pos", "text": "תוכן חלבון גבוה" if is_he else "high protein content"})
+    elif protein_per >= 10:
+        factors.append({"weight": 2, "type": "neutral", "text": "תוכן חלבון בינוני" if is_he else "moderate protein content"})
+    else:
+        factors.append({"weight": 3, "type": "neg", "text": "תוכן חלבון נמוך" if is_he else "low protein content"})
+
+    if sugar_per < 10:
+        factors.append({"weight": 3, "type": "pos", "text": "כמות נמוכה של סוכר" if is_he else "low sugar content"})
+    elif sugar_per <= 20:
+        factors.append({"weight": 2, "type": "neutral", "text": "כמות בינונית של סוכר" if is_he else "moderate sugar content"})
+    elif sugar_per <= 35:
+        factors.append({"weight": 4, "type": "neg", "text": "ריכוז גבוה יחסית של סוכר" if is_he else "a relatively high sugar concentration"})
+    else:
+        factors.append({"weight": 5, "type": "neg", "text": "ריכוז גבוה מאוד של סוכר" if is_he else "a very high sugar concentration"})
+
+    if carbs_per >= 50:
+        factors.append({"weight": 4, "type": "neg", "text": "ריכוז גבוה של פחמימות" if is_he else "a high carbohydrate concentration"})
+    elif carbs_per >= 35:
+        factors.append({"weight": 3, "type": "neg", "text": "כמות בינונית-גבוהה של פחמימות" if is_he else "moderately high carbohydrates"})
+    elif carbs_per >= 25:
+        factors.append({"weight": 2, "type": "neutral", "text": "כמות בינונית של פחמימות" if is_he else "moderate carbohydrates"})
+    elif carbs_per < 15:
+        factors.append({"weight": 2, "type": "pos", "text": "כמות נמוכה של פחמימות" if is_he else "low carbohydrates"})
+
+    if fiber_per >= 4 or rich_in_veg_fruit:
+        factors.append({"weight": 4, "type": "pos", "text": "עשיר בירקות, פירות או קטניות" if is_he else "rich in vegetables, fruit, or legumes"})
+    elif fiber_per >= 2:
+        factors.append({"weight": 2, "type": "pos", "text": "מכיל מקורות לסיבים תזונתיים" if is_he else "sources of dietary fiber"})
+
+    notable_names = _extract_notable_ingredient_names(ingredients, language)
+    if ultra_level == "high" and notable_names:
+        names = _join_hebrew_clauses(notable_names[:3]) if is_he else _join_english_clauses(notable_names[:3])
+        factors.append(
+            {
+                "weight": 5,
+                "type": "neg",
+                "text": f"מרכיבים מעובדים כמו {names}" if is_he else f"processed ingredients such as {names}",
+            }
+        )
+    elif ultra_level == "moderate" and notable_names:
+        names = _join_hebrew_clauses(notable_names[:2]) if is_he else _join_english_clauses(notable_names[:2])
+        factors.append(
+            {
+                "weight": 3,
+                "type": "neg",
+                "text": f"מרכיבים כמו {names}" if is_he else f"ingredients such as {names}",
+            }
+        )
+
+    selected = _select_explanation_factors(factors, safe_score)
+    return _compose_score_explanation(safe_score, selected, language)

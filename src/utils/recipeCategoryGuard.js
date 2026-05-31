@@ -2,35 +2,69 @@
 
 const MEAT_PATTERNS = [
   /עוף/,
-  /חזה\s*עוף/,
-  /כרע(?:יים)?/,
   /בשר/,
-  /בקר/,
-  /כבש/,
-  /הודו/,
-  /טורק/,
-  /נקניק/,
-  /קבב/,
-  /סטייק/,
-  /כבד/,
-  /מרג(?:ז|ע)/,
-  /צלי(?:ה|ת)?/,
+  /chicken/i,
+  /beef/i,
+  /\bmeat\b/i,
+  /steak/i,
+  /turkey/i,
+  /lamb/i,
+  /ground beef/i,
 ]
 
 const DAIRY_PATTERNS = [
   /חלב/,
   /גבינ/,
-  /שמנת/,
-  /חמאה/,
-  /יוגורט/,
-  /קוטג/,
-  /מוצרל/,
-  /פרמז/,
-  /ריקוט/,
-  /מסקרפונ/,
+  /\bmilk\b/i,
+  /cheese/i,
+  /cream/i,
+  /butter/i,
+  /yogurt/i,
+  /ricotta/i,
+  /parmesan/i,
+  /cream cheese/i,
 ]
 
-const DESSERT_TITLE_KEYWORDS = ['עוג', 'קינוח', 'מוס', 'בראונ', 'מאפין', 'גלידה', 'סורבה', 'שוקולד', 'קרם', 'מתוק']
+const DESSERT_TITLE_KEYWORDS = [
+  'עוג',
+  'קינוח',
+  'מוס',
+  'בראונ',
+  'מאפין',
+  'גלידה',
+  'סורבה',
+  'שוקולד',
+  'קרם',
+  'מתוק',
+  'cake',
+  'cookie',
+  'brownie',
+  'muffin',
+  'dessert',
+  'cheesecake',
+  'chocolate',
+  'pudding',
+  'ice cream',
+  'sorbet',
+]
+
+const DAIRY_DESSERT_SIGNALS = [
+  'עוג',
+  'קינוח',
+  'עוגיות',
+  'בראונ',
+  'מאפין',
+  'גבינ',
+  'שוקולד',
+  'קרם',
+  'cake',
+  'cookie',
+  'brownie',
+  'muffin',
+  'cheese',
+  'chocolate',
+  'cream',
+]
 
 export function isInvalidRecipeSelection(recipeType, category) {
   return recipeType === 'dessert' && category === 'meat'
@@ -67,8 +101,7 @@ function isDairyDessertValid(recipe) {
   if (!recipeHasDairy(recipe)) return false
   if (!titleHasDessertKeyword(recipe?.name)) return false
   const text = recipeTextBlob(recipe)
-  const signals = ['עוג', 'קינוח', 'עוגיות', 'בראונ', 'מאפין', 'גבינ', 'שוקולד', 'קרם']
-  return signals.some((signal) => text.includes(signal))
+  return DAIRY_DESSERT_SIGNALS.some((signal) => text.includes(signal))
 }
 
 function isParveDessertValid(recipe) {
@@ -124,12 +157,29 @@ export function logRecipeValidation({
   generatedTitle,
   validationPassed,
   fallbackUsed,
+  recipeSource,
+  skipReparse,
+  selectedLanguage,
+  recipeLanguageUsed,
 }) {
   console.log('[aiRecipeService] selectedRecipeType:', selectedRecipeType)
   console.log('[aiRecipeService] selectedCategory:', selectedCategory)
   console.log('[aiRecipeService] generatedTitle:', generatedTitle)
   console.log('[aiRecipeService] validationPassed:', validationPassed)
   console.log('[aiRecipeService] fallbackUsed:', fallbackUsed)
+  console.log('[aiRecipeService] recipeSource:', recipeSource ?? 'unknown')
+  console.log('[aiRecipeService] skipReparse:', Boolean(skipReparse))
+  if (fallbackUsed && validationPassed) {
+    console.warn(
+      '[aiRecipeService] fallbackUsed=true with validationPassed=true — this is a mock fallback recipe, not Gemini',
+    )
+  }
+  if (selectedLanguage) {
+    console.log('[aiRecipeService] selectedLanguage:', selectedLanguage)
+  }
+  if (recipeLanguageUsed) {
+    console.log('[aiRecipeService] recipeLanguageUsed:', recipeLanguageUsed)
+  }
 }
 
 export function getEffectiveRecipeType(recipeType, category) {
