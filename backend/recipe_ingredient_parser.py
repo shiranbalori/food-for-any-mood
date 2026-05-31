@@ -18,6 +18,7 @@ from recipe_title import apply_descriptive_dish_title, validate_dish_title
 from recipe_quantities import apply_recipe_quantities
 from recipe_pre_return_validation import validate_recipe_before_return
 from recipe_step_sanitize import light_sanitize_recipe_steps
+from recipe_utils import is_staple
 from measurement_units import (
     format_hebrew_measurement,
     parse_leading_measurement,
@@ -30,8 +31,6 @@ LATIN_PATTERN = re.compile(r"[a-z]", re.IGNORECASE)
 from ingredient_allowlist import (
     find_unauthorized_recipe_ingredients,
     is_recipe_ingredient_allowed,
-    is_system_pantry_ingredient,
-    SYSTEM_PANTRY_CANONICAL,
 )
 
 SPLIT_PATTERN = re.compile(
@@ -221,15 +220,11 @@ def _dedupe_ingredients(items: list[str]) -> list[str]:
     return seen
 
 
-def _is_staple(name: str) -> bool:
-    return is_system_pantry_ingredient(name)
-
-
 def _ingredient_used_in_steps(ingredient: str, steps: list[str]) -> bool:
     steps_text = "\n".join(steps)
     if ingredient_appears_in_text(ingredient, steps_text):
         return True
-    return _is_staple(ingredient)
+    return is_staple(ingredient)
 
 
 def _hebrewize_steps(steps: list[str], ingredient_labels: list[str]) -> list[str]:
@@ -311,7 +306,7 @@ def normalize_recipe_ingredients(
     ingredients = [
         item
         for item in ingredients
-        if _is_staple(item)
+        if is_staple(item)
         or _ingredient_used_in_steps(item, steps)
         or any(ingredients_match(item, user_ing) for user_ing in user_ingredients)
         or is_recipe_ingredient_allowed(item, user_ingredients)
@@ -346,7 +341,7 @@ def validate_recipe_quality(
     unused_in_steps = [
         item
         for item in (recipe.get("ingredients") or [])
-        if not _is_staple(item) and not ingredient_appears_in_text(item, steps_text)
+        if not is_staple(item) and not ingredient_appears_in_text(item, steps_text)
     ]
     user_explicit_missing = [
         user_ing

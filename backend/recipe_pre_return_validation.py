@@ -11,7 +11,7 @@ from ingredient_relevance import (
     parse_user_ingredients,
 )
 from measurement_units import parse_leading_measurement
-from recipe_ingredient_parser import _is_staple
+from recipe_utils import is_staple
 from recipe_quantities import is_valid_quantified_display
 from ingredient_allowlist import find_unauthorized_recipe_ingredients
 from recipe_step_sanitize import has_repeated_parenthetical_ingredients
@@ -278,7 +278,7 @@ def validate_recipe_before_return(
     unused_in_steps = [
         item
         for item in ingredients
-        if not _is_staple(item) and not ingredient_appears_in_text(item, steps_text)
+        if not is_staple(item) and not ingredient_appears_in_text(item, steps_text)
     ]
     if unused_in_steps:
         failures.append("unused_ingredients")
