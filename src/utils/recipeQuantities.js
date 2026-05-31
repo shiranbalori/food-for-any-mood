@@ -436,7 +436,7 @@ export function syncStepsWithQuantities(steps, quantifiedItems) {
   })
 }
 
-export function computeNutritionFromQuantities(quantifiedItems, servings = DEFAULT_SERVINGS) {
+export function computeNutritionFromQuantities(quantifiedItems, servings = DEFAULT_SERVINGS, scoreMeta = {}) {
   const totals = { calories: 0, protein: 0, carbs: 0, fat: 0 }
 
   for (const item of quantifiedItems) {
@@ -458,6 +458,8 @@ export function computeNutritionFromQuantities(quantifiedItems, servings = DEFAU
     protein,
     carbs,
     servings,
+    name: scoreMeta.name,
+    recipeType: scoreMeta.recipeType,
   })
 
   return { calories, protein, carbs, fat, servings, healthScore }
@@ -496,7 +498,10 @@ export function applyRecipeQuantities(recipe, options = {}) {
           language,
         ),
       )
-  const nutrition = computeNutritionFromQuantities(quantifiedItems, servings)
+  const nutrition = computeNutritionFromQuantities(quantifiedItems, servings, {
+    name: recipe.name,
+    recipeType: options.recipeType ?? recipe.recipeType,
+  })
   const { healthScore, ...macroNutrition } = nutrition
 
   return {

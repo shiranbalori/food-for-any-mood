@@ -475,6 +475,7 @@ export function applyRecipeIngredientParser(recipe, userIngredientsRaw = '', lan
     language,
     servings: options.servings ?? titled.nutrition?.servings,
     preserveOriginalSteps,
+    recipeType: options.recipeType ?? 'meal',
   })
   const userIngredients = parseUserIngredients(userIngredientsRaw)
   const ingredients = sanitizeIngredientList(

@@ -150,6 +150,78 @@ export function detectUltraProcessedLevel(ingredients) {
   return null
 }
 
+const INDULGENT_DESSERT_KEYWORDS = [
+  'marshmallow', 'marshmallows', 'pudding', 'cookie', 'cookies', 'candy', 'cream', 'sugar', 'honey',
+  'chocolate', 'nutella', 'frosting', 'syrup', 'caramel',
+  'מרשמלו', 'פuding', 'פודינג', 'עוג', 'סוכר', 'דבש', 'שוקולד', 'שמנת', 'סוכריות', 'ממתק', 'קרם', 'קינוח',
+]
+
+const DESSERT_NAME_PATTERN = /pudding|dessert|cookie|cake|mousse|parfait|panna|cotta|treat|sweet|fudge|קינוח|פuding|פודינג|עוג|מוס|קרם|מרשמלו|מתוק/i
+
+function countSweetDessertSignals(text) {
+  return INDULGENT_DESSERT_KEYWORDS.filter((keyword) => text.includes(keyword)).length
+}
+
+/**
+ * Dessert-aware nutrition profile — indulgent sweets should not score as diet-friendly.
+ */
+export function analyzeDessertNutritionProfile({
+  ingredients = [],
+  name = '',
+  recipeType,
+  caloriesPerServing = 0,
+  proteinPerServing = 0,
+  sugarPerServing = 0,
+  carbsPerServing = 0,
+  ultraProcessedLevel = null,
+}) {
+  const text = `${name ?? ''} ${(ingredients ?? []).join(' ')}`.toLowerCase()
+  const ultraLevel = ultraProcessedLevel ?? detectUltraProcessedLevel(ingredients)
+  const sweetSignals = countSweetDessertSignals(text)
+
+  const isDessert =
+    recipeType === 'dessert' ||
+    DESSERT_NAME_PATTERN.test(text) ||
+    sweetSignals >= 2
+
+  const hasIndulgentIngredient = sweetSignals >= 1 || ultraLevel === 'high'
+
+  const isIndulgent =
+    isDessert &&
+    (hasIndulgentIngredient ||
+      caloriesPerServing > 400 ||
+      sugarPerServing > 20 ||
+      carbsPerServing >= 50 ||
+      ultraLevel === 'high')
+
+  const isLightBalanced =
+    isDessert &&
+    caloriesPerServing <= 300 &&
+    sugarPerServing <= 15 &&
+    proteinPerServing >= 4 &&
+    carbsPerServing < 45 &&
+    ultraLevel !== 'high'
+
+  return { isDessert, isIndulgent, isLightBalanced }
+}
+
+export function applyDessertNutritionCap(score, profile) {
+  if (!profile?.isDessert) {
+    return Math.min(100, Math.max(0, Math.round(score)))
+  }
+
+  let capped = score
+  if (profile.isIndulgent && !profile.isLightBalanced) {
+    capped = Math.min(capped, 70)
+  } else if (!profile.isLightBalanced) {
+    capped = Math.min(capped, 80)
+  } else {
+    capped = Math.min(capped, 85)
+  }
+
+  return Math.min(100, Math.max(0, Math.round(capped)))
+}
+
 export function calculateNutritionScore({
   caloriesPerServing,
   proteinPerServing,
@@ -214,22 +286,44 @@ export function getNutritionScoreColor(score) {
   return getNutritionScoreClassification(score).color
 }
 
-export function calculateHealthScoreFromRecipe({ ingredients, calories, protein, carbs, servings }) {
+export function calculateHealthScoreFromRecipe({
+  ingredients,
+  calories,
+  protein,
+  carbs,
+  servings,
+  recipeType,
+  name,
+}) {
   const safeServings = Math.max(1, servings ?? 1)
   const caloriesPer = (calories ?? 0) / safeServings
   const proteinPer = (protein ?? 0) / safeServings
   const carbsPer = (carbs ?? 0) / safeServings
   const sugarPer = estimateSugarPerServing(ingredients, safeServings, carbsPer)
   const fiberPer = estimateFiberPerServing(ingredients, safeServings)
+  const ultraProcessedLevel = detectUltraProcessedLevel(ingredients)
 
-  return calculateNutritionScore({
+  const baseScore = calculateNutritionScore({
     caloriesPerServing: caloriesPer,
     proteinPerServing: proteinPer,
     sugarPerServing: sugarPer,
     fiberPerServing: fiberPer,
     richInVegFruit: isRichInVegetablesOrFruit(ingredients),
-    ultraProcessedLevel: detectUltraProcessedLevel(ingredients),
+    ultraProcessedLevel,
   })
+
+  const dessertProfile = analyzeDessertNutritionProfile({
+    ingredients,
+    name,
+    recipeType,
+    caloriesPerServing: caloriesPer,
+    proteinPerServing: proteinPer,
+    sugarPerServing: sugarPer,
+    carbsPerServing: carbsPer,
+    ultraProcessedLevel,
+  })
+
+  return applyDessertNutritionCap(baseScore, dessertProfile)
 }
 
 /** @deprecated Use calculateHealthScoreFromRecipe */
@@ -443,6 +537,8 @@ export function buildNutritionScoreExplanationFromRecipe(recipe, language = 'he'
     protein: recipe.protein ?? recipe.nutrition?.protein ?? 0,
     carbs: recipe.carbs ?? recipe.nutrition?.carbs ?? 0,
     servings: recipe.servings ?? recipe.nutrition?.servings ?? 2,
+    recipeType: recipe.recipeType,
+    name: recipe.name,
   })
 
   return buildNutritionScoreExplanation({

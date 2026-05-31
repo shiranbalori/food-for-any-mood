@@ -1,7 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { CATEGORIES } from '../utils/themes'
 import { useLanguage } from '../i18n/useLanguage'
-import { uploadCommunityRecipe } from '../services/communityRecipeService'
+import {
+  COMMUNITY_RECIPE_IMAGE_ACCEPT,
+  uploadCommunityRecipe,
+  validateCommunityRecipeImage,
+} from '../services/communityRecipeService'
 import './UploadCommunityRecipeModal.css'
 
 const RECIPE_TYPES = ['meal', 'dessert']
@@ -18,13 +22,22 @@ const INITIAL_FORM = {
 export default function UploadCommunityRecipeModal({ open, onClose, userId, onUploaded }) {
   const { t } = useLanguage()
   const [form, setForm] = useState(INITIAL_FORM)
+  const [imageFile, setImageFile] = useState(null)
+  const [imagePreviewUrl, setImagePreviewUrl] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const fileInputRef = useRef(null)
 
   useEffect(() => {
     if (open) {
       setForm(INITIAL_FORM)
       setError('')
+      setImageFile(null)
+      setImagePreviewUrl((prev) => {
+        if (prev) URL.revokeObjectURL(prev)
+        return ''
+      })
+      if (fileInputRef.current) fileInputRef.current.value = ''
     }
   }, [open])
 
@@ -44,10 +57,47 @@ export default function UploadCommunityRecipeModal({ open, onClose, userId, onUp
     }
   }, [open, onClose])
 
+  useEffect(
+    () => () => {
+      if (imagePreviewUrl) URL.revokeObjectURL(imagePreviewUrl)
+    },
+    [imagePreviewUrl],
+  )
+
   if (!open) return null
 
   const handleChange = (field, value) => {
     setForm((prev) => ({ ...prev, [field]: value }))
+  }
+
+  const clearImage = () => {
+    setImageFile(null)
+    setImagePreviewUrl((prev) => {
+      if (prev) URL.revokeObjectURL(prev)
+      return ''
+    })
+    if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+
+  const handleImageChange = (event) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    const validation = validateCommunityRecipeImage(file)
+    if (!validation.ok) {
+      setError(
+        t(validation.code === 'TOO_LARGE' ? 'communityRecipeImageTooLarge' : 'communityRecipeImageInvalidType'),
+      )
+      event.target.value = ''
+      return
+    }
+
+    setError('')
+    setImageFile(file)
+    setImagePreviewUrl((prev) => {
+      if (prev) URL.revokeObjectURL(prev)
+      return URL.createObjectURL(file)
+    })
   }
 
   const handleSubmit = async (event) => {
@@ -56,11 +106,19 @@ export default function UploadCommunityRecipeModal({ open, onClose, userId, onUp
     setLoading(true)
 
     try {
-      await uploadCommunityRecipe(userId, form)
+      await uploadCommunityRecipe(userId, { ...form, imageFile })
+      clearImage()
       onUploaded?.()
       onClose()
     } catch (err) {
-      setError(err?.message ?? t('communityUploadError'))
+      const code = err?.message
+      if (code === 'INVALID_TYPE' || code === 'INVALID_IMAGE_TYPE') {
+        setError(t('communityRecipeImageInvalidType'))
+      } else if (code === 'TOO_LARGE') {
+        setError(t('communityRecipeImageTooLarge'))
+      } else {
+        setError(err?.message ?? t('communityUploadError'))
+      }
     } finally {
       setLoading(false)
     }
@@ -96,6 +154,38 @@ export default function UploadCommunityRecipeModal({ open, onClose, userId, onUp
               rows={2}
             />
           </label>
+
+          <div className="upload-recipe-modal__field">
+            <span>{t('communityRecipeImage')}</span>
+            <p className="upload-recipe-modal__hint">{t('communityRecipeImageHint')}</p>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept={COMMUNITY_RECIPE_IMAGE_ACCEPT}
+              onChange={handleImageChange}
+              className="upload-recipe-modal__file-input"
+            />
+            {imagePreviewUrl ? (
+              <div className="upload-recipe-modal__preview">
+                <img src={imagePreviewUrl} alt={t('communityRecipeImagePreviewAlt')} />
+                <button
+                  type="button"
+                  className="btn btn--ghost upload-recipe-modal__remove-image"
+                  onClick={clearImage}
+                >
+                  {t('communityRecipeImageRemove')}
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                className="btn btn--ghost upload-recipe-modal__choose-image"
+                onClick={() => fileInputRef.current?.click()}
+              >
+                {t('communityRecipeImageChoose')}
+              </button>
+            )}
+          </div>
 
           <div className="upload-recipe-modal__field">
             <span>{t('recipeTypeLabel')}</span>

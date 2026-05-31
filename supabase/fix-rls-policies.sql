@@ -154,3 +154,59 @@ create policy "Users can update own ratings"
 -- 8. View counter RPC (used when expanding recipe details)
 -- ---------------------------------------------------------------------------
 grant execute on function public.increment_recipe_views(uuid) to anon, authenticated;
+
+-- ---------------------------------------------------------------------------
+-- 9. Community recipe image URL column + Storage bucket
+-- ---------------------------------------------------------------------------
+alter table public.community_recipes
+  add column if not exists image_url text;
+
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values (
+  'community-recipe-images',
+  'community-recipe-images',
+  true,
+  5242880,
+  array['image/jpeg', 'image/jpg', 'image/png', 'image/webp']
+)
+on conflict (id) do update set
+  public = excluded.public,
+  file_size_limit = excluded.file_size_limit,
+  allowed_mime_types = excluded.allowed_mime_types;
+
+drop policy if exists "Community recipe images are publicly readable" on storage.objects;
+drop policy if exists "Authenticated users can upload own community recipe images" on storage.objects;
+drop policy if exists "Users can update own community recipe images" on storage.objects;
+drop policy if exists "Users can delete own community recipe images" on storage.objects;
+
+create policy "Community recipe images are publicly readable"
+  on storage.objects for select
+  using (bucket_id = 'community-recipe-images');
+
+create policy "Authenticated users can upload own community recipe images"
+  on storage.objects for insert
+  to authenticated
+  with check (
+    bucket_id = 'community-recipe-images'
+    and auth.uid()::text = (storage.foldername(name))[1]
+  );
+
+create policy "Users can update own community recipe images"
+  on storage.objects for update
+  to authenticated
+  using (
+    bucket_id = 'community-recipe-images'
+    and auth.uid()::text = (storage.foldername(name))[1]
+  )
+  with check (
+    bucket_id = 'community-recipe-images'
+    and auth.uid()::text = (storage.foldername(name))[1]
+  );
+
+create policy "Users can delete own community recipe images"
+  on storage.objects for delete
+  to authenticated
+  using (
+    bucket_id = 'community-recipe-images'
+    and auth.uid()::text = (storage.foldername(name))[1]
+  );

@@ -211,6 +211,105 @@ def detect_ultra_processed_level(ingredients: list[str]) -> str | None:
     return None
 
 
+INDULGENT_DESSERT_KEYWORDS = (
+    "marshmallow",
+    "marshmallows",
+    "pudding",
+    "cookie",
+    "cookies",
+    "candy",
+    "cream",
+    "sugar",
+    "honey",
+    "chocolate",
+    "nutella",
+    "frosting",
+    "syrup",
+    "caramel",
+    "מרשמלו",
+    "פuding",
+    "פודינג",
+    "עוג",
+    "סוכר",
+    "דבש",
+    "שוקולד",
+    "שמנת",
+    "סוכריות",
+    "ממתק",
+    "קרם",
+    "קינוח",
+)
+
+DESSERT_NAME_PATTERN = re.compile(
+    r"pudding|dessert|cookie|cake|mousse|parfait|panna|cotta|treat|sweet|fudge|"
+    r"קינוח|פuding|פודינג|עוג|מוס|קרם|מרשמלו|מתוק",
+    re.I,
+)
+
+
+def _count_sweet_dessert_signals(text: str) -> int:
+    lower = text.lower()
+    return sum(1 for keyword in INDULGENT_DESSERT_KEYWORDS if keyword in lower)
+
+
+def analyze_dessert_nutrition_profile(
+    *,
+    ingredients: list[str] | None = None,
+    name: str = "",
+    recipe_type: str | None = None,
+    calories_per_serving: float = 0,
+    protein_per_serving: float = 0,
+    sugar_per_serving: float = 0,
+    carbs_per_serving: float = 0,
+    ultra_processed_level: str | None = None,
+) -> dict[str, bool]:
+    text = f"{name or ''} {' '.join(ingredients or [])}".lower()
+    ultra_level = ultra_processed_level or detect_ultra_processed_level(ingredients or [])
+    sweet_signals = _count_sweet_dessert_signals(text)
+
+    is_dessert = (
+        recipe_type == "dessert"
+        or bool(DESSERT_NAME_PATTERN.search(text))
+        or sweet_signals >= 2
+    )
+    has_indulgent_ingredient = sweet_signals >= 1 or ultra_level == "high"
+    is_indulgent = is_dessert and (
+        has_indulgent_ingredient
+        or calories_per_serving > 400
+        or sugar_per_serving > 20
+        or carbs_per_serving >= 50
+        or ultra_level == "high"
+    )
+    is_light_balanced = (
+        is_dessert
+        and calories_per_serving <= 300
+        and sugar_per_serving <= 15
+        and protein_per_serving >= 4
+        and carbs_per_serving < 45
+        and ultra_level != "high"
+    )
+    return {
+        "isDessert": is_dessert,
+        "isIndulgent": is_indulgent,
+        "isLightBalanced": is_light_balanced,
+    }
+
+
+def apply_dessert_nutrition_cap(score: int | float, profile: dict[str, bool]) -> int:
+    if not profile.get("isDessert"):
+        return int(max(0, min(100, round(float(score)))))
+
+    capped = float(score)
+    if profile.get("isIndulgent") and not profile.get("isLightBalanced"):
+        capped = min(capped, 70)
+    elif not profile.get("isLightBalanced"):
+        capped = min(capped, 80)
+    else:
+        capped = min(capped, 85)
+
+    return int(max(0, min(100, round(capped))))
+
+
 def calculate_nutrition_score(
     *,
     calories_per_serving: float,
@@ -271,6 +370,8 @@ def calculate_health_score_from_recipe(
     protein: int,
     carbs: int,
     servings: int,
+    recipe_type: str | None = None,
+    name: str = "",
 ) -> int:
     servings = max(1, servings)
     calories_per = calories / servings
@@ -278,15 +379,27 @@ def calculate_health_score_from_recipe(
     carbs_per = carbs / servings
     sugar_per = estimate_sugar_per_serving(ingredients, servings, carbs_per)
     fiber_per = estimate_fiber_per_serving(ingredients, servings)
+    ultra_level = detect_ultra_processed_level(ingredients)
 
-    return calculate_nutrition_score(
+    base_score = calculate_nutrition_score(
         calories_per_serving=calories_per,
         protein_per_serving=protein_per,
         sugar_per_serving=sugar_per,
         fiber_per_serving=fiber_per,
         rich_in_veg_fruit=is_rich_in_vegetables_or_fruit(ingredients),
-        ultra_processed_level=detect_ultra_processed_level(ingredients),
+        ultra_processed_level=ultra_level,
     )
+    profile = analyze_dessert_nutrition_profile(
+        ingredients=ingredients,
+        name=name,
+        recipe_type=recipe_type,
+        calories_per_serving=calories_per,
+        protein_per_serving=protein_per,
+        sugar_per_serving=sugar_per,
+        carbs_per_serving=carbs_per,
+        ultra_processed_level=ultra_level,
+    )
+    return apply_dessert_nutrition_cap(base_score, profile)
 
 
 NUTRITION_SCORE_CLASSIFICATIONS: list[dict[str, int | str]] = [

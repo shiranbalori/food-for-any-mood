@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { useLanguage } from '../i18n/useLanguage'
 import LanguageToggle from './LanguageToggle'
+import InstallAppButton from './InstallAppButton'
 import AuthModal from './AuthModal'
 import './Header.css'
 
@@ -27,7 +28,10 @@ export default function Header() {
   return (
     <header className="header">
       <div className="header__top">
-        <LanguageToggle />
+        <div className="header__top-start">
+          <LanguageToggle />
+          <InstallAppButton />
+        </div>
         {!loading && isSupabaseReady && (
           <div className="header__auth">
             {isAuthenticated ? (

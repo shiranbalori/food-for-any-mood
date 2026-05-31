@@ -118,6 +118,37 @@
   color: #b45309;
 }
 
+.upload-recipe-modal__hint {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.upload-recipe-modal__file-input {
+  display: none;
+}
+
+.upload-recipe-modal__choose-image,
+.upload-recipe-modal__remove-image {
+  align-self: flex-start;
+  font-size: 0.82rem;
+  padding: 0.45rem 0.75rem;
+}
+
+.upload-recipe-modal__preview {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.upload-recipe-modal__preview img {
+  width: 100%;
+  max-height: 220px;
+  object-fit: cover;
+  border-radius: var(--radius-xs);
+  border: 1.5px solid rgba(148, 163, 184, 0.2);
+}
+
 @media (min-width: 640px) {
   .upload-recipe-modal {
     align-items: center;

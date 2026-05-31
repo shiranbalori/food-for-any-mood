@@ -1,6 +1,13 @@
 import { isSupabaseConfigured, supabase } from '../lib/supabaseClient'
 import { MOCK_COMMUNITY_RECIPES } from '../data/mockCommunityRecipes'
 
+export const COMMUNITY_RECIPE_IMAGE_BUCKET = 'community-recipe-images'
+export const COMMUNITY_RECIPE_IMAGE_MAX_BYTES = 5 * 1024 * 1024
+export const COMMUNITY_RECIPE_IMAGE_ACCEPT = 'image/jpeg,image/jpg,image/png,image/webp'
+
+const ALLOWED_IMAGE_TYPES = new Set(['image/jpeg', 'image/jpg', 'image/png', 'image/webp'])
+const ALLOWED_IMAGE_EXTENSIONS = new Set(['jpg', 'jpeg', 'png', 'webp'])
+
 function averageRating(ratings) {
   if (!ratings?.length) return 0
   const sum = ratings.reduce((acc, value) => {
@@ -19,6 +26,7 @@ function mapMockRecipe(recipe) {
     steps: [],
     category: recipe.category,
     recipeType: recipe.recipeType ?? 'meal',
+    imageUrl: recipe.imageUrl ?? null,
     authorId: null,
     authorName: recipe.authorName,
     rating: recipe.rating ?? 0,
@@ -42,6 +50,7 @@ function mapDbRecipe(row, { profileMap, likeCountMap, ratingsByRecipe, userLikeS
     steps: row.steps ?? [],
     category: row.kosher_category,
     recipeType: row.recipe_type ?? 'meal',
+    imageUrl: row.image_url ?? null,
     authorId: row.user_id,
     authorName: profileMap.get(row.user_id) ?? '—',
     rating: averageRating(recipeRatings),
@@ -73,6 +82,58 @@ function buildRatingsMap(rows) {
   return map
 }
 
+function normalizeImageExtension(file) {
+  const fromName = file.name.split('.').pop()?.toLowerCase()
+  if (fromName && ALLOWED_IMAGE_EXTENSIONS.has(fromName)) {
+    return fromName === 'jpeg' ? 'jpg' : fromName
+  }
+  if (file.type === 'image/jpeg' || file.type === 'image/jpg') return 'jpg'
+  if (file.type === 'image/png') return 'png'
+  if (file.type === 'image/webp') return 'webp'
+  return null
+}
+
+/**
+ * @param {File | null | undefined} file
+ * @returns {{ ok: true } | { ok: false, code: 'INVALID_TYPE' | 'TOO_LARGE' }}
+ */
+export function validateCommunityRecipeImage(file) {
+  if (!file) return { ok: true }
+
+  const extension = file.name.split('.').pop()?.toLowerCase()
+  const typeAllowed = ALLOWED_IMAGE_TYPES.has(file.type)
+  const extensionAllowed = extension ? ALLOWED_IMAGE_EXTENSIONS.has(extension) : false
+
+  if (!typeAllowed && !extensionAllowed) {
+    return { ok: false, code: 'INVALID_TYPE' }
+  }
+  if (file.size > COMMUNITY_RECIPE_IMAGE_MAX_BYTES) {
+    return { ok: false, code: 'TOO_LARGE' }
+  }
+  return { ok: true }
+}
+
+async function uploadCommunityRecipeImage(userId, recipeId, file) {
+  if (!supabase) throw new Error('SUPABASE_NOT_CONFIGURED')
+
+  const extension = normalizeImageExtension(file)
+  if (!extension) throw new Error('INVALID_IMAGE_TYPE')
+
+  const path = `${userId}/${recipeId}.${extension}`
+  const { error: uploadError } = await supabase.storage
+    .from(COMMUNITY_RECIPE_IMAGE_BUCKET)
+    .upload(path, file, {
+      upsert: true,
+      cacheControl: '3600',
+      contentType: file.type || `image/${extension === 'jpg' ? 'jpeg' : extension}`,
+    })
+
+  if (uploadError) throw uploadError
+
+  const { data } = supabase.storage.from(COMMUNITY_RECIPE_IMAGE_BUCKET).getPublicUrl(path)
+  return data.publicUrl
+}
+
 /**
  * @param {string | null | undefined} userId
  */
@@ -84,7 +145,7 @@ export async function fetchCommunityRecipes(userId) {
   const { data: recipes, error } = await supabase
     .from('community_recipes')
     .select(
-      'id, user_id, title, description, ingredients, steps, kosher_category, recipe_type, view_count, created_at',
+      'id, user_id, title, description, ingredients, steps, kosher_category, recipe_type, image_url, view_count, created_at',
     )
     .order('created_at', { ascending: false })
 
@@ -158,9 +219,17 @@ export async function fetchCommunityRecipes(userId) {
 /**
  * @param {string} userId
  * @param {Object} payload
+ * @param {File | null | undefined} [payload.imageFile]
  */
 export async function uploadCommunityRecipe(userId, payload) {
   if (!supabase) throw new Error('SUPABASE_NOT_CONFIGURED')
+
+  if (payload.imageFile) {
+    const imageValidation = validateCommunityRecipeImage(payload.imageFile)
+    if (!imageValidation.ok) {
+      throw new Error(imageValidation.code)
+    }
+  }
 
   const ingredients = payload.ingredients
     .split(/[,;\n]/)
@@ -187,6 +256,18 @@ export async function uploadCommunityRecipe(userId, payload) {
     .single()
 
   if (error) throw error
+
+  if (payload.imageFile) {
+    const imageUrl = await uploadCommunityRecipeImage(userId, data.id, payload.imageFile)
+    const { error: updateError } = await supabase
+      .from('community_recipes')
+      .update({ image_url: imageUrl })
+      .eq('id', data.id)
+      .eq('user_id', userId)
+
+    if (updateError) throw updateError
+  }
+
   return data
 }
 

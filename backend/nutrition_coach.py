@@ -10,8 +10,11 @@ from google import genai
 from pydantic import BaseModel, Field, ValidationError
 
 from nutrition_score import (
+    analyze_dessert_nutrition_profile,
     build_nutrition_score_explanation,
     calculate_health_score_from_recipe,
+    detect_ultra_processed_level,
+    estimate_sugar_per_serving,
     get_nutrition_score_classification,
 )
 from recipe_health_tips import build_recipe_specific_tips
@@ -78,6 +81,7 @@ class NutritionAnalysisRequest(BaseModel):
     cookTime: int = Field(default=30, ge=5, le=180)
     spiceLevel: int = Field(default=0, ge=0, le=3)
     healthScore: int = Field(default=70, ge=0, le=100)
+    recipeType: Literal["meal", "dessert"] = "meal"
     language: Language = "he"
 
 
@@ -128,9 +132,25 @@ def _build_insights(
 ) -> HealthInsights:
     ingredient_text = " ".join(payload.ingredients).lower()
     heavy = any(keyword in ingredient_text for keyword in HEAVY_KEYWORDS)
+    sugar_per = estimate_sugar_per_serving(payload.ingredients, payload.servings, carbs_per)
+    dessert_profile = analyze_dessert_nutrition_profile(
+        ingredients=payload.ingredients,
+        name=payload.name,
+        recipe_type=payload.recipeType,
+        calories_per_serving=calories_per,
+        protein_per_serving=protein_per,
+        sugar_per_serving=sugar_per,
+        carbs_per_serving=carbs_per,
+        ultra_processed_level=detect_ultra_processed_level(payload.ingredients),
+    )
 
     return HealthInsights(
-        suitableForDiet=calories_per <= 550 and fat_per <= 28 and not heavy,
+        suitableForDiet=(
+            calories_per <= 500
+            and fat_per <= 28
+            and not heavy
+            and not dessert_profile["isIndulgent"]
+        ),
         suitableForKids=payload.spiceLevel <= 1 and fat_per <= 32,
         suitableForDinner=calories_per <= 700 and fat_per <= 38,
         suitableForPostWorkout=protein_per >= 18 and carbs_per >= 25,
@@ -154,6 +174,8 @@ def calculate_nutrition_score(
         protein=payload.protein,
         carbs=payload.carbs,
         servings=payload.servings,
+        recipe_type=payload.recipeType,
+        name=payload.name,
     )
 
 
@@ -202,6 +224,13 @@ def build_nutrition_analysis(payload: NutritionAnalysisRequest) -> NutritionAnal
         calories_per=calories_per,
     )
     tips = build_fallback_tips(payload, macro_levels, insights)
+    if calories_per > 500:
+        high_calorie_tip = (
+            f"מנה זו עשירה מאוד (כ-{round(calories_per)} קלוריות למנה) — מומלץ ליהנות ממנה במתינות, בפורציה קטנה."
+            if (payload.language or "he") == "he"
+            else f"This serving is very calorie-dense (~{round(calories_per)} kcal) — enjoy a small portion in moderation."
+        )
+        tips = [high_calorie_tip, *[tip for tip in tips if tip != high_calorie_tip]][:3]
     score_explanation = build_nutrition_score_explanation(
         score=nutrition_score,
         ingredients=payload.ingredients,

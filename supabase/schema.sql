@@ -63,6 +63,7 @@ create table if not exists public.community_recipes (
   steps text[] not null default '{}',
   kosher_category text not null check (kosher_category in ('dairy', 'meat', 'parve')),
   recipe_type text not null default 'meal' check (recipe_type in ('meal', 'dessert')),
+  image_url text,
   view_count integer not null default 0 check (view_count >= 0),
   created_at timestamptz not null default now()
 );
@@ -163,6 +164,54 @@ end;
 $$;
 
 grant execute on function public.increment_recipe_views(uuid) to anon, authenticated;
+
+-- ---------------------------------------------------------------------------
+-- Community recipe images (Supabase Storage)
+-- ---------------------------------------------------------------------------
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values (
+  'community-recipe-images',
+  'community-recipe-images',
+  true,
+  5242880,
+  array['image/jpeg', 'image/jpg', 'image/png', 'image/webp']
+)
+on conflict (id) do update set
+  public = excluded.public,
+  file_size_limit = excluded.file_size_limit,
+  allowed_mime_types = excluded.allowed_mime_types;
+
+create policy "Community recipe images are publicly readable"
+  on storage.objects for select
+  using (bucket_id = 'community-recipe-images');
+
+create policy "Authenticated users can upload own community recipe images"
+  on storage.objects for insert
+  to authenticated
+  with check (
+    bucket_id = 'community-recipe-images'
+    and auth.uid()::text = (storage.foldername(name))[1]
+  );
+
+create policy "Users can update own community recipe images"
+  on storage.objects for update
+  to authenticated
+  using (
+    bucket_id = 'community-recipe-images'
+    and auth.uid()::text = (storage.foldername(name))[1]
+  )
+  with check (
+    bucket_id = 'community-recipe-images'
+    and auth.uid()::text = (storage.foldername(name))[1]
+  );
+
+create policy "Users can delete own community recipe images"
+  on storage.objects for delete
+  to authenticated
+  using (
+    bucket_id = 'community-recipe-images'
+    and auth.uid()::text = (storage.foldername(name))[1]
+  );
 
 -- Table-level grants (required — without these you get "permission denied for table ...")
 grant usage on schema public to anon, authenticated;

@@ -100,6 +100,25 @@ export default function CommunityRecipeCard({
         '--theme-accent-light': theme.accentLight,
       }}
     >
+      <div className="community-card__media">
+        {recipe.imageUrl ? (
+          <img
+            src={recipe.imageUrl}
+            alt=""
+            className="community-card__image"
+            loading="lazy"
+          />
+        ) : (
+          <div
+            className="community-card__placeholder"
+            style={{ background: theme.accentLight }}
+            aria-hidden="true"
+          >
+            <span>{theme.emoji}</span>
+          </div>
+        )}
+      </div>
+
       <div className="community-card__top">
         <div className="community-card__badges">
           <span className="community-card__category">
