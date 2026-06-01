@@ -364,19 +364,19 @@ export function pickAlternateMealVariant({
           {
             id: 'pasta-egg-homestyle',
             method: 'general',
-            name: language === 'he' ? 'פסטה ביתית עם ביצה' : 'Homemade Pasta with Egg',
+            name: language === 'he' ? 'פסטה קרמית בסגנון ביתי' : 'Creamy Homestyle Pasta',
             steps: buildPastaEggSteps(listPhrase, cookingTime, language, 'homestyle'),
           },
           {
             id: 'pasta-egg-skillet',
             method: 'fried',
-            name: language === 'he' ? 'פסטה מהירה במחבת' : 'Quick Pasta Skillet',
+            name: language === 'he' ? 'פסטה מהירה בשמן זית' : 'Quick Olive Oil Pasta',
             steps: buildPastaEggSteps(listPhrase, cookingTime, language, 'skillet'),
           },
           {
             id: 'pasta-egg-rustic',
             method: 'boiled',
-            name: language === 'he' ? 'פסטה בסגנון ביתי' : 'Rustic Pasta Dish',
+            name: language === 'he' ? 'פסטה עם ביצה מקושקשת' : 'Pasta with Scrambled Egg',
             steps: buildPastaEggSteps(listPhrase, cookingTime, language, 'rustic'),
           },
         ]
@@ -384,19 +384,19 @@ export function pickAlternateMealVariant({
           {
             id: 'meal-skillet',
             method: 'fried',
-            name: language === 'he' ? 'מנה מהירה במחבת' : 'Quick Skillet Dish',
+            name: language === 'he' ? 'מוקפץ ירק מהיר' : 'Quick Vegetable Sauté',
             steps: buildGenericMealSteps(listPhrase, cookingTime, language, 'skillet'),
           },
           {
             id: 'meal-pot',
             method: 'boiled',
-            name: language === 'he' ? 'מנה ביתית בסיר' : 'Homemade Pot Dish',
+            name: language === 'he' ? 'תבשיל ביתי בסיר' : 'Homestyle Pot Stew',
             steps: buildGenericMealSteps(listPhrase, cookingTime, language, 'pot'),
           },
           {
             id: 'meal-pan',
             method: 'general',
-            name: language === 'he' ? 'מנה ביתית מהמטבח' : 'Homemade Kitchen Dish',
+            name: language === 'he' ? 'מנה חמה מהמטבח' : 'Warm Kitchen-Style Dish',
             steps: buildGenericMealSteps(listPhrase, cookingTime, language, 'skillet'),
           },
         ]

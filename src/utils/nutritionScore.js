@@ -150,6 +150,142 @@ export function detectUltraProcessedLevel(ingredients) {
   return null
 }
 
+const LEGUME_CANONICAL = new Set([
+  'lentils',
+  'lentil',
+  'chickpeas',
+  'chickpea',
+  'beans',
+  'bean',
+  'peas',
+  'pea',
+])
+
+const REFINED_CARB_CANONICAL = new Set(['pasta', 'flour', 'rice', 'bread', 'noodles'])
+
+const REFINED_CARB_KEYWORDS = [
+  'pasta',
+  'noodle',
+  'spaghetti',
+  'macaroni',
+  'penne',
+  'fusilli',
+  'fettuccine',
+  'white rice',
+  'bread',
+  'bun',
+  'breadcrumbs',
+  'crouton',
+  'פסטה',
+  'אטריות',
+  'ספגטי',
+  'קמח',
+  'אורז',
+  'לחם',
+  'פתיתים',
+]
+
+const AROMATIC_ONLY = new Set(['onion', 'garlic'])
+
+export function hasLegumes(ingredients) {
+  for (const item of ingredients ?? []) {
+    const canon = canonicalIngredient(String(item)) || ''
+    if (LEGUME_CANONICAL.has(canon)) return true
+    if (/lentil|chickpea|bean|hummus|עדש|חומוס|שעועית|אפונה/.test(String(item))) return true
+  }
+  return false
+}
+
+const SPICE_OR_SEASONING_PATTERN = /black pepper|peppercorn|פלפל שחור|מלח|salt|cinnamon|כמון|cumin|spice|תבלין|paprika|כורכום|turmeric|oregano|basil dried|שום|garlic powder/i
+
+export function hasAnyVegetable(ingredients) {
+  for (const item of ingredients ?? []) {
+    const text = String(item)
+    if (SPICE_OR_SEASONING_PATTERN.test(text)) continue
+    const canon = canonicalIngredient(text) || normalizeIngredient(text)
+    if (canon === 'black pepper' || AROMATIC_ONLY.has(canon)) continue
+    if (
+      VEG_FRUIT_CANONICAL.has(canon) ||
+      /tomato|carrot|pepper|berry|apple|banana|spinach|broccoli|zucchini|cucumber|avocado|kale|corn|עגבנ|גזר|פלפל|תות|תפוח|תרד|ברוקולי|קישוא|מלפפון|אבוקדו|ירק/.test(canon)
+    ) {
+      return true
+    }
+  }
+  return false
+}
+
+/** @returns {'high' | 'moderate' | null} */
+export function detectRefinedCarbLevel(ingredients) {
+  let hits = 0
+  for (const item of ingredients ?? []) {
+    const text = String(item)
+    const canon = canonicalIngredient(text) || ''
+    if (REFINED_CARB_CANONICAL.has(canon)) hits += 1
+    else if (textHits(text, REFINED_CARB_KEYWORDS)) hits += 1
+  }
+  if (hits >= 2) return 'high'
+  if (hits === 1) return 'moderate'
+  return null
+}
+
+function scoreCaloriesContribution(caloriesPerServing) {
+  if (caloriesPerServing <= 300) return 10
+  if (caloriesPerServing <= 450) return 4
+  if (caloriesPerServing <= 550) return 0
+  if (caloriesPerServing <= 650) return -10
+  if (caloriesPerServing <= 800) return -18
+  return -28
+}
+
+function scoreProteinContribution(proteinPerServing) {
+  if (proteinPerServing >= 28) return 12
+  if (proteinPerServing >= 22) return 8
+  if (proteinPerServing >= 15) return 4
+  if (proteinPerServing >= 8) return 0
+  return -8
+}
+
+function scoreCarbsContribution(carbsPerServing, sugarPerServing, refinedCarbLevel) {
+  let contribution = 0
+  if (carbsPerServing <= 25) contribution = 4
+  else if (carbsPerServing <= 35) contribution = 0
+  else if (carbsPerServing <= 50) contribution = -8
+  else if (carbsPerServing <= 65) contribution = -16
+  else if (carbsPerServing <= 80) contribution = -22
+  else contribution = -30
+
+  if (sugarPerServing > 30) contribution -= 8
+  else if (sugarPerServing > 20) contribution -= 4
+  else if (sugarPerServing > 15) contribution -= 2
+
+  if (refinedCarbLevel === 'high') contribution -= 12
+  else if (refinedCarbLevel === 'moderate') contribution -= 6
+
+  return contribution
+}
+
+function scoreFatContribution(fatPerServing) {
+  if (fatPerServing >= 38) return -18
+  if (fatPerServing >= 29) return -12
+  if (fatPerServing >= 21) return -6
+  if (fatPerServing <= 12) return 2
+  return 0
+}
+
+function scoreVegetableContribution(ingredients) {
+  if (isRichInVegetablesOrFruit(ingredients)) return 10
+  if (hasLegumes(ingredients)) return 8
+  if (hasAnyVegetable(ingredients)) return 4
+  return -10
+}
+
+function scoreFiberContribution(fiberPerServing) {
+  if (fiberPerServing >= 6) return 10
+  if (fiberPerServing >= 4) return 6
+  if (fiberPerServing >= 2) return 2
+  return -8
+}
+
 const INDULGENT_DESSERT_KEYWORDS = [
   'marshmallow', 'marshmallows', 'pudding', 'cookie', 'cookies', 'candy', 'cream', 'sugar', 'honey',
   'chocolate', 'nutella', 'frosting', 'syrup', 'caramel',
@@ -222,6 +358,110 @@ export function applyDessertNutritionCap(score, profile) {
   return Math.min(100, Math.max(0, Math.round(capped)))
 }
 
+const HEALTH_SCORE_BASE = 50
+
+/**
+ * Contribution-based health score from per-serving macros and ingredients.
+ * @returns {{ score: number, healthScoreBreakdown: object, explanation: string, classification: object }}
+ */
+export function calculateHealthScoreDetailed({
+  ingredients = [],
+  calories = 0,
+  protein = 0,
+  carbs = 0,
+  fat = 0,
+  servings = 1,
+  recipeType,
+  name,
+  language = 'he',
+}) {
+  const safeServings = Math.max(1, servings ?? 1)
+  const caloriesPer = (calories ?? 0) / safeServings
+  const proteinPer = (protein ?? 0) / safeServings
+  const carbsPer = (carbs ?? 0) / safeServings
+  const fatPer = (fat ?? 0) / safeServings
+  const sugarPer = estimateSugarPerServing(ingredients, safeServings, carbsPer)
+  const fiberPer = estimateFiberPerServing(ingredients, safeServings)
+  const ultraProcessedLevel = detectUltraProcessedLevel(ingredients)
+  const refinedCarbLevel = detectRefinedCarbLevel(ingredients)
+  const richInVegFruit = isRichInVegetablesOrFruit(ingredients)
+
+  const caloriesContribution = scoreCaloriesContribution(caloriesPer)
+  const proteinContribution = scoreProteinContribution(proteinPer)
+  const carbsContribution = scoreCarbsContribution(carbsPer, sugarPer, refinedCarbLevel)
+  const fatContribution = scoreFatContribution(fatPer)
+  const vegetableContribution = scoreVegetableContribution(ingredients)
+  const fiberContribution = scoreFiberContribution(fiberPer)
+
+  let rawScore =
+    HEALTH_SCORE_BASE +
+    caloriesContribution +
+    proteinContribution +
+    carbsContribution +
+    fatContribution +
+    vegetableContribution +
+    fiberContribution
+
+  if (ultraProcessedLevel === 'high') rawScore -= 10
+  else if (ultraProcessedLevel === 'moderate') rawScore -= 5
+
+  if (proteinPer >= 15 && richInVegFruit && caloriesPer <= 500 && carbsPer <= 45) {
+    rawScore += 5
+  }
+
+  const dessertProfile = analyzeDessertNutritionProfile({
+    ingredients,
+    name,
+    recipeType,
+    caloriesPerServing: caloriesPer,
+    proteinPerServing: proteinPer,
+    sugarPerServing: sugarPer,
+    carbsPerServing: carbsPer,
+    ultraProcessedLevel,
+  })
+
+  const scoreBeforeCap = Math.round(rawScore)
+  const score = applyDessertNutritionCap(scoreBeforeCap, dessertProfile)
+  const classification = getNutritionScoreClassification(score)
+
+  const healthScoreBreakdown = {
+    calories: caloriesContribution,
+    protein: proteinContribution,
+    carbs: carbsContribution,
+    fat: fatContribution,
+    vegetable: vegetableContribution,
+    fiber: fiberContribution,
+    perServing: {
+      calories: Math.round(caloriesPer),
+      protein: Math.round(proteinPer * 10) / 10,
+      carbs: Math.round(carbsPer * 10) / 10,
+      fat: Math.round(fatPer * 10) / 10,
+      sugar: sugarPer,
+      fiber: fiberPer,
+    },
+    baseScore: HEALTH_SCORE_BASE,
+    ultraProcessedPenalty: ultraProcessedLevel === 'high' ? -10 : ultraProcessedLevel === 'moderate' ? -5 : 0,
+    dessertCapApplied: score !== scoreBeforeCap,
+    finalScore: score,
+    classification: classification.id,
+  }
+
+  const explanation = buildNutritionScoreExplanation({
+    score,
+    ingredients,
+    calories,
+    protein,
+    carbs,
+    servings: safeServings,
+    language,
+  })
+
+  console.log('[nutritionScore] healthScoreBreakdown', healthScoreBreakdown, 'explanation', explanation)
+
+  return { score, healthScoreBreakdown, explanation, classification }
+}
+
+/** @deprecated Prefer calculateHealthScoreDetailed */
 export function calculateNutritionScore({
   caloriesPerServing,
   proteinPerServing,
@@ -229,34 +469,32 @@ export function calculateNutritionScore({
   fiberPerServing,
   richInVegFruit = false,
   ultraProcessedLevel = null,
+  carbsPerServing = 0,
+  fatPerServing = 0,
+  ingredients = [],
 }) {
-  let score = 100
+  void richInVegFruit
+  const refinedCarbLevel = detectRefinedCarbLevel(ingredients)
+  const caloriesContribution = scoreCaloriesContribution(caloriesPerServing)
+  const proteinContribution = scoreProteinContribution(proteinPerServing)
+  const carbsContribution = scoreCarbsContribution(carbsPerServing, sugarPerServing, refinedCarbLevel)
+  const fatContribution = scoreFatContribution(fatPerServing)
+  const vegetableContribution = scoreVegetableContribution(ingredients)
+  const fiberContribution = scoreFiberContribution(fiberPerServing)
 
-  if (caloriesPerServing < 250) score += 10
-  else if (caloriesPerServing <= 450) {
-    // no change
-  } else if (caloriesPerServing <= 650) score -= 10
-  else score -= 20
+  let rawScore =
+    HEALTH_SCORE_BASE +
+    caloriesContribution +
+    proteinContribution +
+    carbsContribution +
+    fatContribution +
+    vegetableContribution +
+    fiberContribution
 
-  if (proteinPerServing > 20) score += 15
-  else if (proteinPerServing >= 10) score += 5
-  else score -= 10
+  if (ultraProcessedLevel === 'high') rawScore -= 10
+  else if (ultraProcessedLevel === 'moderate') rawScore -= 5
 
-  if (sugarPerServing < 10) score += 10
-  else if (sugarPerServing <= 20) {
-    // no change
-  } else if (sugarPerServing <= 35) score -= 10
-  else score -= 20
-
-  if (fiberPerServing > 8) score += 10
-  else if (fiberPerServing >= 4) score += 5
-
-  if (richInVegFruit) score += 10
-
-  if (ultraProcessedLevel === 'moderate') score -= 10
-  else if (ultraProcessedLevel === 'high') score -= 20
-
-  return Math.min(100, Math.max(0, Math.round(score)))
+  return Math.min(100, Math.max(0, Math.round(rawScore)))
 }
 
 /** @typedef {'dietFriendly' | 'balancedHealthy' | 'moderatelyBalanced' | 'moderateTreat' | 'indulgent'} NutritionScoreClassId */
@@ -291,39 +529,23 @@ export function calculateHealthScoreFromRecipe({
   calories,
   protein,
   carbs,
+  fat,
   servings,
   recipeType,
   name,
+  language,
 }) {
-  const safeServings = Math.max(1, servings ?? 1)
-  const caloriesPer = (calories ?? 0) / safeServings
-  const proteinPer = (protein ?? 0) / safeServings
-  const carbsPer = (carbs ?? 0) / safeServings
-  const sugarPer = estimateSugarPerServing(ingredients, safeServings, carbsPer)
-  const fiberPer = estimateFiberPerServing(ingredients, safeServings)
-  const ultraProcessedLevel = detectUltraProcessedLevel(ingredients)
-
-  const baseScore = calculateNutritionScore({
-    caloriesPerServing: caloriesPer,
-    proteinPerServing: proteinPer,
-    sugarPerServing: sugarPer,
-    fiberPerServing: fiberPer,
-    richInVegFruit: isRichInVegetablesOrFruit(ingredients),
-    ultraProcessedLevel,
-  })
-
-  const dessertProfile = analyzeDessertNutritionProfile({
+  return calculateHealthScoreDetailed({
     ingredients,
-    name,
+    calories,
+    protein,
+    carbs,
+    fat,
+    servings,
     recipeType,
-    caloriesPerServing: caloriesPer,
-    proteinPerServing: proteinPer,
-    sugarPerServing: sugarPer,
-    carbsPerServing: carbsPer,
-    ultraProcessedLevel,
-  })
-
-  return applyDessertNutritionCap(baseScore, dessertProfile)
+    name,
+    language,
+  }).score
 }
 
 /** @deprecated Use calculateHealthScoreFromRecipe */
@@ -505,6 +727,16 @@ export function buildNutritionScoreExplanation({
     factors.push({ weight: 4, type: 'pos', text: isHe ? 'עשיר בירקות, פירות או קטניות' : 'rich in vegetables, fruit, or legumes' })
   } else if (fiberPer >= 2) {
     factors.push({ weight: 2, type: 'pos', text: isHe ? 'מכיל מקורות לסיבים תזונתיים' : 'sources of dietary fiber' })
+  } else if (!hasAnyVegetable(ingredients) && !hasLegumes(ingredients)) {
+    factors.push({ weight: 4, type: 'neg', text: isHe ? 'מעט ירקות, פירות או קטניות' : 'few vegetables, fruit, or legumes' })
+  }
+
+  if (detectRefinedCarbLevel(ingredients) === 'high' && carbsPer >= 45) {
+    factors.push({
+      weight: 4,
+      type: 'neg',
+      text: isHe ? 'דומיננטיות של פחמימות מעובדות' : 'a dominance of refined carbohydrates',
+    })
   }
 
   const notableNames = extractNotableIngredientNames(ingredients, language)
@@ -536,9 +768,11 @@ export function buildNutritionScoreExplanationFromRecipe(recipe, language = 'he'
     calories: recipe.calories ?? recipe.nutrition?.calories ?? 0,
     protein: recipe.protein ?? recipe.nutrition?.protein ?? 0,
     carbs: recipe.carbs ?? recipe.nutrition?.carbs ?? 0,
+    fat: recipe.fat ?? recipe.nutrition?.fat ?? 0,
     servings: recipe.servings ?? recipe.nutrition?.servings ?? 2,
     recipeType: recipe.recipeType,
     name: recipe.name,
+    language,
   })
 
   return buildNutritionScoreExplanation({

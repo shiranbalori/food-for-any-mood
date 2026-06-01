@@ -211,6 +211,187 @@ def detect_ultra_processed_level(ingredients: list[str]) -> str | None:
     return None
 
 
+LEGUME_CANONICAL = {
+    "lentils",
+    "lentil",
+    "chickpeas",
+    "chickpea",
+    "beans",
+    "bean",
+    "peas",
+    "pea",
+}
+
+REFINED_CARB_CANONICAL = {"pasta", "flour", "rice", "bread", "noodles"}
+
+REFINED_CARB_KEYWORDS = {
+    "pasta",
+    "noodle",
+    "spaghetti",
+    "macaroni",
+    "penne",
+    "fusilli",
+    "fettuccine",
+    "white rice",
+    "bread",
+    "bun",
+    "breadcrumbs",
+    "crouton",
+    "פסטה",
+    "אטריות",
+    "ספגטי",
+    "קמח",
+    "אורז",
+    "לחם",
+    "פתיתים",
+}
+
+AROMATIC_ONLY = {"onion", "garlic"}
+
+HEALTH_SCORE_BASE = 50
+
+
+def has_legumes(ingredients: list[str]) -> bool:
+    for item in ingredients or []:
+        canon = canonical_ingredient(str(item)) or ""
+        if canon in LEGUME_CANONICAL:
+            return True
+        if re.search(r"lentil|chickpea|bean|hummus|עדש|חומוס|שעועית|אפונה", str(item), re.I):
+            return True
+    return False
+
+
+def has_any_vegetable(ingredients: list[str]) -> bool:
+    spice_pattern = re.compile(
+        r"black pepper|peppercorn|פלפל שחור|מלח|salt|cinnamon|כמון|cumin|spice|תבלין|paprika|כורכום|turmeric|oregano|garlic powder",
+        re.I,
+    )
+    for item in ingredients or []:
+        text = str(item)
+        if spice_pattern.search(text):
+            continue
+        canon = canonical_ingredient(text) or normalize_ingredient(text)
+        if canon == "black pepper" or canon in AROMATIC_ONLY:
+            continue
+        if (
+            canon in VEG_FRUIT_CANONICAL
+            or re.search(
+                r"tomato|carrot|pepper|berry|apple|banana|spinach|broccoli|zucchini|cucumber|avocado|kale|corn|"
+                r"עגבנ|גזר|פלפל|תות|תפוח|תרד|ברוקולי|קישוא|מלפפון|אבוקדו|ירק",
+                canon,
+            )
+        ):
+            return True
+    return False
+
+
+def detect_refined_carb_level(ingredients: list[str]) -> str | None:
+    hits = 0
+    for item in ingredients or []:
+        text = str(item)
+        canon = canonical_ingredient(text) or ""
+        if canon in REFINED_CARB_CANONICAL:
+            hits += 1
+        elif _ingredient_text_hits(text, REFINED_CARB_KEYWORDS):
+            hits += 1
+    if hits >= 2:
+        return "high"
+    if hits == 1:
+        return "moderate"
+    return None
+
+
+def _score_calories_contribution(calories_per_serving: float) -> int:
+    if calories_per_serving <= 300:
+        return 10
+    if calories_per_serving <= 450:
+        return 4
+    if calories_per_serving <= 550:
+        return 0
+    if calories_per_serving <= 650:
+        return -10
+    if calories_per_serving <= 800:
+        return -18
+    return -28
+
+
+def _score_protein_contribution(protein_per_serving: float) -> int:
+    if protein_per_serving >= 28:
+        return 12
+    if protein_per_serving >= 22:
+        return 8
+    if protein_per_serving >= 15:
+        return 4
+    if protein_per_serving >= 8:
+        return 0
+    return -8
+
+
+def _score_carbs_contribution(
+    carbs_per_serving: float,
+    sugar_per_serving: float,
+    refined_carb_level: str | None,
+) -> int:
+    if carbs_per_serving <= 25:
+        contribution = 4
+    elif carbs_per_serving <= 35:
+        contribution = 0
+    elif carbs_per_serving <= 50:
+        contribution = -8
+    elif carbs_per_serving <= 65:
+        contribution = -16
+    elif carbs_per_serving <= 80:
+        contribution = -22
+    else:
+        contribution = -30
+
+    if sugar_per_serving > 30:
+        contribution -= 8
+    elif sugar_per_serving > 20:
+        contribution -= 4
+    elif sugar_per_serving > 15:
+        contribution -= 2
+
+    if refined_carb_level == "high":
+        contribution -= 12
+    elif refined_carb_level == "moderate":
+        contribution -= 6
+
+    return contribution
+
+
+def _score_fat_contribution(fat_per_serving: float) -> int:
+    if fat_per_serving >= 38:
+        return -18
+    if fat_per_serving >= 29:
+        return -12
+    if fat_per_serving >= 21:
+        return -6
+    if fat_per_serving <= 12:
+        return 2
+    return 0
+
+
+def _score_vegetable_contribution(ingredients: list[str]) -> int:
+    if is_rich_in_vegetables_or_fruit(ingredients):
+        return 10
+    if has_legumes(ingredients):
+        return 8
+    if has_any_vegetable(ingredients):
+        return 4
+    return -10
+
+
+def _score_fiber_contribution(fiber_per_serving: float) -> int:
+    if fiber_per_serving >= 6:
+        return 10
+    if fiber_per_serving >= 4:
+        return 6
+    if fiber_per_serving >= 2:
+        return 2
+    return -8
+
+
 INDULGENT_DESSERT_KEYWORDS = (
     "marshmallow",
     "marshmallows",
@@ -318,77 +499,79 @@ def calculate_nutrition_score(
     fiber_per_serving: float,
     rich_in_veg_fruit: bool = False,
     ultra_processed_level: str | None = None,
+    carbs_per_serving: float = 0,
+    fat_per_serving: float = 0,
+    ingredients: list[str] | None = None,
 ) -> int:
-    """Start at 100 and adjust per portion. Clamped 0-100."""
-    score = 100.0
+    """Contribution-based score from per-serving values. Clamped 0-100."""
+    _ = rich_in_veg_fruit
+    refined_carb_level = detect_refined_carb_level(ingredients or [])
+    raw_score = (
+        HEALTH_SCORE_BASE
+        + _score_calories_contribution(calories_per_serving)
+        + _score_protein_contribution(protein_per_serving)
+        + _score_carbs_contribution(carbs_per_serving, sugar_per_serving, refined_carb_level)
+        + _score_fat_contribution(fat_per_serving)
+        + _score_vegetable_contribution(ingredients or [])
+        + _score_fiber_contribution(fiber_per_serving)
+    )
 
-    if calories_per_serving < 250:
-        score += 10
-    elif calories_per_serving <= 450:
-        pass
-    elif calories_per_serving <= 650:
-        score -= 10
-    else:
-        score -= 20
+    if ultra_processed_level == "high":
+        raw_score -= 10
+    elif ultra_processed_level == "moderate":
+        raw_score -= 5
 
-    if protein_per_serving > 20:
-        score += 15
-    elif protein_per_serving >= 10:
-        score += 5
-    else:
-        score -= 10
-
-    if sugar_per_serving < 10:
-        score += 10
-    elif sugar_per_serving <= 20:
-        pass
-    elif sugar_per_serving <= 35:
-        score -= 10
-    else:
-        score -= 20
-
-    if fiber_per_serving > 8:
-        score += 10
-    elif fiber_per_serving >= 4:
-        score += 5
-
-    if rich_in_veg_fruit:
-        score += 10
-
-    if ultra_processed_level == "moderate":
-        score -= 10
-    elif ultra_processed_level == "high":
-        score -= 20
-
-    return int(max(0, min(100, round(score))))
+    return int(max(0, min(100, round(raw_score))))
 
 
-def calculate_health_score_from_recipe(
+def calculate_health_score_detailed(
     *,
     ingredients: list[str],
     calories: int,
     protein: int,
     carbs: int,
+    fat: int = 0,
     servings: int,
     recipe_type: str | None = None,
     name: str = "",
-) -> int:
+    language: str = "he",
+) -> dict:
     servings = max(1, servings)
     calories_per = calories / servings
     protein_per = protein / servings
     carbs_per = carbs / servings
+    fat_per = fat / servings
     sugar_per = estimate_sugar_per_serving(ingredients, servings, carbs_per)
     fiber_per = estimate_fiber_per_serving(ingredients, servings)
     ultra_level = detect_ultra_processed_level(ingredients)
+    refined_carb_level = detect_refined_carb_level(ingredients)
+    rich_in_veg_fruit = is_rich_in_vegetables_or_fruit(ingredients)
 
-    base_score = calculate_nutrition_score(
-        calories_per_serving=calories_per,
-        protein_per_serving=protein_per,
-        sugar_per_serving=sugar_per,
-        fiber_per_serving=fiber_per,
-        rich_in_veg_fruit=is_rich_in_vegetables_or_fruit(ingredients),
-        ultra_processed_level=ultra_level,
+    calories_contribution = _score_calories_contribution(calories_per)
+    protein_contribution = _score_protein_contribution(protein_per)
+    carbs_contribution = _score_carbs_contribution(carbs_per, sugar_per, refined_carb_level)
+    fat_contribution = _score_fat_contribution(fat_per)
+    vegetable_contribution = _score_vegetable_contribution(ingredients)
+    fiber_contribution = _score_fiber_contribution(fiber_per)
+
+    raw_score = (
+        HEALTH_SCORE_BASE
+        + calories_contribution
+        + protein_contribution
+        + carbs_contribution
+        + fat_contribution
+        + vegetable_contribution
+        + fiber_contribution
     )
+
+    if ultra_level == "high":
+        raw_score -= 10
+    elif ultra_level == "moderate":
+        raw_score -= 5
+
+    if protein_per >= 15 and rich_in_veg_fruit and calories_per <= 500 and carbs_per <= 45:
+        raw_score += 5
+
     profile = analyze_dessert_nutrition_profile(
         ingredients=ingredients,
         name=name,
@@ -399,7 +582,76 @@ def calculate_health_score_from_recipe(
         carbs_per_serving=carbs_per,
         ultra_processed_level=ultra_level,
     )
-    return apply_dessert_nutrition_cap(base_score, profile)
+
+    score_before_cap = int(round(raw_score))
+    score = apply_dessert_nutrition_cap(score_before_cap, profile)
+    classification = get_nutrition_score_classification(score)
+
+    health_score_breakdown = {
+        "calories": calories_contribution,
+        "protein": protein_contribution,
+        "carbs": carbs_contribution,
+        "fat": fat_contribution,
+        "vegetable": vegetable_contribution,
+        "fiber": fiber_contribution,
+        "perServing": {
+            "calories": round(calories_per),
+            "protein": round(protein_per, 1),
+            "carbs": round(carbs_per, 1),
+            "fat": round(fat_per, 1),
+            "sugar": sugar_per,
+            "fiber": fiber_per,
+        },
+        "baseScore": HEALTH_SCORE_BASE,
+        "ultraProcessedPenalty": -10 if ultra_level == "high" else -5 if ultra_level == "moderate" else 0,
+        "dessertCapApplied": score != score_before_cap,
+        "finalScore": score,
+        "classification": classification["id"],
+    }
+
+    explanation = build_nutrition_score_explanation(
+        score=score,
+        ingredients=ingredients,
+        calories=calories,
+        protein=protein,
+        carbs=carbs,
+        servings=servings,
+        language=language,
+    )
+
+    print("[nutritionScore] healthScoreBreakdown", health_score_breakdown, "explanation", explanation)
+
+    return {
+        "score": score,
+        "healthScoreBreakdown": health_score_breakdown,
+        "explanation": explanation,
+        "classification": classification,
+    }
+
+
+def calculate_health_score_from_recipe(
+    *,
+    ingredients: list[str],
+    calories: int,
+    protein: int,
+    carbs: int,
+    fat: int = 0,
+    servings: int,
+    recipe_type: str | None = None,
+    name: str = "",
+    language: str = "he",
+) -> int:
+    return calculate_health_score_detailed(
+        ingredients=ingredients,
+        calories=calories,
+        protein=protein,
+        carbs=carbs,
+        fat=fat,
+        servings=servings,
+        recipe_type=recipe_type,
+        name=name,
+        language=language,
+    )["score"]
 
 
 NUTRITION_SCORE_CLASSIFICATIONS: list[dict[str, int | str]] = [
@@ -581,6 +833,17 @@ def build_nutrition_score_explanation(
         factors.append({"weight": 4, "type": "pos", "text": "עשיר בירקות, פירות או קטניות" if is_he else "rich in vegetables, fruit, or legumes"})
     elif fiber_per >= 2:
         factors.append({"weight": 2, "type": "pos", "text": "מכיל מקורות לסיבים תזונתיים" if is_he else "sources of dietary fiber"})
+    elif not has_any_vegetable(ingredients) and not has_legumes(ingredients):
+        factors.append({"weight": 4, "type": "neg", "text": "מעט ירקות, פירות או קטניות" if is_he else "few vegetables, fruit, or legumes"})
+
+    if detect_refined_carb_level(ingredients) == "high" and carbs_per >= 45:
+        factors.append(
+            {
+                "weight": 4,
+                "type": "neg",
+                "text": "דומיננטיות של פחמימות מעובדות" if is_he else "a dominance of refined carbohydrates",
+            }
+        )
 
     notable_names = _extract_notable_ingredient_names(ingredients, language)
     if ultra_level == "high" and notable_names:

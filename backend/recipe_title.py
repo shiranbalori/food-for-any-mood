@@ -563,9 +563,6 @@ def title_describes_dish(title: str, ingredients: list[str]) -> bool:
     if _is_generic_dish_title(text, ingredients):
         return False
 
-    if _has_dish_name_prefix(text):
-        return True
-
     if any(ingredient_appears_in_text(item, text) for item in mains):
         return True
 

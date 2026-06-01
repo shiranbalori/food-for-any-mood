@@ -15,6 +15,7 @@ from ingredient_relevance import (
     validate_recipe_relevance,
 )
 from recipe_title import apply_descriptive_dish_title, validate_dish_title
+from recipe_grounding import repair_recipe_grounding, validate_recipe_grounding
 from recipe_quantities import apply_recipe_quantities
 from recipe_pre_return_validation import validate_recipe_before_return
 from recipe_step_sanitize import light_sanitize_recipe_steps
@@ -352,6 +353,7 @@ def validate_recipe_quality(
 
     ingredient_relevance_score = round(relevance["match_ratio"] * 100)
     title_validation = validate_dish_title(recipe.get("name", ""), recipe.get("ingredients") or [])
+    grounding = validate_recipe_grounding(user_ingredients, recipe)
 
     language_ok = not english_ingredients if language == "he" else not hebrew_ingredients
 
@@ -366,6 +368,8 @@ def validate_recipe_quality(
         and not user_explicit_missing
         and pre_return["ok"]
         and unauthorized_ok
+        and title_validation.get("ok", False)
+        and grounding["ok"]
     )
 
     return {
@@ -379,6 +383,7 @@ def validate_recipe_quality(
         "unused_in_steps": unused_in_steps,
         "user_explicit_missing": user_explicit_missing,
         "title_validation": title_validation,
+        "grounding": grounding,
         "pre_return": pre_return,
         "unauthorized_ingredients": unauthorized,
     }
@@ -415,6 +420,8 @@ def apply_recipe_ingredient_parser(
     quantified["ingredients"] = _dedupe_ingredients(list(quantified.get("ingredients") or []))
     if preserve_original_steps:
         quantified["steps"] = light_sanitize_recipe_steps(quantified.get("steps") or [])
+    if user_ingredients:
+        quantified = repair_recipe_grounding(quantified, user_ingredients_raw, language)
     validation = validate_recipe_quality(
         user_ingredients,
         quantified,

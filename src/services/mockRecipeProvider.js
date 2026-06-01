@@ -20,7 +20,7 @@ import {
   validateRecipeRelevance,
 } from '../utils/ingredientRelevance'
 import { applyRecipeIngredientParser } from '../utils/recipeIngredientParser'
-import { buildDescriptiveDishTitle } from '../utils/recipeTitle'
+import { buildGroundedChefTitle } from '../utils/recipeGrounding'
 import { buildDessertDishTitle } from '../utils/dessertDishTitle'
 import { buildChefIntro } from '../utils/chefIntro'
 import { buildStepsFromUserIngredients } from '../utils/userIngredientSteps'
@@ -378,9 +378,12 @@ function buildIngredientList(
   }
 
   const pantryStaples = ['water', 'salt', 'black pepper', 'olive oil', 'baking powder']
+  const copy = getRecipeCopy(language)
+  const addedSuffix = copy.pantrySuffix ? ` ${copy.pantrySuffix}` : ''
+
   for (const staple of pantryStaples) {
     if (!list.some((entry) => ingredientsMatch(entry, staple))) {
-      list.push(formatIngredient(staple, language, false))
+      list.push(`${formatIngredient(staple, language, false)}${addedSuffix}`)
     }
   }
 
@@ -590,12 +593,15 @@ function computeNutrition(template, matchData, servings) {
   const macroBalance = protein * 4 + carbs * 4 + fat * 9
   const normalizedCalories = macroBalance > 0 ? Math.round(macroBalance) : calories
 
-  let healthScore = base.healthScore
-  if (protein >= 25) healthScore += 2
-  if (fat > 30) healthScore -= 3
-  if (template.styles.includes('healthy')) healthScore += 4
-  if (template.spiceLevel >= 2) healthScore += 1
-  healthScore = Math.min(98, Math.max(45, Math.round(healthScore + (Math.random() * 4 - 2))))
+  const ingredientList = [...(template.ingredients ?? []), ...(matchData.matched ?? [])]
+  const healthScore = calculateHealthScoreFromRecipe({
+    ingredients: ingredientList,
+    calories: normalizedCalories,
+    protein,
+    carbs,
+    fat,
+    servings,
+  })
 
   return {
     calories: normalizedCalories,
@@ -637,6 +643,9 @@ function finalizeRecipe(recipe, ingredientsRaw, language, meta = {}) {
     servings: meta.servings,
     recipeType: meta.recipeType ?? 'meal',
     category: meta.category ?? 'dairy',
+    isGlutenFree: meta.isGlutenFree ?? false,
+    spiceLevel: recipe.spiceLevel ?? 0,
+    source: 'mock',
   })
   return parsed
 }
@@ -748,15 +757,9 @@ export function buildIngredientFirstFallbackRecipe(
     name = variant.name
     recipeSteps = variant.steps
   } else if (category === 'meat') {
-    name = buildTitleFromIngredients(finalIngredients, { language, recipeType: 'meal' })
+    name = buildGroundedChefTitle(filteredUserIngredients, finalIngredients, language, { excludeTitles })
   } else {
-    name = buildDescriptiveDishTitle(finalIngredients, {
-      cookingTime,
-      steps: recipeSteps,
-      style: 'quick',
-      tags: cookingTime <= 25 ? ['quick'] : [],
-      language,
-    })
+    name = buildGroundedChefTitle(filteredUserIngredients, finalIngredients, language, { excludeTitles })
   }
 
   let description = buildChefIntro(finalIngredients, {
@@ -800,6 +803,7 @@ export function buildIngredientFirstFallbackRecipe(
       calories: 360 + displayNames.length * 25,
       protein: 14 + displayNames.length * 2,
       carbs: 30 + displayNames.length * 3,
+      fat: 16 + displayNames.length,
       servings,
     }),
     tags: cookingTime <= 25 ? ['quick'] : ['comfortFood'],
@@ -826,6 +830,7 @@ export function buildIngredientFirstFallbackRecipe(
       servings,
       recipeType: effectiveRecipeType,
       category,
+      isGlutenFree,
     }),
     meta,
   }
@@ -912,7 +917,16 @@ function buildDessertMockRecipe(
       fat: template.fat,
       servings,
     },
-    healthScore: template.healthScore,
+    healthScore: calculateHealthScoreFromRecipe({
+      ingredients: template.ingredients ?? [],
+      calories: template.calories,
+      protein: template.protein,
+      carbs: template.carbs,
+      fat: template.fat,
+      servings,
+      recipeType: 'dessert',
+      name: template.name,
+    }),
     tags: template.tags,
     playlist,
   }
@@ -937,6 +951,7 @@ function buildDessertMockRecipe(
       servings,
       recipeType: 'dessert',
       category,
+      isGlutenFree,
     }),
     meta,
   }
@@ -986,11 +1001,7 @@ export function buildMockRecipe(
   const excludeKeys = excludeTemplateKeys
 
   const rawUserListEarly = parseUserIngredients(ingredients)
-  const hasRegenerationConstraints =
-    excludeTitles.length > 0 ||
-    excludeCookingMethods.length > 0 ||
-    excludeDessertCategories.length > 0
-  if (rawUserListEarly.length > 0 && hasRegenerationConstraints) {
+  if (rawUserListEarly.length > 0) {
     return buildIngredientFirstFallbackRecipe(
       {
         category,
@@ -1133,6 +1144,7 @@ export function buildMockRecipe(
       servings,
       recipeType: 'meal',
       category,
+      isGlutenFree: glutenFree,
     }),
     meta,
   }

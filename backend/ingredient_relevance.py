@@ -22,6 +22,7 @@ INGREDIENT_SYNONYMS: dict[str, list[str]] = {
     "pasta": ["פסטה", "spaghetti", "penne"],
     "rice": ["אורז", "basmati"],
     "egg": ["eggs", "ביצה", "ביצים"],
+    "eggs": ["egg", "ביצה", "ביצים"],
     "cheese": ["גבינה", "mozzarella", "cheddar"],
     "cream": ["שמנת", "שמנת מתוקה", "heavy cream"],
     "garlic": ["שום"],

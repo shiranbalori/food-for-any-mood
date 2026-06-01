@@ -29,6 +29,14 @@ import {
   stepHasMeaningfulAction,
   validateRecipeBeforeReturn,
 } from './recipePreReturnValidation'
+import { applyDerivedRecipeTags } from './recipeTags'
+import { logRecipeQualitySnapshot } from './recipeQualityLog'
+import {
+  logRecipeGroundingDecision,
+  repairRecipeGrounding,
+  validateRecipeGrounding,
+} from './recipeGrounding'
+import { buildStepsFromUserIngredients } from './userIngredientSteps'
 
 const LATIN_PATTERN = /[a-z]/i
 
@@ -310,7 +318,8 @@ export function validateRecipeQuality(userIngredients, recipe, language = 'he', 
 function validateRecipeQualityCore(userIngredients, recipe, language = 'he', options = {}) {
   const relevance = validateRecipeRelevance(userIngredients, recipe)
   const stepsText = (recipe.steps ?? []).join('\n')
-  const titleValidation = validateDishTitle(recipe.name, recipe.ingredients ?? [], language)
+  const titleValidation = validateDishTitle(recipe.name, recipe.ingredients ?? [], language, userIngredients)
+  const grounding = validateRecipeGrounding(userIngredients, recipe, language)
 
   const englishIngredients = (recipe.ingredients ?? []).filter((item) =>
     containsLatinText(item),
@@ -365,11 +374,14 @@ function validateRecipeQualityCore(userIngredients, recipe, language = 'he', opt
   const maxUnusedNonStaples = Math.max(2, Math.ceil(ingredientCount * 0.4))
   const relevanceOk =
     userIngredients.length === 0 ||
-    relevance.matchRatio >= 0.4 ||
-    relevance.matched.length > 0
+    (relevance.matchRatio >= MIN_INGREDIENT_MATCH_RATIO && relevance.titleHasIngredient)
   const unusedOk = unusedInSteps.length <= maxUnusedNonStaples
   const invalidOk = invalidIngredients.length === 0
   const userIngredientsOk = userExplicitMissing.length === 0
+  const titleOk = titleValidation.ok
+  const groundingOk = userIngredients.length === 0 || grounding.ok
+  const stepsQualityOk =
+    stepsAligned && unnaturalSteps.length === 0 && weakSteps.length === 0
 
   const checks = {
     invalidIngredients: invalidOk,
@@ -377,7 +389,8 @@ function validateRecipeQualityCore(userIngredients, recipe, language = 'he', opt
     relevanceOk,
     unusedInStepsOk: unusedOk,
     userIngredientsInList: userIngredientsOk,
-    titleOk: titleValidation.ok,
+    titleOk,
+    groundingOk,
     stepsAligned,
     noUnnaturalSteps: unnaturalSteps.length === 0,
     meaningfulStepActions: weakSteps.length === 0,
@@ -392,7 +405,10 @@ function validateRecipeQualityCore(userIngredients, recipe, language = 'he', opt
     unusedOk &&
     userIngredientsOk &&
     preReturn.ok &&
-    unauthorizedOk
+    unauthorizedOk &&
+    titleOk &&
+    groundingOk &&
+    stepsQualityOk
 
   return {
     ok,
@@ -408,6 +424,7 @@ function validateRecipeQualityCore(userIngredients, recipe, language = 'he', opt
     userExplicitMissing,
     userMissingFromSteps,
     titleValidation,
+    grounding,
     relevance,
     invalidIngredients,
     unnaturalSteps,
@@ -439,6 +456,7 @@ export function logRecipeValidationDetails(report, extra = {}) {
   console.log('unnaturalSteps:', report.unnaturalSteps ?? [])
   console.log('stepsAligned:', report.stepsAligned)
   console.log('titleMismatch:', report.titleValidation?.ok === false ? report.titleValidation : null)
+  console.log('grounding:', report.grounding ?? null)
   console.log('relevance:', {
     ok: report.relevance?.ok,
     matchRatio: report.matchRatio,
@@ -463,6 +481,7 @@ export function logRecipeValidationDetails(report, extra = {}) {
  */
 export function applyRecipeIngredientParser(recipe, userIngredientsRaw = '', language = 'he', options = {}) {
   const preserveOriginalSteps = Boolean(options.preserveOriginalSteps)
+  const userIngredients = parseUserIngredients(userIngredientsRaw)
   const normalized = normalizeRecipeIngredients(recipe, userIngredientsRaw, language)
   const titled = applyDescriptiveDishTitle(normalized, {
     cookingTime: options.cookingTime,
@@ -470,6 +489,7 @@ export function applyRecipeIngredientParser(recipe, userIngredientsRaw = '', lan
     language,
     recipeType: options.recipeType ?? 'meal',
     category: options.category ?? 'dairy',
+    userIngredients,
   })
   const quantified = applyRecipeQuantities(titled, {
     language,
@@ -477,7 +497,6 @@ export function applyRecipeIngredientParser(recipe, userIngredientsRaw = '', lan
     preserveOriginalSteps,
     recipeType: options.recipeType ?? 'meal',
   })
-  const userIngredients = parseUserIngredients(userIngredientsRaw)
   const ingredients = sanitizeIngredientList(
     dedupeIngredients(quantified.ingredients ?? []),
   )
@@ -490,7 +509,39 @@ export function applyRecipeIngredientParser(recipe, userIngredientsRaw = '', lan
     ingredients,
     steps,
   }
-  const validation = validateRecipeQuality(userIngredients, finalized, language, options)
+
+  let tagged = applyDerivedRecipeTags(finalized, {
+    category: options.category ?? 'dairy',
+    isGlutenFree: Boolean(options.isGlutenFree),
+    recipeType: options.recipeType ?? 'meal',
+    spiceLevel: finalized.spiceLevel ?? 0,
+    cookTime: options.cookingTime ?? 30,
+  })
+
+  if (userIngredients.length > 0) {
+    tagged = repairRecipeGrounding(tagged, userIngredientsRaw, language, {
+      excludeTitles: options.excludeTitles ?? [],
+    })
+  }
+
+  if (
+    userIngredients.length > 0 &&
+    (hasUnnaturalStepPhrasing(tagged.steps ?? [], language).length > 0 ||
+      !verifyStepIngredientAlignment(tagged.ingredients ?? [], tagged.steps ?? [], language, {
+        staples: SYSTEM_PANTRY_CANONICAL,
+      }))
+  ) {
+    const rebuiltSteps = buildStepsFromUserIngredients(tagged.ingredients ?? [], {
+      recipeType: options.recipeType ?? 'meal',
+      language,
+      cookingTime: options.cookingTime ?? 30,
+    })
+    if (rebuiltSteps.length >= 4) {
+      tagged = { ...tagged, steps: rebuiltSteps }
+    }
+  }
+
+  let validation = validateRecipeQuality(userIngredients, tagged, language, options)
   const safeValidation = {
     ...validation,
     unauthorizedIngredients: validation?.unauthorizedIngredients ?? [],
@@ -498,14 +549,30 @@ export function applyRecipeIngredientParser(recipe, userIngredientsRaw = '', lan
 
   const hasUserIngredients = userIngredients.length > 0
 
+  logRecipeQualitySnapshot({
+    userIngredientsRaw,
+    recipe: tagged,
+    validation,
+    tags: tagged.tags,
+    source: options.source ?? 'parser',
+  })
+
+  logRecipeGroundingDecision({
+    userIngredientsRaw,
+    recipe: tagged,
+    grounding: validation.grounding,
+    accepted: validation.ok,
+    source: options.source ?? 'parser',
+  })
+
   return {
     recipe: {
-      ...finalized,
+      ...tagged,
       matchPercentage: hasUserIngredients
-        ? computeUserIngredientMatchPercent(userIngredients, finalized)
-        : finalized.matchPercentage,
+        ? computeUserIngredientMatchPercent(userIngredients, tagged)
+        : tagged.matchPercentage,
       generatedFromPreferences: !hasUserIngredients,
-      optionalUpgrades: hasUserIngredients ? (finalized.optionalUpgrades ?? []) : [],
+      optionalUpgrades: hasUserIngredients ? (tagged.optionalUpgrades ?? []) : [],
     },
     validation: safeValidation,
   }

@@ -10,6 +10,7 @@ export const SYSTEM_PANTRY_CANONICAL = new Set([
   'oil',
   'olive',
   'olive oil',
+  'garlic',
   'baking powder',
 ])
 
@@ -35,7 +36,7 @@ function userProvidedVanilla(userIngredients) {
 }
 
 export function getSystemPantryItems(userIngredients = []) {
-  const items = ['water', 'salt', 'black pepper', 'oil', 'olive oil', 'baking powder']
+  const items = ['water', 'salt', 'black pepper', 'oil', 'olive oil', 'garlic', 'baking powder']
   if (userProvidedVanilla(userIngredients)) {
     items.push('vanilla', 'vanilla extract')
   }

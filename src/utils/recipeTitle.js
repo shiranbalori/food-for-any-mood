@@ -9,6 +9,7 @@ import {
   isIngredientListTitle,
   titleReflectsIngredients,
 } from './ingredientBasedTitle'
+import { buildGroundedChefTitle, validateTitleGrounding } from './recipeGrounding'
 import { countTitleWords } from './dessertDishTitle'
 
 const STAPLE_CANONICAL = new Set([
@@ -189,13 +190,16 @@ function buildTomatoEggTitle(mainCanon, cookingStyle, steps = []) {
   return 'חביתת עגבניות'
 }
 
-function buildPastaTitle(mainCanon, cookingStyle, ingredients = [], language = 'he') {
-  const hasCream = mainCanon.includes('cream')
-  const hasMushroom = mainCanon.includes('mushroom')
+function buildPastaTitle(mainCanon, cookingStyle, ingredients = [], language = 'he', userIngredients = []) {
+  const userCanon = userIngredients.length
+    ? userIngredients.map((item) => canonicalIngredient(stripQtyPrefix(item))).filter(Boolean)
+    : mainCanon
+  const hasCream = userCanon.includes('cream')
+  const hasMushroom = userCanon.includes('mushroom')
 
   if (hasCream && hasMushroom) return 'פסטה ברוטב שמנת ופטריות'
   if (hasCream) return 'פסטה ברוטב שמנת'
-  return buildTitleFromIngredients(ingredients, { language, recipeType: 'meal' })
+  return buildGroundedChefTitle(userIngredients.length ? userIngredients : ingredients, ingredients, language)
 }
 
 function buildOmeletteTitle(mainCanon, ingredients = [], language = 'he') {
@@ -206,15 +210,17 @@ function buildOmeletteTitle(mainCanon, ingredients = [], language = 'he') {
   return buildTitleFromIngredients(ingredients, { language, recipeType: 'meal' })
 }
 
-function buildGenericDishTitle(mainCanon, cookingStyle, steps = [], ingredients = [], language = 'he') {
+function buildGenericDishTitle(mainCanon, cookingStyle, steps = [], ingredients = [], language = 'he', userIngredients = []) {
   if (mainCanon.includes('tomato') && (mainCanon.includes('egg') || mainCanon.includes('eggs'))) {
     return buildTomatoEggTitle(mainCanon, cookingStyle, steps)
   }
-  if (mainCanon.includes('pasta')) return buildPastaTitle(mainCanon, cookingStyle, ingredients, language)
+  if (mainCanon.includes('pasta')) {
+    return buildPastaTitle(mainCanon, cookingStyle, ingredients, language, userIngredients)
+  }
   if (mainCanon.includes('egg') || mainCanon.includes('eggs')) {
     return buildOmeletteTitle(mainCanon, ingredients, language)
   }
-  return buildTitleFromIngredients(ingredients, { language, recipeType: 'meal' })
+  return buildGroundedChefTitle(userIngredients.length ? userIngredients : ingredients, ingredients, language)
 }
 
 function isGenericDishTitle(title, ingredients = []) {
@@ -272,9 +278,11 @@ export function buildDescriptiveDishTitle(
     style = null,
     tags = [],
     language = 'he',
+    userIngredients = [],
   } = {},
 ) {
-  const mainNames = [...new Set(toDisplayLabels(ingredients, language))].slice(0, 4)
+  const sourceIngredients = userIngredients.length ? userIngredients : ingredients
+  const mainNames = [...new Set(toDisplayLabels(sourceIngredients, language))].slice(0, 4)
   const mainCanon = mainNames
     .map((name) => canonicalIngredient(stripQtyPrefix(name)))
     .filter(Boolean)
@@ -285,9 +293,9 @@ export function buildDescriptiveDishTitle(
     case 'tomatoEgg':
       return buildTomatoEggTitle(mainCanon, cookingStyle, steps)
     case 'pasta':
-      return buildPastaTitle(mainCanon, cookingStyle, ingredients, language)
+      return buildPastaTitle(mainCanon, cookingStyle, ingredients, language, userIngredients)
     case 'rice':
-      return buildTitleFromIngredients(ingredients, { language, recipeType: 'meal' })
+      return buildGroundedChefTitle(userIngredients.length ? userIngredients : ingredients, ingredients, language)
     case 'omelette':
       return buildOmeletteTitle(mainCanon, ingredients, language)
     case 'tunaSalad':
@@ -295,17 +303,17 @@ export function buildDescriptiveDishTitle(
     case 'curry':
       if (!ingredientsSupportCurryTitle(mainCanon)) break
       if (mainCanon.includes('lentils')) return 'קארי עדשים'
-      return buildTitleFromIngredients(ingredients, { language, recipeType: 'meal' })
+      return buildGroundedChefTitle(userIngredients.length ? userIngredients : ingredients, ingredients, language)
     case 'stirFry':
     case 'chicken':
     case 'meat':
     case 'salad':
-      return buildTitleFromIngredients(ingredients, { language, recipeType: 'meal' })
+      return buildGroundedChefTitle(userIngredients.length ? userIngredients : ingredients, ingredients, language)
     default:
       break
   }
 
-  return buildGenericDishTitle(mainCanon, cookingStyle, steps, ingredients, language)
+  return buildGenericDishTitle(mainCanon, cookingStyle, steps, ingredients, language, userIngredients)
 }
 
 export function isMoodBasedTitle(title) {
@@ -318,7 +326,7 @@ export function isMoodBasedTitle(title) {
   return FORBIDDEN_TITLE_WORDS.some((word) => lower.includes(word.toLowerCase()))
 }
 
-export function titleDescribesDish(title, ingredients = [], language = 'he') {
+export function titleDescribesDish(title, ingredients = [], language = 'he', userIngredients = []) {
   const text = String(title ?? '').trim()
   if (!text || isMoodBasedTitle(text) || isForbiddenGenericTitle(text)) {
     return false
@@ -328,6 +336,11 @@ export function titleDescribesDish(title, ingredients = [], language = 'he') {
   }
   if (isIngredientListTitle(text, ingredients, language)) {
     return false
+  }
+
+  if (userIngredients.length > 0) {
+    const grounding = validateTitleGrounding(text, ingredients, userIngredients, language)
+    if (!grounding.ok) return false
   }
 
   if (titleReflectsIngredients(text, ingredients, language)) {
@@ -349,8 +362,6 @@ export function titleDescribesDish(title, ingredients = [], language = 'he') {
     return false
   }
 
-  if (hasDishNamePrefix(text)) return true
-
   if (mains.some((item) => ingredientAppearsInText(item, text))) {
     return true
   }
@@ -360,15 +371,16 @@ export function titleDescribesDish(title, ingredients = [], language = 'he') {
 
 export function ensureDescriptiveDishTitle(title, ingredients = [], options = {}) {
   const language = options.language ?? 'he'
+  const userIngredients = options.userIngredients ?? []
 
   if (
     isMoodBasedTitle(title) ||
     isForbiddenGenericTitle(title) ||
     isGenericDishTitle(title, ingredients) ||
     !titleMatchesIngredients(title, ingredients) ||
-    !titleDescribesDish(title, ingredients, language)
+    !titleDescribesDish(title, ingredients, language, userIngredients)
   ) {
-    return buildDescriptiveDishTitle(ingredients, options)
+    return buildDescriptiveDishTitle(ingredients, { ...options, userIngredients })
   }
 
   return String(title).trim()
@@ -378,10 +390,11 @@ export function applyDescriptiveDishTitle(recipe, options = {}) {
   const recipeType = options.recipeType ?? 'meal'
   const category = options.category ?? 'dairy'
   const language = options.language ?? 'he'
+  const userIngredients = options.userIngredients ?? []
 
   if (recipeType === 'dessert') {
     if (isInvalidRecipeSelection('dessert', category)) {
-      const name = buildTitleFromIngredients(recipe.ingredients ?? [], { language, recipeType: 'meal' })
+      const name = buildGroundedChefTitle(userIngredients, recipe.ingredients ?? [], language)
       return { ...recipe, name }
     }
     return enforceRecipeTypeTitle(recipe, 'dessert', category, language)
@@ -393,6 +406,7 @@ export function applyDescriptiveDishTitle(recipe, options = {}) {
     style: options.style,
     tags: recipe.tags ?? [],
     language,
+    userIngredients,
   })
 
   return { ...recipe, name }
@@ -400,12 +414,17 @@ export function applyDescriptiveDishTitle(recipe, options = {}) {
 
 export { isValidDessertTitle, pickGuaranteedDessertTitle, enforceRecipeTypeTitle }
 
-export function validateDishTitle(title, ingredients = [], language = 'he') {
-  const descriptive = titleDescribesDish(title, ingredients, language)
+export function validateDishTitle(title, ingredients = [], language = 'he', userIngredients = []) {
+  const descriptive = titleDescribesDish(title, ingredients, language, userIngredients)
+  const grounding = userIngredients.length
+    ? validateTitleGrounding(title, ingredients, userIngredients, language)
+    : { ok: true, violations: [] }
   return {
-    ok: descriptive,
+    ok: descriptive && grounding.ok,
     isMoodBased: isMoodBasedTitle(title),
     isLiteral: isLiteralIngredientTitle(title, ingredients, language),
     describesDish: descriptive,
+    groundingOk: grounding.ok,
+    groundingViolations: grounding.violations,
   }
 }

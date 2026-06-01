@@ -3,6 +3,7 @@ import {
   buildDessertDishTitle,
   pickPrimaryFlavorLabel,
 } from './dessertDishTitle'
+import { buildGroundedChefTitle } from './recipeGrounding'
 import { canonicalIngredient } from '../data/ingredientKnowledge'
 import { getIngredientLabel } from '../data/ingredientLabels'
 
@@ -49,9 +50,10 @@ export function suggestDishOptions(ingredients = [], { language = 'he', recipeTy
       : ['Pan-seared chicken', 'Oven-baked chicken', 'Light chicken soup']
   }
   if (canon.has('pasta')) {
-    return language === 'he'
-      ? ['פסטה ברוטב שמנת', 'פסטה עם ירקות', 'פסטה מהירה']
-      : ['Creamy pasta', 'Vegetable pasta', 'Quick pasta skillet']
+    return uniqueNames([
+      buildGroundedChefTitle(ingredients, ingredients, language),
+      language === 'he' ? 'פסטה מהירה' : 'Quick pasta',
+    ]).slice(0, 3)
   }
   if (canon.has('tomato') && (canon.has('egg') || canon.has('eggs'))) {
     return language === 'he'
@@ -59,9 +61,10 @@ export function suggestDishOptions(ingredients = [], { language = 'he', recipeTy
       : ['Shakshuka', 'Tomato omelette', 'Eggs in tomato sauce']
   }
   if (canon.has('rice')) {
-    return language === 'he'
-      ? ['אורז מוקפץ', 'תבשיל אורז', 'אורז עם ירקות']
-      : ['Fried rice', 'Rice pilaf', 'Vegetable rice']
+    return uniqueNames([
+      buildGroundedChefTitle(ingredients, ingredients, language),
+      language === 'he' ? 'אורז ביתי' : 'Homestyle rice',
+    ]).slice(0, 3)
   }
 
   const label = flavor || getIngredientLabel([...canon][0] ?? 'ingredient', language)

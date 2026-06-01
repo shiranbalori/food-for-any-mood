@@ -80,6 +80,7 @@ export function calculateNutritionScore(recipe, fiberLevel, { proteinPer, fatPer
     calories: recipe.calories ?? recipe.nutrition?.calories ?? 0,
     protein: recipe.protein ?? recipe.nutrition?.protein ?? 0,
     carbs: recipe.carbs ?? recipe.nutrition?.carbs ?? 0,
+    fat: recipe.fat ?? recipe.nutrition?.fat ?? 0,
     servings: recipe.servings ?? recipe.nutrition?.servings ?? 2,
     recipeType: recipe.recipeType,
     name: recipe.name,

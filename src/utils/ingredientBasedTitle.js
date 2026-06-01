@@ -2,6 +2,7 @@ import { getIngredientLabel } from '../data/ingredientLabels'
 import { canonicalIngredient } from '../data/ingredientKnowledge'
 import { ingredientAppearsInText } from './ingredientRelevance'
 import { buildDessertDishTitle, isIngredientListTitle } from './dessertDishTitle'
+import { buildGroundedChefTitle } from './recipeGrounding'
 
 const STAPLE_CANONICAL = new Set([
   'salt',
@@ -35,6 +36,12 @@ export const FORBIDDEN_GENERIC_TITLES = new Set([
   'קארי ביתי',
   'פסטה ביתית',
   'פסטה מהירה',
+  'מנה מהירה במחבת',
+  'מנה ביתית מהמטבח',
+  'מנה ביתית בסיר',
+  'ביצה עם פסטה',
+  'פסטה עם ביצה',
+  'קמח במחבת',
   'אורז מוקפץ',
   'homemade beef patties',
   'cheesecake dessert',
@@ -148,10 +155,10 @@ export function buildTitleFromIngredients(
     return language === 'en' ? 'Homemade Beef Dish' : 'בשר בקר ביתי'
   }
   if (mainCanon.includes('pasta')) {
-    return language === 'en' ? 'Creamy Pasta' : 'פסטה ביתית'
+    return buildGroundedChefTitle(ingredients, ingredients, language)
   }
   if (mainCanon.includes('rice')) {
-    return language === 'en' ? 'Homemade Rice Dish' : 'אורז ביתי'
+    return language === 'en' ? 'Homestyle Rice Dish' : 'אורז ביתי'
   }
 
   const first = mainNames[0]

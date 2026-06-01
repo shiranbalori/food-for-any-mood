@@ -394,6 +394,7 @@ def compute_nutrition_from_quantities(quantified_items: list[dict], servings: in
         calories=calories,
         protein=protein,
         carbs=carbs,
+        fat=fat,
         servings=servings,
     )
 

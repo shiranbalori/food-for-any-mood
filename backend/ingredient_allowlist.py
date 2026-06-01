@@ -12,6 +12,7 @@ SYSTEM_PANTRY_CANONICAL = {
     "oil",
     "olive",
     "olive oil",
+    "garlic",
     "baking powder",
 }
 
@@ -38,7 +39,7 @@ def _user_provided_vanilla(user_ingredients: list[str]) -> bool:
 
 
 def get_system_pantry_items(user_ingredients: list[str] | None = None) -> list[str]:
-    items = ["water", "salt", "black pepper", "oil", "olive oil", "baking powder"]
+    items = ["water", "salt", "black pepper", "oil", "olive oil", "garlic", "baking powder"]
     if user_ingredients and _user_provided_vanilla(user_ingredients):
         items.extend(["vanilla", "vanilla extract"])
     return items

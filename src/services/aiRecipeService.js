@@ -4,6 +4,7 @@ import {
   logRecipeValidationDetails,
   validateRecipeQuality,
 } from '../utils/recipeIngredientParser'
+import { logRecipeQualitySnapshot } from '../utils/recipeQualityLog'
 import { parseUserIngredients, computeUserIngredientMatchPercent } from '../utils/ingredientRelevance'
 import { sanitizeIngredientList, lightSanitizeRecipeSteps } from '../utils/ingredientFormatting'
 import { enforceRecipeTypeTitle } from '../utils/recipeTypeGuard'
@@ -291,6 +292,8 @@ function finalizeRecipeForUser(userInput, recipe, meta = {}) {
     servings: userInput.servings,
     recipeType: userInput.recipeType,
     category: userInput.category,
+    isGlutenFree: userInput.isGlutenFree,
+    source: meta.recipeSource ?? 'unknown',
   }
 
   let parsed
@@ -340,7 +343,14 @@ function finalizeRecipeForUser(userInput, recipe, meta = {}) {
   const recipeLanguageUsed = detectRecipeLanguage(typed)
   const ingredientValidationPassed = Boolean(validation?.ok)
   const passed = categoryPassed && languagePassed && ingredientValidationPassed
-  const returnDespiteIngredientValidation = Boolean(typed) && categoryPassed && languagePassed
+
+  logRecipeQualitySnapshot({
+    userIngredientsRaw: userInput.ingredients,
+    recipe: typed,
+    validation,
+    tags: typed.tags,
+    source: meta.recipeSource ?? 'ai',
+  })
 
   logRecipeValidationDetails(validation, {
     categoryMismatch: categoryPassed
@@ -397,7 +407,7 @@ function finalizeRecipeForUser(userInput, recipe, meta = {}) {
       generatedFromPreferences: preferenceBased,
       optionalUpgrades: preferenceBased ? [] : (typed.optionalUpgrades ?? []),
     },
-    passed: passed || returnDespiteIngredientValidation,
+    passed,
     validation,
     categoryPassed,
     languagePassed,
@@ -475,11 +485,6 @@ function processGeneratedRecipe(userInput, recipe, { source = 'unknown', timer =
     return { recipe: result, ok: true }
   }
 
-  if (result && categoryPassed && languagePassed) {
-    console.warn('[aiRecipeService] Returning recipe despite ingredient validation failure')
-    return { recipe: result, ok: true, validation }
-  }
-
   return { recipe: null, ok: false, validation }
 }
 
@@ -542,41 +547,39 @@ async function generateAIRecipeCore(userInput) {
     timer.mark('backendResult', 'Success', `source=${source} geminiError=${geminiError ?? 'none'}`)
 
     const processed = processGeneratedRecipe(normalized, backendRecipe, { source, timer })
-    if (!processed.ok && !processed.recipe) {
+    if (!processed.ok || !processed.recipe) {
+      console.warn('[aiRecipeService] Validation failed — using mock fallback', {
+        source,
+        failedChecks: Object.entries(processed.validation?.checks ?? {})
+          .filter(([, ok]) => !ok)
+          .map(([name]) => name),
+      })
       timer.mark('processGeneratedRecipe:reject', 'Failed')
-      timer.printTable()
-      const { reason, missingIngredients } = buildValidationFailureMessage(
-        processed.validation?.preReturn ?? {},
-        null,
-        { language: normalized.language },
-      )
-      return {
-        recipe: null,
-        recipePossible: false,
-        impossibleReason: reason,
-        missingIngredients,
-        fallbackReason: null,
+      const fallbackRecipe = fetchMockFallbackRecipe(normalized, timer)
+      if (!fallbackRecipe) {
+        timer.printTable()
+        const { reason, missingIngredients } = buildValidationFailureMessage(
+          processed.validation?.preReturn ?? {},
+          null,
+          { language: normalized.language },
+        )
+        return {
+          recipe: null,
+          recipePossible: false,
+          impossibleReason: reason,
+          missingIngredients,
+          fallbackReason: null,
+        }
       }
-    }
-    if (!processed.ok && processed.recipe) {
-      console.warn('[aiRecipeService] Ingredient validation failed — returning recipe anyway')
-      timer.mark('processGeneratedRecipe:softPass', 'Success', 'ingredient validation failed')
+      timer.mark('qualityFallback:mock', 'Success')
+      timer.printTable()
+      return {
+        recipe: fallbackRecipe,
+        recipePossible: true,
+        fallbackReason: 'fallback',
+      }
     }
     const recipe = processed.recipe
-    if (!recipe) {
-      timer.mark('processGeneratedRecipe:empty', 'Failed')
-      timer.printTable()
-      return {
-        recipe: null,
-        recipePossible: false,
-        impossibleReason:
-          normalized.language === 'he'
-            ? 'לא הצלחנו לעבד את המתכון.'
-            : 'We could not process the recipe.',
-        missingIngredients: [],
-        fallbackReason: null,
-      }
-    }
     const preReturn = validateRecipeBeforeReturn(recipe, normalized.ingredients, {
       language: normalized.language,
     })
@@ -589,7 +592,15 @@ async function generateAIRecipeCore(userInput) {
     })
     timer.mark('validateRecipeDiversity', diversity.ok ? 'Success' : 'Failed', diversity.failures?.join(', '))
     if (!preReturn.ok) {
-      console.warn('[aiRecipeService] Recipe failed pre-return validation:', preReturn.failures)
+      console.warn('[aiRecipeService] Recipe failed pre-return validation — using mock fallback:', preReturn.failures)
+      timer.mark('preReturnFallback:mock', 'Success')
+      const fallbackRecipe = fetchMockFallbackRecipe(normalized, timer)
+      timer.printTable()
+      return {
+        recipe: fallbackRecipe,
+        recipePossible: Boolean(fallbackRecipe),
+        fallbackReason: 'fallback',
+      }
     }
     if (!diversity.ok) {
       const hasRegenerationConstraints =

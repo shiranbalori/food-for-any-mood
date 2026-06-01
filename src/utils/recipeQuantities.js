@@ -457,6 +457,7 @@ export function computeNutritionFromQuantities(quantifiedItems, servings = DEFAU
     calories,
     protein,
     carbs,
+    fat,
     servings,
     name: scoreMeta.name,
     recipeType: scoreMeta.recipeType,

@@ -836,6 +836,7 @@ def _normalize_gemini_recipe(
             calories=max(0, gemini_recipe.nutrition.calories),
             protein=max(0, gemini_recipe.nutrition.protein),
             carbs=max(0, gemini_recipe.nutrition.carbs),
+            fat=max(0, gemini_recipe.nutrition.fat),
             servings=payload.servings,
         ),
         tags=gemini_recipe.tags,
