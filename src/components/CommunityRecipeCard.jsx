@@ -125,6 +125,9 @@ export default function CommunityRecipeCard({
             {theme.emoji} {t(`categories.${categoryId}`)}
           </span>
           <span className="community-card__type">{t(`recipeTypes.${recipe.recipeType ?? 'meal'}`)}</span>
+          {recipe.isGlutenFree ? (
+            <span className="community-card__gf-badge">{t('glutenFreeBadge')}</span>
+          ) : null}
         </div>
         <span className="community-card__rating">
           ⭐ {localRating > 0 ? localRating.toFixed(1) : '—'}
@@ -173,6 +176,11 @@ export default function CommunityRecipeCard({
 
       {expanded && (
         <div className="community-card__details">
+          {recipe.isGlutenFree ? (
+            <span className="community-card__gf-badge community-card__gf-badge--details">
+              {t('glutenFreeBadge')}
+            </span>
+          ) : null}
           {recipe.description && <p>{recipe.description}</p>}
           {displayIngredients.length > 0 && (
             <>

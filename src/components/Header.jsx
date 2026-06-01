@@ -29,8 +29,8 @@ export default function Header() {
     <header className="header">
       <div className="header__top">
         <div className="header__top-start">
-          <LanguageToggle />
           <InstallAppButton />
+          <LanguageToggle />
         </div>
         {!loading && isSupabaseReady && (
           <div className="header__auth">

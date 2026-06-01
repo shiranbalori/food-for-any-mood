@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { CATEGORIES } from '../utils/themes'
+import { CATEGORIES, getTheme } from '../utils/themes'
 import { useLanguage } from '../i18n/useLanguage'
 import {
   COMMUNITY_RECIPE_IMAGE_ACCEPT,
@@ -7,6 +7,7 @@ import {
   validateCommunityRecipeImage,
 } from '../services/communityRecipeService'
 import './UploadCommunityRecipeModal.css'
+import './DietaryPreferences.css'
 
 const RECIPE_TYPES = ['meal', 'dessert']
 
@@ -17,6 +18,7 @@ const INITIAL_FORM = {
   steps: '',
   category: 'dairy',
   recipeType: 'meal',
+  isGlutenFree: false,
 }
 
 export default function UploadCommunityRecipeModal({ open, onClose, userId, onUploaded }) {
@@ -65,6 +67,8 @@ export default function UploadCommunityRecipeModal({ open, onClose, userId, onUp
   )
 
   if (!open) return null
+
+  const categoryTheme = getTheme(form.category)
 
   const handleChange = (field, value) => {
     setForm((prev) => ({ ...prev, [field]: value }))
@@ -223,6 +227,33 @@ export default function UploadCommunityRecipeModal({ open, onClose, userId, onUp
                 </button>
               ))}
             </div>
+          </div>
+
+          <div
+            className="upload-recipe-modal__field"
+            style={{
+              '--theme-accent': categoryTheme.accent,
+              '--theme-accent-light': categoryTheme.accentLight,
+              '--theme-glow': categoryTheme.glow,
+            }}
+          >
+            <button
+              type="button"
+              className={`dietary-toggle upload-recipe-modal__dietary-toggle ${
+                form.isGlutenFree ? 'dietary-toggle--active' : ''
+              }`}
+              onClick={() => handleChange('isGlutenFree', !form.isGlutenFree)}
+              aria-pressed={form.isGlutenFree}
+            >
+              <span className="dietary-toggle__icon">🌾🚫</span>
+              <span className="dietary-toggle__text">
+                <strong>{t('glutenFreeLabel')}</strong>
+                <small>{t('glutenFreeHint')}</small>
+              </span>
+              <span className={`dietary-toggle__switch ${form.isGlutenFree ? 'dietary-toggle__switch--on' : ''}`}>
+                <span className="dietary-toggle__knob" />
+              </span>
+            </button>
           </div>
 
           <label className="upload-recipe-modal__field">

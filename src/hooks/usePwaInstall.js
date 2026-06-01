@@ -36,7 +36,7 @@ export function usePwaInstall() {
   }, [])
 
   const promptInstall = useCallback(async () => {
-    if (!installPrompt) return false
+    if (!installPrompt || isInstalled) return false
 
     await installPrompt.prompt()
     const { outcome } = await installPrompt.userChoice
@@ -47,10 +47,16 @@ export function usePwaInstall() {
     }
 
     return false
-  }, [installPrompt])
+  }, [installPrompt, isInstalled])
+
+  const showInstallButton =
+    typeof window !== 'undefined' &&
+    'serviceWorker' in navigator &&
+    (isInstalled || !isStandaloneDisplay())
 
   return {
     canInstall: Boolean(installPrompt) && !isInstalled,
+    showInstallButton,
     isInstalled,
     promptInstall,
   }

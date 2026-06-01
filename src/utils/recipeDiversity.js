@@ -7,6 +7,12 @@ import {
   isDuplicateDessertTitle,
   pickPrimaryFlavorLabel,
 } from './dessertDishTitle'
+import {
+  formatEnglishStepIngredientList,
+  formatHebrewStepIngredientList,
+  toStepIngredientReference,
+} from './recipeStepWording'
+import { canonicalIngredient } from '../data/ingredientKnowledge'
 
 function normalizeTitle(title) {
   return String(title ?? '')
@@ -249,6 +255,161 @@ export function pickAlternateDessertVariant({
     dessertCategory: variant.category,
     styleId: variant.id,
   }
+}
+
+function buildIngredientListPhrase(ingredients, language = 'he') {
+  const names = (ingredients ?? []).map((item) => String(item ?? '').trim()).filter(Boolean)
+  const refs = names.map((name) => toStepIngredientReference(name, language))
+  return language === 'he'
+    ? formatHebrewStepIngredientList(refs)
+    : formatEnglishStepIngredientList(refs)
+}
+
+function buildGenericMealSteps(listPhrase, cookingTime, language, style = 'skillet') {
+  const mins = Math.min(cookingTime, Math.max(10, Math.round(cookingTime / 2)))
+  if (style === 'pot') {
+    return language === 'he'
+      ? [
+          'מחממים סיר על אש בינונית.',
+          `מוסיפים את ${listPhrase} ומבשלים יחד תוך ערבוב מדי פעם.`,
+          `ממשיכים כ-${mins} דקות עד שהמרכיבים רכים ומשתלבים.`,
+          'טועמים, מתבלים לפי הצורך ומגישים חם.',
+        ]
+      : [
+          'Warm a pot over medium heat.',
+          `Add ${listPhrase} and cook together, stirring occasionally.`,
+          `Continue for about ${mins} minutes until tender and combined.`,
+          'Taste, adjust seasoning, and serve hot.',
+        ]
+  }
+  return language === 'he'
+    ? [
+        'מחממים מחבת על אש בינונית עם מעט שמן.',
+        `מוסיפים את ${listPhrase} ומבשלים תוך ערבוב.`,
+        `ממשיכים כ-${mins} דקות עד שהמרכיבים משתלבים ומקבלים צבע.`,
+        'מגישים חם.',
+      ]
+    : [
+        'Heat a lightly oiled pan over medium heat.',
+        `Add ${listPhrase} and cook, stirring often.`,
+        `Continue for about ${mins} minutes until combined and fragrant.`,
+        'Serve hot.',
+      ]
+}
+
+function buildPastaEggSteps(listPhrase, cookingTime, language, style = 'homestyle') {
+  const pastaMins = Math.min(cookingTime, Math.max(8, Math.round(cookingTime * 0.35)))
+  const finishMins = Math.min(cookingTime, Math.max(4, Math.round(cookingTime * 0.2)))
+  if (style === 'skillet') {
+    return language === 'he'
+      ? [
+          `מבשלים את הפסטה במים רותחים עם מלח כ-${pastaMins} דקות עד al dente, מסננים ושומרים בצד.`,
+          'מחממים מחבת על אש בינונית עם מעט שמן.',
+          `מוסיפים את ${listPhrase} למחבת ומבשלים יחד כ-${finishMins} דקות.`,
+          'מגישים מיד.',
+        ]
+      : [
+          `Boil the pasta in salted water for about ${pastaMins} minutes until al dente, then drain.`,
+          'Warm a pan with a little oil over medium heat.',
+          `Add ${listPhrase} to the pan and cook together for about ${finishMins} minutes.`,
+          'Serve right away.',
+        ]
+  }
+  if (style === 'rustic') {
+    return language === 'he'
+      ? [
+          `מבשלים את הפסטה במים רותחים עם מלח כ-${pastaMins} דקות עד al dente, מסננים ושומרים מעט ממי הבישול.`,
+          `מחזירים את הפסטה לסיר, מוסיפים את ${listPhrase} ומערבבים בעדינות.`,
+          `מחממים על אש נמוכה כ-${finishMins} דקות עד שהמנה אחידה.`,
+          'מגישים חם.',
+        ]
+      : [
+          `Cook the pasta in salted boiling water for about ${pastaMins} minutes until al dente; drain, reserving a little water.`,
+          `Return the pasta to the pot, add ${listPhrase}, and toss gently.`,
+          `Warm over low heat for about ${finishMins} minutes until combined.`,
+          'Serve hot.',
+        ]
+  }
+  return language === 'he'
+    ? [
+        `מבשלים את הפסטה במים רותחים עם מלח כ-${pastaMins} דקות עד al dente, מסננים ושומרים בצד.`,
+        `מחממים מחבת, מוסיפים את ${listPhrase} ומערבבים.`,
+        `מחזירים את הפסטה למחבת ומבשלים יחד כ-${finishMins} דקות.`,
+        'מגישים חם.',
+      ]
+    : [
+        `Boil the pasta in salted water for about ${pastaMins} minutes until al dente, then drain.`,
+        `Warm a pan, add ${listPhrase}, and stir.`,
+        `Return the pasta to the pan and cook together for about ${finishMins} minutes.`,
+        'Serve hot.',
+      ]
+}
+
+export function pickAlternateMealVariant({
+  ingredients = [],
+  language = 'he',
+  cookingTime = 30,
+  excludeTitles = [],
+  excludeCookingMethods = [],
+} = {}) {
+  const listPhrase = buildIngredientListPhrase(ingredients, language)
+  const set = new Set(
+    (ingredients ?? []).map((item) => canonicalIngredient(String(item))).filter(Boolean),
+  )
+  const hasPasta = set.has('pasta')
+  const hasEgg = set.has('egg') || set.has('eggs')
+  const variants =
+    hasPasta && hasEgg
+      ? [
+          {
+            id: 'pasta-egg-homestyle',
+            method: 'general',
+            name: language === 'he' ? 'פסטה ביתית עם ביצה' : 'Homemade Pasta with Egg',
+            steps: buildPastaEggSteps(listPhrase, cookingTime, language, 'homestyle'),
+          },
+          {
+            id: 'pasta-egg-skillet',
+            method: 'fried',
+            name: language === 'he' ? 'פסטה מהירה במחבת' : 'Quick Pasta Skillet',
+            steps: buildPastaEggSteps(listPhrase, cookingTime, language, 'skillet'),
+          },
+          {
+            id: 'pasta-egg-rustic',
+            method: 'boiled',
+            name: language === 'he' ? 'פסטה בסגנון ביתי' : 'Rustic Pasta Dish',
+            steps: buildPastaEggSteps(listPhrase, cookingTime, language, 'rustic'),
+          },
+        ]
+      : [
+          {
+            id: 'meal-skillet',
+            method: 'fried',
+            name: language === 'he' ? 'מנה מהירה במחבת' : 'Quick Skillet Dish',
+            steps: buildGenericMealSteps(listPhrase, cookingTime, language, 'skillet'),
+          },
+          {
+            id: 'meal-pot',
+            method: 'boiled',
+            name: language === 'he' ? 'מנה ביתית בסיר' : 'Homemade Pot Dish',
+            steps: buildGenericMealSteps(listPhrase, cookingTime, language, 'pot'),
+          },
+          {
+            id: 'meal-pan',
+            method: 'general',
+            name: language === 'he' ? 'מנה ביתית מהמטבח' : 'Homemade Kitchen Dish',
+            steps: buildGenericMealSteps(listPhrase, cookingTime, language, 'skillet'),
+          },
+        ]
+  const available = variants.filter(
+    (variant) =>
+      !isDuplicateTitle(variant.name, excludeTitles) &&
+      !excludeCookingMethods.includes(variant.method),
+  )
+  return (
+    available[0] ??
+    variants.find((variant) => !isDuplicateTitle(variant.name, excludeTitles)) ??
+    variants[0]
+  )
 }
 
 export function buildRegenerationPromptSection({

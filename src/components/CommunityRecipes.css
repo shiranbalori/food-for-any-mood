@@ -131,6 +131,24 @@
   border-radius: 999px;
 }
 
+.community-card__gf-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: #b45309;
+  background: #fef3c7;
+  padding: 0.18rem 0.5rem;
+  border-radius: 999px;
+  border: 1px solid rgba(245, 158, 11, 0.2);
+}
+
+.community-card__gf-badge--details {
+  display: inline-block;
+  margin-bottom: 0.65rem;
+}
+
 .community-card__category {
   font-size: 0.7rem;
   font-weight: 700;

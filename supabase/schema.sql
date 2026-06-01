@@ -63,6 +63,7 @@ create table if not exists public.community_recipes (
   steps text[] not null default '{}',
   kosher_category text not null check (kosher_category in ('dairy', 'meat', 'parve')),
   recipe_type text not null default 'meal' check (recipe_type in ('meal', 'dessert')),
+  is_gluten_free boolean not null default false,
   image_url text,
   view_count integer not null default 0 check (view_count >= 0),
   created_at timestamptz not null default now()

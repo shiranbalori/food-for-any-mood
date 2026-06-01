@@ -35,6 +35,7 @@ function mapMockRecipe(recipe) {
     likeCount: recipe.likeCount ?? 0,
     userLiked: false,
     userRating: null,
+    isGlutenFree: recipe.isGlutenFree ?? false,
     createdAt: null,
   }
 }
@@ -59,6 +60,7 @@ function mapDbRecipe(row, { profileMap, likeCountMap, ratingsByRecipe, userLikeS
     likeCount: likeCountMap.get(row.id) ?? 0,
     userLiked: userLikeSet.has(row.id),
     userRating: userRatingMap.get(row.id) ?? null,
+    isGlutenFree: Boolean(row.is_gluten_free),
     createdAt: row.created_at,
   }
 }
@@ -145,7 +147,7 @@ export async function fetchCommunityRecipes(userId) {
   const { data: recipes, error } = await supabase
     .from('community_recipes')
     .select(
-      'id, user_id, title, description, ingredients, steps, kosher_category, recipe_type, image_url, view_count, created_at',
+      'id, user_id, title, description, ingredients, steps, kosher_category, recipe_type, image_url, is_gluten_free, view_count, created_at',
     )
     .order('created_at', { ascending: false })
 
@@ -251,6 +253,7 @@ export async function uploadCommunityRecipe(userId, payload) {
       steps,
       kosher_category: payload.category,
       recipe_type: payload.recipeType,
+      is_gluten_free: Boolean(payload.isGlutenFree),
     })
     .select('id')
     .single()

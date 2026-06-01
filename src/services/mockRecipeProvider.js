@@ -25,7 +25,7 @@ import { buildDessertDishTitle } from '../utils/dessertDishTitle'
 import { buildChefIntro } from '../utils/chefIntro'
 import { buildStepsFromUserIngredients } from '../utils/userIngredientSteps'
 import { buildOptionalUpgrades } from '../utils/optionalUpgrades'
-import { pickAlternateDessertVariant } from '../utils/recipeDiversity'
+import { pickAlternateDessertVariant, pickAlternateMealVariant } from '../utils/recipeDiversity'
 import { calculateHealthScoreFromRecipe } from '../utils/nutritionScore'
 import { getEffectiveRecipeType, isInvalidRecipeSelection } from '../utils/recipeCategoryGuard'
 import {
@@ -737,6 +737,16 @@ export function buildIngredientFirstFallbackRecipe(
     recipeSteps = variant.steps
   } else if (effectiveRecipeType === 'dessert') {
     name = buildDessertDishTitle(finalIngredients, { language }).name
+  } else if (hasRegenerationConstraints) {
+    const variant = pickAlternateMealVariant({
+      ingredients: finalIngredients,
+      language,
+      cookingTime,
+      excludeTitles,
+      excludeCookingMethods,
+    })
+    name = variant.name
+    recipeSteps = variant.steps
   } else if (category === 'meat') {
     name = buildTitleFromIngredients(finalIngredients, { language, recipeType: 'meal' })
   } else {
@@ -974,6 +984,33 @@ export function buildMockRecipe(
   const time = cookingTime
   const glutenFree = isGlutenFree
   const excludeKeys = excludeTemplateKeys
+
+  const rawUserListEarly = parseUserIngredients(ingredients)
+  const hasRegenerationConstraints =
+    excludeTitles.length > 0 ||
+    excludeCookingMethods.length > 0 ||
+    excludeDessertCategories.length > 0
+  if (rawUserListEarly.length > 0 && hasRegenerationConstraints) {
+    return buildIngredientFirstFallbackRecipe(
+      {
+        category,
+        ingredients,
+        cookingTime: time,
+        mood,
+        isGlutenFree: glutenFree,
+        musicPlatform,
+        servings,
+        recipeType,
+      },
+      {
+        language,
+        pantrySuffix,
+        excludeTitles,
+        excludeCookingMethods,
+        excludeDessertCategories,
+      },
+    )
+  }
 
   const userIngredients = parseIngredients(ingredients)
   const filteredUserIngredients = glutenFree

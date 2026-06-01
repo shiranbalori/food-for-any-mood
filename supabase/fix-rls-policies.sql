@@ -210,3 +210,9 @@ create policy "Users can delete own community recipe images"
     bucket_id = 'community-recipe-images'
     and auth.uid()::text = (storage.foldername(name))[1]
   );
+
+-- ---------------------------------------------------------------------------
+-- 10. Community recipe gluten-free flag
+-- ---------------------------------------------------------------------------
+alter table public.community_recipes
+  add column if not exists is_gluten_free boolean not null default false;
