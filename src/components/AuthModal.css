@@ -118,9 +118,9 @@
   cursor: pointer;
   padding: 0;
 }
-
 @media (min-width: 640px) {
   .auth-modal {
     align-items: center;
   }
 }
+

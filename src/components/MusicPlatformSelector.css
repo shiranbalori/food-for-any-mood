@@ -102,8 +102,33 @@
   animation: fadeInScale 0.3s var(--ease-spring) both;
 }
 
-@media (max-width: 400px) {
+@media (max-width: 768px) {
   .music-platform__grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.45rem;
+  }
+
+  .music-platform__card {
+    min-height: 42px;
+    padding: 0.5rem 0.45rem;
+    gap: 0.35rem;
+    font-size: 0.72rem;
+  }
+
+  .platform-icon {
+    width: 18px;
+    height: 18px;
+  }
+
+  .music-platform__check {
+    top: 0.35rem;
+    inset-inline-end: 0.35rem;
+    width: 16px;
+    height: 16px;
+    font-size: 0.55rem;
+  }
+
+  .music-platform__card:hover {
+    transform: translateY(-2px);
   }
 }

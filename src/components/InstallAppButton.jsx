@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import { useLanguage } from '../i18n/useLanguage'
 import { usePwaInstall } from '../hooks/usePwaInstall'
 import './InstallAppButton.css'
@@ -32,19 +31,17 @@ function InstallIcon() {
 export default function InstallAppButton() {
   const { t } = useLanguage()
   const { showInstallButton, canInstall, isInstalled, promptInstall } = usePwaInstall()
-  const [isPrompting, setIsPrompting] = useState(false)
 
   if (!showInstallButton) return null
 
-  const handleClick = async () => {
-    if (!canInstall || isPrompting || isInstalled) return
-
-    setIsPrompting(true)
-    try {
-      await promptInstall()
-    } finally {
-      setIsPrompting(false)
+  const handleClick = () => {
+    console.log('Install button clicked')
+    if (isInstalled) return
+    if (!canInstall) {
+      console.log('Install prompt not available')
+      return
     }
+    void promptInstall()
   }
 
   if (isInstalled) {
@@ -57,15 +54,9 @@ export default function InstallAppButton() {
 
   return (
     <div className="install-app-pill">
-      <button
-        type="button"
-        className="install-app-pill__btn"
-        onClick={handleClick}
-        disabled={isPrompting}
-        aria-busy={isPrompting}
-      >
-        {!isPrompting && <InstallIcon />}
-        {isPrompting ? t('installAppOpening') : t('installApp')}
+      <button type="button" className="install-app-pill__btn" onClick={handleClick}>
+        <InstallIcon />
+        {t('installApp')}
       </button>
     </div>
   )

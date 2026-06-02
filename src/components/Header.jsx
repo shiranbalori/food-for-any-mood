@@ -28,9 +28,9 @@ export default function Header() {
   return (
     <header className="header">
       <div className="header__top">
-        <div className="header__top-start">
-          <InstallAppButton />
+        <div className="header__top-end">
           <LanguageToggle />
+          <InstallAppButton />
         </div>
         {!loading && isSupabaseReady && (
           <div className="header__auth">
@@ -59,7 +59,7 @@ export default function Header() {
         )}
       </div>
 
-      <div className="header__badge">{t('badge')}</div>
+      <p className="header__badge">{t('badge')}</p>
       <h1 className="header__title" dir="ltr">
         FOOD FOR <span className="header__highlight">ANY MOOD</span>
       </h1>

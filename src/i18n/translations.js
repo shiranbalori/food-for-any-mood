@@ -186,7 +186,7 @@ export const translations = {
     authLogin: 'התחברות',
     authSignup: 'הרשמה',
     authLogout: 'התנתקות',
-    installApp: 'התקנת האפליקציה',
+    installApp: 'התקנת אפליקציה',
     installAppInstalled: 'האפליקציה מותקנת',
     installAppOpening: 'פותח...',
     authHello: 'שלום, {{name}}',
