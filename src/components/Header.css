@@ -105,3 +105,84 @@ html[dir='rtl'] .header__top-start .language-toggle {
   line-height: 1.7;
   animation: fadeInUp 0.65s 0.22s var(--ease-spring) both;
 }
+
+@media (max-width: 768px) {
+  .header__top {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-rows: auto auto;
+    align-items: center;
+    width: 100%;
+    gap: 0.26rem 0.32rem;
+    margin-bottom: 0.35rem;
+  }
+
+  .header__top-start {
+    display: contents;
+  }
+
+  .header__auth {
+    grid-row: 1;
+    grid-column: 1;
+    justify-content: flex-start;
+    align-items: center;
+    flex-wrap: nowrap;
+    gap: 0.2rem;
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  .header__top .language-toggle {
+    grid-row: 1;
+    grid-column: 2;
+    margin-bottom: 0;
+  }
+
+  .header__top:not(:has(.header__auth)) .language-toggle {
+    grid-column: 1 / -1;
+    justify-self: center;
+  }
+
+  .header__top .install-app-pill {
+    grid-row: 2;
+    grid-column: 1 / -1;
+    justify-self: center;
+    margin-bottom: 0;
+  }
+
+  .header__user {
+    font-size: 11px;
+    line-height: 1.2;
+    max-width: 38vw;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .header__auth-btn.btn {
+    min-height: unset;
+    height: 26px;
+    width: auto;
+    flex-shrink: 0;
+    padding: 0 0.4rem;
+    font-size: 11px;
+    font-weight: 500;
+    line-height: 1;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.2);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    box-shadow: none;
+  }
+
+  .header__auth-btn.btn:hover {
+    transform: none;
+    box-shadow: none;
+    background: rgba(255, 255, 255, 0.26);
+  }
+
+  .header .language-toggle,
+  .header .install-app-pill {
+    margin-bottom: 0;
+  }
+}
