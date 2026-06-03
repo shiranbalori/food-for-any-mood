@@ -290,7 +290,14 @@ def infer_recipe_category(recipe: dict) -> Category:
 def resolve_kosher_category(selected_category: str, recipe: dict) -> Category:
     if selected_category == "any":
         return infer_recipe_category(recipe)
-    return selected_category  # type: ignore[return-value]
+    inferred = infer_recipe_category(recipe)
+    if selected_category == "dairy" and recipe_has_dairy(recipe) and not recipe_has_meat(recipe):
+        return "dairy"
+    if selected_category == "meat" and recipe_has_meat(recipe) and not recipe_has_dairy(recipe):
+        return "meat"
+    if selected_category == "parve" and not recipe_has_meat(recipe) and not recipe_has_dairy(recipe):
+        return "parve"
+    return inferred
 
 
 def is_dairy_dessert_valid(recipe: dict) -> bool:

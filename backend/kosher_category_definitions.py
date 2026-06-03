@@ -44,7 +44,9 @@ def build_kosher_rules_he(*, category: str, category_label: str) -> str:
     return f"""
 כללי כשרות (חובה — קטגוריה שנבחרה: {category_label} / {category}):
 {KOSHER_CATEGORY_DEFINITIONS_HE.strip()}
-- המרכיבים והשלבים חייבים לעמוד בקטגוריה שנבחרה: {category}.
+- אם אין במרכיבי המשתמש מוצרי חלב/בשר המתאימים לקטגוריה — אל תמציא חלב, גבינה, בשר או דג.
+- בנה את המתכון הטוב ביותר מהמרכיבים בפועל; המערכת תסווג את הקטגוריה הסופית לפי המנה.
+- המרכיבים שהמשתמש הזין הם מקור האמת — לא קטגוריה או מצב רוח.
 """
 
 
@@ -58,5 +60,7 @@ KOSHER RULES — no preference:
     return f"""
 KOSHER RULES (mandatory — selected category: {category_label} / {category}):
 {KOSHER_CATEGORY_DEFINITIONS_EN.strip()}
-- Ingredients and steps must match the selected category: {category}.
+- If user ingredients lack dairy/meat for the selected category — do NOT invent milk, cheese, or meat.
+- Build the best recipe from actual ingredients; final category is inferred from the dish.
+- User ingredients are the source of truth — not category or mood alone.
 """

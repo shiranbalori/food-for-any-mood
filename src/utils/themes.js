@@ -58,6 +58,7 @@ export const MOODS = [
   { id: 'comfort', emoji: '🤗' },
 ]
 
+/** Visual theme follows the user's selected category (not inferred recipe classification). */
 export function getTheme(categoryId) {
-  return CATEGORIES[categoryId] ?? CATEGORIES.parve
+  return CATEGORIES[categoryId] ?? CATEGORIES.any
 }

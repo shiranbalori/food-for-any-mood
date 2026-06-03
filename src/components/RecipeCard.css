@@ -125,6 +125,18 @@
   box-shadow: 0 2px 8px var(--theme-glow);
 }
 
+.recipe-card__classified-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--theme-accent-dark, var(--theme-accent));
+  background: var(--theme-accent-light);
+  padding: 0.25rem 0.7rem;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--theme-accent) 25%, transparent);
+}
+
 .recipe-card__gf-badge {
   display: inline-flex;
   align-items: center;
@@ -285,6 +297,45 @@
   border-radius: 999px;
   transition: width 1.2s var(--ease-spring);
   box-shadow: 0 0 10px currentColor;
+}
+
+.recipe-card__category-note {
+  margin: 0 0 1rem;
+  padding: 0.65rem 0.85rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  line-height: 1.45;
+  color: var(--text-muted);
+  background: rgba(255, 255, 255, 0.55);
+  border-radius: var(--radius-xs);
+  border: 1px dashed color-mix(in srgb, var(--theme-accent, #3b82f6) 22%, transparent);
+}
+
+.recipe-card__steps-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 0.75rem;
+  margin-bottom: 0.65rem;
+}
+
+.recipe-card__steps-header h3 {
+  margin: 0;
+}
+
+.recipe-card__regenerate-steps-btn {
+  font-size: 0.78rem;
+  padding: 0.4rem 0.7rem;
+  white-space: nowrap;
+}
+
+.recipe-card__steps-error {
+  margin: 0 0 0.65rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #b91c1c;
+  line-height: 1.4;
 }
 
 .recipe-card__section {

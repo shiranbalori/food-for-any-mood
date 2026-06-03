@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import re
 
+from category_mismatch_note import build_category_mismatch_note
 from ingredient_relevance import canonical_ingredient, normalize_ingredient, parse_user_ingredients
 
 DAIRY_CANON = frozenset(
@@ -148,50 +149,39 @@ def assess_category_fit(
         return {"category_ok": True, "reason": "", "suggested_category": suggested, "missing_ingredients": []}
 
     if category == "dairy" and not profile["has_dairy"]:
-        missing = ["חלב, גבינה, שמנת, חמאה או יוגורט"] if is_he else ["milk, cheese, cream, butter, or yogurt"]
         return {
-            "category_ok": False,
-            "reason": (
-                f"הקטגוריה «{selected_label}» דורשת מרכיב חלבי אמיתי (גבינה, חלב, שמנת, חמאה, יוגורט). "
-                f"מה שיש לכם מתאים יותר ל«{suggested_label}» — הוסיפו מוצר חלב או שנו קטגוריה."
-                if is_he
-                else f"Category «{selected_label}» needs a real dairy ingredient. Try «{suggested_label}» instead."
-            ),
-            "suggested_category": suggested,
-            "missing_ingredients": missing,
-        }
-
-    if category == "meat" and not profile["has_meat"]:
-        missing = ["עוף, בשר, דג או טונה"] if is_he else ["chicken, beef, fish, or tuna"]
-        return {
-            "category_ok": False,
-            "reason": (
-                f"הקטגוריה «{selected_label}» דורשת בשר, עוף או דג. "
-                f"מה שיש לכם מתאים יותר ל«{suggested_label}» — הוסיפו חלבון מהבשר או שנו קטגוריה."
-                if is_he
-                else f"Category «{selected_label}» needs meat, chicken, or fish. Try «{suggested_label}» instead."
-            ),
-            "suggested_category": suggested,
-            "missing_ingredients": missing,
-        }
-
-    if category == "parve" and (profile["has_meat"] or profile["has_dairy"]):
-        parts = []
-        if profile["has_meat"]:
-            parts.append("בשר/עוף/דג" if is_he else "meat/fish")
-        if profile["has_dairy"]:
-            parts.append("מוצרי חלב" if is_he else "dairy")
-        joined = " ו".join(parts) if is_he else " and ".join(parts)
-        return {
-            "category_ok": False,
-            "reason": (
-                f"הקטגוריה «{selected_label}» אינה כוללת {joined}. "
-                f"הסירו אותם או בחרו «{suggested_label}»."
-                if is_he
-                else f"Category «{selected_label}» cannot include {joined}. Choose «{suggested_label}»."
-            ),
+            "category_ok": True,
+            "category_mismatch": True,
+            "category_note": build_category_mismatch_note("dairy", suggested, language=language),
+            "reason": "",
             "suggested_category": suggested,
             "missing_ingredients": [],
         }
 
-    return {"category_ok": True, "reason": "", "suggested_category": category, "missing_ingredients": []}
+    if category == "meat" and not profile["has_meat"]:
+        return {
+            "category_ok": True,
+            "category_mismatch": True,
+            "category_note": build_category_mismatch_note("meat", suggested, language=language),
+            "reason": "",
+            "suggested_category": suggested,
+            "missing_ingredients": [],
+        }
+
+    if category == "parve" and (profile["has_meat"] or profile["has_dairy"]):
+        return {
+            "category_ok": True,
+            "category_mismatch": True,
+            "category_note": build_category_mismatch_note("parve", suggested, language=language),
+            "reason": "",
+            "suggested_category": suggested,
+            "missing_ingredients": [],
+        }
+
+    return {
+        "category_ok": True,
+        "reason": "",
+        "suggested_category": category,
+        "missing_ingredients": [],
+        "category_note": "",
+    }

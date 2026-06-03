@@ -3,11 +3,13 @@
  */
 
 import { canonicalIngredient } from '../data/ingredientKnowledge'
+import { ingredientsMatch } from '../data/ingredientKnowledge'
 import { ingredientAppearsInText, parseUserIngredients } from './ingredientRelevance'
 import { parseAnyLeadingMeasurement } from './measurementUnits'
 import { hasRepeatedParentheticalIngredients } from './ingredientFormatting'
 import { findUnauthorizedRecipeIngredients, SYSTEM_PANTRY_CANONICAL } from './ingredientAllowlist'
 import { assessCategoryFit } from './recipeCategoryFit'
+import { validateRecipeCoherence } from './recipeCoherenceValidation'
 
 const PLACEHOLDER_PATTERNS = [
   /\(strawberry\)/i,
@@ -246,6 +248,20 @@ export function validateRecipeBeforeReturn(recipe, userIngredientsRaw = '', { la
   if (steps.length < 4) failures.push('too_few_steps')
   if (ingredients.length === 0) failures.push('no_ingredients')
 
+  if (userIngredients.length) {
+    const missingUser = userIngredients.filter(
+      (userIng) => !(ingredients ?? []).some((line) => ingredientsMatch(line, userIng)),
+    )
+    if (missingUser.length) failures.push('missing_user_ingredients')
+
+    const coherence = validateRecipeCoherence(userIngredients, recipe, language)
+    if (!coherence.ok) {
+      for (const failure of coherence.failures) {
+        if (!failures.includes(failure)) failures.push(failure)
+      }
+    }
+  }
+
   return {
     ok: failures.length === 0,
     failures,
@@ -270,11 +286,38 @@ export function buildValidationFailureMessage(validation, feasibility = null, { 
   const failures = validation.failures ?? []
   const missing = validation.missingQuantities ?? []
 
+  if (failures.includes('missing_user_ingredients')) {
+    return {
+      reason: isHe
+        ? 'לא כל המרכיבים שהזנתם מופיעים במתכון — נסו ליצור מתכון שוב.'
+        : 'Not all ingredients you entered appear in the recipe — please try generating again.',
+      missingIngredients: missing,
+    }
+  }
+
+  if (failures.includes('title_grounding') || failures.includes('title_missing_ingredient') || failures.includes('generic_title')) {
+    return {
+      reason: isHe
+        ? 'שם המתכון לא תואם למרכיבים — נסו שוב.'
+        : 'The recipe title does not match the ingredients — please try again.',
+      missingIngredients: missing,
+    }
+  }
+
+  if (failures.includes('unnatural_steps')) {
+    return {
+      reason: isHe
+        ? 'שלבי ההכנה לא ברורים מספיק — נסו שוב.'
+        : 'The preparation steps are not clear enough — please try again.',
+      missingIngredients: missing,
+    }
+  }
+
   if (failures.includes('unauthorized_ingredients')) {
     const extras = validation.unauthorizedIngredients ?? []
     return {
       reason: isHe
-        ? 'המתכון כולל מרכיבים שלא סיפקתם — ניתן להשתמש רק במרכיבים שלכם ובמצרכי מזוון בסיסיים (מים, מלח, פלפל שחור, שמן, אבקת אפייה).'
+        ? 'המתכון כולל מרכיבים שלא סיפקתם — ניתן להשתמש רק במרכיבים שלכם ובמצרכי מזוון בסיסיים (מלח, פלפל, שמן, מים, תבלינים בסיסיים).'
         : 'The recipe includes ingredients you did not provide — only your ingredients and basic pantry staples are allowed.',
       missingIngredients: extras,
     }

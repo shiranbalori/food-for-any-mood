@@ -72,6 +72,12 @@ from recipe_quality import (
 )
 from chef_prompt_rules import get_chef_rules_en, get_chef_rules_he
 from chef_intro import build_chef_intro
+from regenerate_recipe_steps import (
+    GeminiStepsOutput,
+    build_regenerate_steps_prompt,
+    finalize_regenerated_steps,
+)
+from recipe_category_fit import assess_category_fit
 from nutrition_score import calculate_health_score_from_recipe
 from recipe_copy import get_recipe_copy
 from recipe_templates import get_category_templates, get_playlist_presets
@@ -268,6 +274,7 @@ class GeneratedRecipe(BaseModel):
     playlist: Playlist
     optionalUpgrades: list[OptionalUpgrade] = Field(default_factory=list)
     generatedFromPreferences: bool = False
+    categoryNote: str | None = None
 
 
 class GenerateRecipeResponse(BaseModel):
@@ -576,21 +583,19 @@ def _build_gemini_prompt_he(payload: GenerateRecipeRequest, *, strict: bool = Fa
         ingredient_rules = """
 כללי יצירה לפי העדפות (המשתמש לא ציין מרכיבים):
 - צור מתכון מלא המתאים לקטגוריה, סוג המתכון, מצב הרוח, זמן ההכנה, מספר המנות והעדפת הגלוטן.
+- בתיאור ציין בבירור: «הצעה כללית כי לא הוזנו מרכיבים».
 - אתה רשאי לכלול את כל המרכיבים הנדרשים למנה — בסיסי מטבח (מלח, שמן, תבלינים) מותרים.
 - optionalUpgrades: מערך ריק [] — אין שדרוגים במצב זה.
 - matchPercentage: 0 — לא רלוונטי (נוצר לפי העדפות).
 """
 
     title_rules = """
-כללי שם המנה (חובה — שם מנה אמיתית בלבד):
-- שם המנה חייב להישמע כמו מנה אמיתית — לא רשימת מרכיבים.
-- מקסימום 4 מילים בשם.
-- אסור לחלוטין: "קינוח שמנת סוכר וביצים", "מתכון וניל ביתי", "קינוח גבינת שמנת ביצים".
-- דוגמאות טובות: "קרם וניל אפוי", "מוס וניל קטיפתי", "פודינג וניל ביתי", "קינוח כוסות וניל", "קרם ברולה ביתי".
-- השתמש בסוג מנה (קרם, מוס, פודינג, עוגה, פנקייק) + טעם עיקרי אחד + תיאור קצר (אפוי, ביתי, קטיפתי).
-- אסור לחזור על שמות גנריים ללא מנה: "תבשיל ביתי", "קינוח גבינה", "עוגה ביתית".
-- מצב רוח משפיע רק על התיאור, התיבול והפלייליסט — לעולם לא על שם המנה.
-- אסור: ארוחת, ערב, וייב, נוחות, רומנטי, נעים, אנרגטי, רגוע, מצב רוח — בשם המנה.
+כללי שם המנה (חובה — פשוט וקשור למרכיבים):
+- שם המנה חייב לשקף את המרכיבים בפועל (למשל: חביתה עם עגבניות, סלט עגבניות וביצה).
+- מקסימום 5 מילים, שפה ביתית וברורה.
+- אסור: וניל (אלא אם המשתמש הזין), "מנה ביתית", "קסם במחבת", "מהמטבח", שמות גנריים בלי מרכיבים.
+- אסור: ארוחת, ערב, וייב, נוחות, רומנטי, מצב רוח — בשם המנה.
+- מצב רוח משפיע רק על התיאור והפלייליסט — לא על שם המנה.
 """
 
     quantity_rules = f"""
@@ -1011,6 +1016,14 @@ def _post_process_recipe(
         cook_time=payload.cookingTime,
     )
 
+    category_fit = assess_category_fit(
+        payload.ingredients,
+        category=payload.category,
+        is_gluten_free=payload.isGlutenFree,
+        language=payload.language or "he",
+    )
+    category_note = (category_fit.get("category_note") or "").strip() or None
+
     return GeneratedRecipe(
         name=tagged["name"],
         description=description,
@@ -1024,6 +1037,7 @@ def _post_process_recipe(
         playlist=recipe.playlist,
         optionalUpgrades=[] if preference_based else (recipe.optionalUpgrades or []),
         generatedFromPreferences=processed.get("generatedFromPreferences", preference_based),
+        categoryNote=category_note,
     )
 
 
@@ -1502,6 +1516,101 @@ async def generate_recipe(payload: GenerateRecipeRequest):
 async def generate_recipe_alias(payload: GenerateRecipeRequest):
     """Backward-compatible alias for older frontend paths."""
     return await generate_recipe(payload)
+
+
+class RegenerateStepsRequest(BaseModel):
+    name: str
+    ingredients: list[str]
+    currentSteps: list[str] = Field(default_factory=list)
+    language: str = "he"
+    cookingTime: int = 30
+    recipeType: str = "meal"
+    variationIndex: int = 0
+
+
+class RegenerateStepsResponse(BaseModel):
+    steps: list[str]
+    ok: bool = True
+    error: str | None = None
+
+
+@app.post("/regenerate-steps", response_model=RegenerateStepsResponse)
+async def regenerate_recipe_steps_endpoint(payload: RegenerateStepsRequest):
+    """Regenerate preparation steps only — same title and ingredients."""
+    print(
+        "[FOOD FOR ANY MOOD] Regenerate steps:",
+        payload.name,
+        "ingredients=",
+        len(payload.ingredients),
+        "variation=",
+        payload.variationIndex,
+    )
+    ingredients = [item.strip() for item in payload.ingredients if item and item.strip()]
+    current_steps = [s.strip() for s in (payload.currentSteps or []) if s and s.strip()]
+    language = payload.language or "he"
+
+    if not ingredients:
+        return RegenerateStepsResponse(
+            steps=[],
+            ok=False,
+            error="No ingredients provided",
+        )
+
+    from alternate_user_ingredient_steps import build_alternate_steps_from_user_ingredients
+
+    def _local_alternate() -> list[str]:
+        return finalize_regenerated_steps(
+            build_alternate_steps_from_user_ingredients(
+                ingredients,
+                recipe_type=payload.recipeType or "meal",
+                language=language,
+                cooking_time=payload.cookingTime,
+                variation_index=payload.variationIndex,
+            ),
+            language=language,
+        )
+
+    if gemini_client is None:
+        print("[FOOD FOR ANY MOOD] Regenerate steps: no Gemini — local alternate")
+        return RegenerateStepsResponse(steps=_local_alternate())
+
+    try:
+        prompt = build_regenerate_steps_prompt(
+            name=payload.name,
+            ingredients=ingredients,
+            current_steps=current_steps,
+            language=language,
+            cooking_time=payload.cookingTime,
+            recipe_type=payload.recipeType or "meal",
+            variation_index=payload.variationIndex,
+        )
+        schema = GeminiStepsOutput.model_json_schema()
+        response = gemini_client.models.generate_content(
+            model=GEMINI_MODEL,
+            contents=prompt,
+            config={
+                "response_mime_type": "application/json",
+                "response_json_schema": schema,
+            },
+        )
+        if not response.text:
+            raise RuntimeError("Gemini returned empty steps")
+        parsed = GeminiStepsOutput.model_validate_json(response.text)
+        steps = finalize_regenerated_steps(parsed.steps, language=language)
+        joined_prev = "|".join(current_steps)
+        joined_new = "|".join(steps)
+        if joined_prev == joined_new:
+            print("[FOOD FOR ANY MOOD] Regenerate steps: Gemini same as current — local alternate")
+            return RegenerateStepsResponse(steps=_local_alternate())
+        print("[FOOD FOR ANY MOOD] Regenerate steps: Gemini OK,", len(steps), "steps")
+        return RegenerateStepsResponse(steps=steps)
+    except Exception as exc:
+        print(f"[FOOD FOR ANY MOOD] Regenerate steps failed: {exc}")
+        try:
+            return RegenerateStepsResponse(steps=_local_alternate(), ok=True, error=str(exc))
+        except Exception as local_exc:
+            print(f"[FOOD FOR ANY MOOD] Local alternate failed: {local_exc}")
+            return RegenerateStepsResponse(steps=[], ok=False, error=str(exc))
 
 
 @app.post("/analyze-ingredients-image", response_model=AnalyzeIngredientsImageResponse)

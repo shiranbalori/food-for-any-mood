@@ -15,7 +15,9 @@ from recipe_utils import is_staple
 from recipe_quantities import is_valid_quantified_display
 from ingredient_allowlist import find_unauthorized_recipe_ingredients
 from recipe_category_fit import assess_category_fit
+from recipe_coherence_validation import validate_recipe_coherence
 from recipe_step_sanitize import has_repeated_parenthetical_ingredients
+from ingredient_relevance import ingredients_match
 
 PLACEHOLDER_PATTERNS = (
     r"\(strawberry\)",
@@ -326,6 +328,19 @@ def validate_recipe_before_return(
     if not ingredients:
         failures.append("no_ingredients")
 
+    if user_ingredients:
+        missing_user = [
+            item
+            for item in user_ingredients
+            if not any(ingredients_match(line, item) for line in ingredients)
+        ]
+        if missing_user:
+            failures.append("missing_user_ingredients")
+        coherence = validate_recipe_coherence(user_ingredients, recipe, language=language)
+        for failure in coherence.get("failures") or []:
+            if failure not in failures:
+                failures.append(failure)
+
     ok = not failures
     return {
         "ok": ok,
@@ -352,12 +367,33 @@ def build_validation_failure_message(
     failures = validation.get("failures") or []
     missing: list[str] = list(validation.get("missing_quantities") or [])
 
+    if "missing_user_ingredients" in failures:
+        return (
+            "לא כל המרכיבים שהזנתם מופיעים במתכון — נסו ליצור מתכון שוב."
+            if is_he
+            else "Not all ingredients you entered appear in the recipe — please try generating again.",
+        ), missing
+
+    if "title_grounding" in failures or "generic_title" in failures:
+        return (
+            "שם המתכון לא תואם למרכיבים — נסו שוב."
+            if is_he
+            else "The recipe title does not match the ingredients — please try again.",
+        ), missing
+
+    if "unnatural_steps" in failures:
+        return (
+            "שלבי ההכנה לא ברורים מספיק — נסו שוב."
+            if is_he
+            else "The preparation steps are not clear enough — please try again.",
+        ), missing
+
     if "unauthorized_ingredients" in failures:
         extras = list(validation.get("unauthorized_ingredients") or [])
         return (
-            "המתכון כולל מרכיבים שלא סיפקתם — ניתן להשתמש רק במרכיבים שלכם ובמצרכי מזוון בסיסיים (מים, מלח, פלפל שחור, שמן, אבקת אפייה)."
+            "המתכון כולל מרכיבים שלא סיפקתם — ניתן להשתמש רק במרכיבים שלכם ובמצרכי מזוון בסיסיים (מלח, פלפל, שמן, מים, תבלינים בסיסיים)."
             if is_he
-            else "The recipe includes ingredients you did not provide — only your ingredients and basic pantry staples are allowed."
+            else "The recipe includes ingredients you did not provide — only your ingredients and basic pantry staples are allowed.",
         ), extras
 
     if "missing_quantities" in failures:

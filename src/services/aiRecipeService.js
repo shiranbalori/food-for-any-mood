@@ -11,6 +11,7 @@ import { enforceRecipeTypeTitle } from '../utils/recipeTypeGuard'
 import {
   getEffectiveRecipeType,
   logRecipeValidation,
+  inferRecipeCategory,
   resolveKosherCategory,
   validateRecipeCategory,
 } from '../utils/recipeCategoryGuard'
@@ -21,6 +22,7 @@ import {
   buildValidationFailureMessage,
   validateRecipeBeforeReturn,
 } from '../utils/recipePreReturnValidation'
+import { assessCategoryFit } from '../utils/recipeCategoryFit'
 import { validateRecipeDiversity } from '../utils/recipeDiversity'
 import { createRecipeGenerationTimer } from '../utils/recipeGenerationTiming'
 
@@ -275,13 +277,11 @@ async function fetchRecipeFromBackend(payload, timer = null) {
   )
 
   const resolvedCategory = data.resolvedCategory ?? null
-  const recipeWithCategory =
-    resolvedCategory && recipe
-      ? { ...recipe, category: resolvedCategory }
-      : recipe
+  const recipeWithMeta =
+    resolvedCategory && recipe ? { ...recipe, resolvedCategory } : recipe
 
   return {
-    recipe: recipeWithCategory,
+    recipe: recipeWithMeta,
     recipePossible: true,
     source: data.source ?? 'unknown',
     geminiError: data.geminiError ?? null,
@@ -347,7 +347,7 @@ function finalizeRecipeForUser(userInput, recipe, meta = {}) {
 
   const kosherCategory = resolveKosherCategory(userInput.category, parsed)
   const typed = enforceRecipeTypeTitle(parsed, userInput.recipeType, kosherCategory, userInput.language)
-  const displayCategory = resolveKosherCategory(userInput.category, typed)
+  const resolvedCategory = inferRecipeCategory(typed)
   const categoryPassed = validateRecipeCategory(userInput.recipeType, userInput.category, typed)
   const languagePassed = validateRecipeLanguage(userInput.language, typed)
   const recipeLanguageUsed = detectRecipeLanguage(typed)
@@ -410,12 +410,20 @@ function finalizeRecipeForUser(userInput, recipe, meta = {}) {
   })
 
   const preferenceBased = isPreferenceBasedGeneration(userInput)
+  const categoryFit = assessCategoryFit(userInput.ingredients, {
+    category: userInput.category,
+    isGlutenFree: userInput.isGlutenFree,
+    language: userInput.language,
+  })
+  const categoryNote = (categoryFit.categoryNote || typed.categoryNote || '').trim()
 
   return {
     recipe: {
       ...typed,
-      category: displayCategory,
+      category: userInput.category,
+      resolvedCategory,
       generatedFromPreferences: preferenceBased,
+      categoryNote: categoryNote || undefined,
       optionalUpgrades: preferenceBased ? [] : (typed.optionalUpgrades ?? []),
     },
     passed,
@@ -559,37 +567,42 @@ async function generateAIRecipeCore(userInput) {
     const { recipe: backendRecipe, source, geminiError } = backendResult
     timer.mark('backendResult', 'Success', `source=${source} geminiError=${geminiError ?? 'none'}`)
 
-    const processed = processGeneratedRecipe(normalized, backendRecipe, { source, timer })
+    let processed = processGeneratedRecipe(normalized, backendRecipe, { source, timer })
     if (!processed.ok || !processed.recipe) {
-      console.warn('[aiRecipeService] Validation failed — using mock fallback', {
+      console.warn('[aiRecipeService] Validation failed — retrying generation once', {
         source,
         failedChecks: Object.entries(processed.validation?.checks ?? {})
           .filter(([, ok]) => !ok)
           .map(([name]) => name),
       })
-      timer.mark('processGeneratedRecipe:reject', 'Failed')
-      const fallbackRecipe = fetchMockFallbackRecipe(normalized, timer)
-      if (!fallbackRecipe) {
-        timer.printTable()
-        const { reason, missingIngredients } = buildValidationFailureMessage(
-          processed.validation?.preReturn ?? {},
-          null,
-          { language: normalized.language },
-        )
-        return {
-          recipe: null,
-          recipePossible: false,
-          impossibleReason: reason,
-          missingIngredients,
-          fallbackReason: null,
-        }
+      timer.mark('processGeneratedRecipe:retry', 'Failed')
+      const retryResult = await fetchRecipeFromBackend(payload, timer)
+      if (retryResult.recipePossible !== false && retryResult.recipe) {
+        processed = processGeneratedRecipe(normalized, retryResult.recipe, {
+          source: retryResult.source,
+          timer,
+        })
       }
-      timer.mark('qualityFallback:mock', 'Success')
+    }
+
+    if (!processed.ok || !processed.recipe) {
+      timer.mark('processGeneratedRecipe:reject', 'Failed')
       timer.printTable()
+      const { reason, missingIngredients } = buildValidationFailureMessage(
+        processed.validation?.preReturn ?? processed.validation ?? {},
+        null,
+        { language: normalized.language },
+      )
       return {
-        recipe: fallbackRecipe,
-        recipePossible: true,
-        fallbackReason: 'fallback',
+        recipe: null,
+        recipePossible: false,
+        impossibleReason:
+          reason ||
+          (normalized.language === 'he'
+            ? 'לא הצלחנו ליצור מתכון אמין מהמרכיבים — נסו שוב.'
+            : 'We could not create a trustworthy recipe from your ingredients — please try again.'),
+        missingIngredients,
+        fallbackReason: null,
       }
     }
     const recipe = processed.recipe
@@ -605,14 +618,18 @@ async function generateAIRecipeCore(userInput) {
     })
     timer.mark('validateRecipeDiversity', diversity.ok ? 'Success' : 'Failed', diversity.failures?.join(', '))
     if (!preReturn.ok) {
-      console.warn('[aiRecipeService] Recipe failed pre-return validation — using mock fallback:', preReturn.failures)
-      timer.mark('preReturnFallback:mock', 'Success')
-      const fallbackRecipe = fetchMockFallbackRecipe(normalized, timer)
+      console.warn('[aiRecipeService] Recipe failed pre-return validation:', preReturn.failures)
+      timer.mark('preReturnValidation:reject', 'Failed')
       timer.printTable()
+      const { reason, missingIngredients } = buildValidationFailureMessage(preReturn, null, {
+        language: normalized.language,
+      })
       return {
-        recipe: fallbackRecipe,
-        recipePossible: Boolean(fallbackRecipe),
-        fallbackReason: 'fallback',
+        recipe: null,
+        recipePossible: false,
+        impossibleReason: reason,
+        missingIngredients,
+        fallbackReason: null,
       }
     }
     if (!diversity.ok) {

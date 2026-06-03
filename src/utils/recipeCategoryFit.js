@@ -6,6 +6,7 @@
 
 import { canonicalIngredient } from '../data/ingredientKnowledge'
 import { parseUserIngredients } from './ingredientRelevance'
+import { buildCategoryMismatchNote } from './categoryMismatchNote'
 
 const DAIRY_CANON = new Set([
   'milk', 'cheese', 'cream', 'butter', 'yogurt', 'ricotta', 'parmesan', 'feta', 'cottage cheese', 'mozzarella',
@@ -86,40 +87,36 @@ export function assessCategoryFit(userIngredientsRaw, { category = 'dairy', isGl
 
   if (category === 'dairy' && !profile.hasDairy) {
     return {
-      categoryOk: false,
-      reason: isHe
-        ? `הקטגוריה «${selectedLabel}» דורשת מרכיב חלבי אמיתי. מה שיש לכם מתאים יותר ל«${suggestedLabel}» — הוסיפו מוצר חלב או שנו קטגוריה.`
-        : `Category «${selectedLabel}» needs dairy. Try «${suggestedLabel}» instead.`,
-      suggestedCategory: suggested,
-      missingIngredients: isHe ? ['חלב, גבינה, שמנת, חמאה או יוגורט'] : ['milk, cheese, cream, butter, or yogurt'],
-    }
-  }
-
-  if (category === 'meat' && !profile.hasMeat) {
-    return {
-      categoryOk: false,
-      reason: isHe
-        ? `הקטגוריה «${selectedLabel}» דורשת בשר, עוף או דג. מה שיש לכם מתאים יותר ל«${suggestedLabel}».`
-        : `Category «${selectedLabel}» needs meat, chicken, or fish. Try «${suggestedLabel}».`,
-      suggestedCategory: suggested,
-      missingIngredients: isHe ? ['עוף, בשר, דג או טונה'] : ['chicken, beef, fish, or tuna'],
-    }
-  }
-
-  if (category === 'parve' && (profile.hasMeat || profile.hasDairy)) {
-    const parts = []
-    if (profile.hasMeat) parts.push(isHe ? 'בשר/עוף/דג' : 'meat/fish')
-    if (profile.hasDairy) parts.push(isHe ? 'מוצרי חלב' : 'dairy')
-    const joined = isHe ? parts.join(' ו') : parts.join(' and ')
-    return {
-      categoryOk: false,
-      reason: isHe
-        ? `הקטגוריה «${selectedLabel}» אינה כוללת ${joined}. הסירו אותם או בחרו «${suggestedLabel}».`
-        : `Category «${selectedLabel}» cannot include ${joined}. Choose «${suggestedLabel}».`,
+      categoryOk: true,
+      categoryMismatch: true,
+      categoryNote: buildCategoryMismatchNote('dairy', suggested, language),
+      reason: '',
       suggestedCategory: suggested,
       missingIngredients: [],
     }
   }
 
-  return { categoryOk: true, reason: '', suggestedCategory: category, missingIngredients: [] }
+  if (category === 'meat' && !profile.hasMeat) {
+    return {
+      categoryOk: true,
+      categoryMismatch: true,
+      categoryNote: buildCategoryMismatchNote('meat', suggested, language),
+      reason: '',
+      suggestedCategory: suggested,
+      missingIngredients: [],
+    }
+  }
+
+  if (category === 'parve' && (profile.hasMeat || profile.hasDairy)) {
+    return {
+      categoryOk: true,
+      categoryMismatch: true,
+      categoryNote: buildCategoryMismatchNote('parve', suggested, language),
+      reason: '',
+      suggestedCategory: suggested,
+      missingIngredients: [],
+    }
+  }
+
+  return { categoryOk: true, reason: '', suggestedCategory: category, missingIngredients: [], categoryNote: '' }
 }

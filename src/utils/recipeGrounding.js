@@ -26,7 +26,6 @@ export const HELPER_PANTRY_CANONICAL = new Set([
 
 const SKIP_TITLE_SCAN_CANONICAL = new Set([
   ...HELPER_PANTRY_CANONICAL,
-  'vanilla',
   'herbs',
   'parsley',
   'cilantro',

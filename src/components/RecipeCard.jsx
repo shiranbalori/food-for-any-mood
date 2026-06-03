@@ -74,12 +74,17 @@ export default function RecipeCard({
   recipe,
   musicPlatform,
   theme,
+  themeCategory,
   isSaved,
   isFavorite,
   saveError,
   onSave,
   onAddFavorite,
   onRegenerate,
+  onRegenerateSteps,
+  stepsRegenerating = false,
+  stepsRegenerateError = null,
+  stepsGenerationKey = 0,
   recipeIdeas,
   ideasLoading,
   onLoadMoreIdeas,
@@ -90,6 +95,10 @@ export default function RecipeCard({
   const [mealPlanOpen, setMealPlanOpen] = useState(false)
   const preferenceBased = Boolean(recipe.generatedFromPreferences)
   const matchPercent = Math.min(100, Math.max(0, recipe.matchPercent ?? 0))
+  const displayCategory =
+    themeCategory === 'any' && recipe.resolvedCategory
+      ? recipe.resolvedCategory
+      : themeCategory ?? recipe.category
   const textDir = isRtl ? 'rtl' : dir
   const displayIngredients = sanitizeIngredientList(recipe.ingredients ?? [])
 
@@ -145,6 +154,11 @@ export default function RecipeCard({
             {recipe.glutenFree && (
               <span className="recipe-card__gf-badge">{t('glutenFreeBadge')}</span>
             )}
+            {themeCategory === 'any' && recipe.resolvedCategory && (
+              <span className="recipe-card__classified-badge">
+                {t(`categories.${recipe.resolvedCategory}`)}
+              </span>
+            )}
           </div>
           <h2>{recipe.name}</h2>
           <p className="recipe-card__chef-intro">{recipe.description}</p>
@@ -179,7 +193,7 @@ export default function RecipeCard({
         playlist={recipe.playlist}
         musicPlatform={musicPlatform ?? recipe.musicPlatform}
         mood={recipe.mood}
-        category={recipe.category}
+        category={displayCategory}
         recipeName={recipe.name}
         cookTime={recipe.cookTime ?? recipe.time}
         style={recipe.style}
@@ -214,11 +228,34 @@ export default function RecipeCard({
         </div>
       )}
 
+      {recipe.categoryNote && (
+        <p className="recipe-card__category-note animate-in stagger-4" role="note">
+          {recipe.categoryNote}
+        </p>
+      )}
+
       <div className="recipe-card__section animate-in stagger-5">
-        <h3>{t('cookingSteps')}</h3>
-        <ol dir={textDir}>
+        <div className="recipe-card__steps-header">
+          <h3>{t('cookingSteps')}</h3>
+          {onRegenerateSteps && (
+            <button
+              type="button"
+              className="btn btn--secondary recipe-card__regenerate-steps-btn"
+              onClick={onRegenerateSteps}
+              disabled={stepsRegenerating}
+            >
+              {stepsRegenerating ? t('regenerateStepsLoading') : t('regenerateSteps')}
+            </button>
+          )}
+        </div>
+        {stepsRegenerateError && (
+          <p className="recipe-card__steps-error" role="alert">
+            {stepsRegenerateError}
+          </p>
+        )}
+        <ol dir={textDir} key={`steps-${stepsGenerationKey}`}>
           {(recipe.steps ?? []).map((step, i) => (
-            <li key={i}>
+            <li key={`${stepsGenerationKey}-${i}`}>
               <span className="step-number">{i + 1}</span>
               {step}
             </li>

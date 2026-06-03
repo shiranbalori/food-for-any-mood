@@ -172,7 +172,8 @@ function toAppRecipe(recipe, meta) {
   return {
     id: meta.id,
     templateKey: meta.templateKey,
-    category: recipe.category ?? meta.category,
+    category: meta.category,
+    resolvedCategory: recipe.resolvedCategory ?? recipe.category ?? meta.category,
     mood: meta.mood,
     time: meta.cookingTime,
     glutenFree: meta.isGlutenFree,
@@ -196,6 +197,7 @@ function toAppRecipe(recipe, meta) {
     playlist: recipe.playlist,
     optionalUpgrades: recipe.optionalUpgrades ?? [],
     generatedFromPreferences: Boolean(recipe.generatedFromPreferences),
+    categoryNote: recipe.categoryNote ?? null,
     savedAt: null,
   }
 }

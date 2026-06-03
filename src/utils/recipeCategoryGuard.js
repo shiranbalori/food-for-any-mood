@@ -115,8 +115,19 @@ export function inferRecipeCategory(recipe) {
 
 /** Kosher category used for validation, tags, and UI after generation. */
 export function resolveKosherCategory(selectedCategory, recipe) {
-  if (!isAnyCategory(selectedCategory)) return selectedCategory
-  return inferRecipeCategory(recipe)
+  if (isAnyCategory(selectedCategory)) return inferRecipeCategory(recipe)
+
+  const inferred = inferRecipeCategory(recipe)
+  if (selectedCategory === 'dairy' && recipeHasDairy(recipe) && !recipeHasMeat(recipe)) {
+    return 'dairy'
+  }
+  if (selectedCategory === 'meat' && recipeHasMeat(recipe) && !recipeHasDairy(recipe)) {
+    return 'meat'
+  }
+  if (selectedCategory === 'parve' && !recipeHasMeat(recipe) && !recipeHasDairy(recipe)) {
+    return 'parve'
+  }
+  return inferred
 }
 
 function recipeTextBlob(recipe) {
@@ -178,7 +189,7 @@ function isParveMealValid(recipe) {
 export function validateRecipeCategory(recipeType, category, recipe) {
   if (isInvalidRecipeSelection(recipeType, category)) return false
 
-  const effectiveCategory = isAnyCategory(category) ? inferRecipeCategory(recipe) : category
+  const effectiveCategory = resolveKosherCategory(category, recipe)
 
   const tags = (recipe?.tags ?? []).map((tag) => String(tag).toLowerCase())
   if (tags.includes('vegetarian') && recipeHasMeat(recipe)) return false

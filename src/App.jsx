@@ -15,6 +15,7 @@ import MyAreaDrawer, { MY_AREA_PANELS } from './components/MyAreaDrawer'
 import { useLanguage } from './i18n/useLanguage'
 import { getTheme } from './utils/themes'
 import { generateAppRecipe } from './services/recipeService'
+import { regenerateRecipeSteps } from './services/regenerateStepsService'
 import { fetchMoreRecipeIdeas } from './services/recipeIdeasService'
 import { detectCookingMethod, detectDessertCategory } from './utils/recipeDiversity'
 // Recipe source: FastAPI backend (default) — see .env.example
@@ -67,6 +68,9 @@ export default function App() {
   const [mealPlan, setMealPlan] = useState(getMealPlan)
   const [myAreaOpen, setMyAreaOpen] = useState(false)
   const [myAreaPanel, setMyAreaPanel] = useState(null)
+  const [stepsRegenerating, setStepsRegenerating] = useState(false)
+  const [stepsRegenerateError, setStepsRegenerateError] = useState(null)
+  const [stepsGenerationKey, setStepsGenerationKey] = useState(0)
 
   const theme = getTheme(category)
   const isSaved = recipe ? savedRecipes.some((r) => r.id === recipe.id) : false
@@ -89,6 +93,8 @@ export default function App() {
       setRecipe(null)
       setRecipeIdeas(null)
       setImpossibleRecipe(null)
+      setStepsRegenerateError(null)
+      setStepsGenerationKey(0)
       setSaveError(false)
       setBackendNotice(null)
 
@@ -225,6 +231,46 @@ export default function App() {
     })
   }
 
+  const handleRegenerateSteps = useCallback(async () => {
+    if (!recipe || stepsRegenerating) return
+
+    const variationIndex = stepsGenerationKey
+    console.log('[App] regenerateSteps click', {
+      recipeId: recipe.id,
+      variationIndex,
+      stepCount: recipe.steps?.length ?? 0,
+    })
+
+    setStepsRegenerateError(null)
+    setStepsRegenerating(true)
+
+    try {
+      const { steps, source } = await regenerateRecipeSteps({
+        name: recipe.name,
+        ingredients: recipe.ingredients ?? [],
+        currentSteps: recipe.steps ?? [],
+        language,
+        cookingTime: recipe.time ?? form.time,
+        recipeType,
+        variationIndex,
+      })
+
+      console.log('[App] regenerateSteps success', {
+        source,
+        newStepCount: steps.length,
+        firstStep: steps[0]?.slice(0, 80),
+      })
+
+      setRecipe((prev) => (prev ? { ...prev, steps: [...steps] } : prev))
+      setStepsGenerationKey((k) => k + 1)
+    } catch (error) {
+      console.error('[App] regenerateSteps failed', error)
+      setStepsRegenerateError(t('regenerateStepsError'))
+    } finally {
+      setStepsRegenerating(false)
+    }
+  }, [recipe, stepsRegenerating, stepsGenerationKey, language, form.time, recipeType, t])
+
   const handleLoadMoreIdeas = useCallback(async () => {
     if (!recipe || ideasLoading) return
 
@@ -344,13 +390,18 @@ export default function App() {
             key={recipe.id}
             recipe={recipe}
             musicPlatform={form.musicPlatform}
-            theme={getTheme(recipe.category)}
+            theme={theme}
+            themeCategory={category}
             isSaved={isSaved}
             isFavorite={isFavorite}
             saveError={saveError}
             onSave={handleSave}
             onAddFavorite={handleAddFavorite}
             onRegenerate={handleRegenerate}
+            onRegenerateSteps={handleRegenerateSteps}
+            stepsRegenerating={stepsRegenerating}
+            stepsRegenerateError={stepsRegenerateError}
+            stepsGenerationKey={stepsGenerationKey}
             recipeIdeas={recipeIdeas}
             ideasLoading={ideasLoading}
             onLoadMoreIdeas={handleLoadMoreIdeas}

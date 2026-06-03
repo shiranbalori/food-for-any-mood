@@ -25,7 +25,6 @@ HELPER_PANTRY_CANONICAL = {
 
 SKIP_TITLE_SCAN_CANONICAL = {
     *HELPER_PANTRY_CANONICAL,
-    "vanilla",
     "herbs",
     "parsley",
     "cilantro",
