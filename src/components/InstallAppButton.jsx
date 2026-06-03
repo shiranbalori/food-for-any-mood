@@ -1,6 +1,10 @@
+import { useEffect, useRef, useState } from 'react'
 import { useLanguage } from '../i18n/useLanguage'
 import { usePwaInstall } from '../hooks/usePwaInstall'
+import { isIOS } from '../utils/pwaPlatform'
 import './InstallAppButton.css'
+
+const FEEDBACK_MS = 6000
 
 function InstallIcon() {
   return (
@@ -30,28 +34,82 @@ function InstallIcon() {
 
 export default function InstallAppButton() {
   const { t } = useLanguage()
-  const { showInstallButton, isInstalled, promptInstall } = usePwaInstall()
+  const { showInstallButton, isInstalledView, promptInstall } = usePwaInstall()
+  const [feedbackMessage, setFeedbackMessage] = useState(null)
+  const feedbackTimerRef = useRef(null)
+
+  useEffect(() => {
+    return () => {
+      if (feedbackTimerRef.current) clearTimeout(feedbackTimerRef.current)
+    }
+  }, [])
+
+  const showFeedback = (message) => {
+    if (feedbackTimerRef.current) clearTimeout(feedbackTimerRef.current)
+    setFeedbackMessage(message)
+    feedbackTimerRef.current = setTimeout(() => {
+      setFeedbackMessage(null)
+      feedbackTimerRef.current = null
+    }, FEEDBACK_MS)
+  }
 
   if (!showInstallButton) return null
 
   const handleClick = (event) => {
     event.preventDefault()
     event.stopPropagation()
-    void promptInstall()
+
+    if (isInstalledView) {
+      showFeedback(t('installAppInstalled'))
+      return
+    }
+
+    void (async () => {
+      const result = await promptInstall()
+
+      if (result.ok) return
+
+      if (result.reason === 'installed') {
+        showFeedback(t('installAppInstalled'))
+        return
+      }
+
+      if (result.reason === 'unavailable' || result.reason === 'error') {
+        showFeedback(isIOS() ? t('installAppIosGuide') : t('installAppBrowserMenuGuide'))
+      }
+    })()
   }
 
-  return (
-    <div className={`install-app-pill${isInstalled ? ' install-app-pill--installed' : ''}`}>
-      {isInstalled ? (
+  const pillClass = `install-app-pill${
+    isInstalledView || feedbackMessage ? ' install-app-pill--installed' : ''
+  }`
+
+  if (isInstalledView && !feedbackMessage) {
+    return (
+      <div className={pillClass}>
         <span className="install-app-pill__btn install-app-pill__label" aria-live="polite">
           {t('installAppInstalled')}
         </span>
-      ) : (
-        <button type="button" className="install-app-pill__btn" onClick={handleClick}>
-          <InstallIcon />
-          {t('installApp')}
-        </button>
-      )}
+      </div>
+    )
+  }
+
+  if (feedbackMessage) {
+    return (
+      <div className={pillClass}>
+        <span className="install-app-pill__btn install-app-pill__label" role="status" aria-live="polite">
+          {feedbackMessage}
+        </span>
+      </div>
+    )
+  }
+
+  return (
+    <div className={pillClass}>
+      <button type="button" className="install-app-pill__btn" onClick={handleClick}>
+        <InstallIcon />
+        {t('installApp')}
+      </button>
     </div>
   )
 }

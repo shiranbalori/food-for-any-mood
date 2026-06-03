@@ -190,6 +190,8 @@ export const translations = {
     installAppInstalled: 'האפליקציה מותקנת',
     installAppOpening: 'פותח...',
     installAppBrowserHint: 'התקנה זמינה דרך תפריט הדפדפן',
+    installAppBrowserMenuGuide: 'אפשר להתקין דרך תפריט הדפדפן',
+    installAppIosGuide: 'באייפון: לחצי שיתוף ואז הוספה למסך הבית',
     installAppHelperHint:
       'אם לא נפתח חלון התקנה, התקינו דרך תפריט הדפדפן.',
     installAppDismissedSoft: 'ההתקנה בוטלה — אפשר לנסות שוב',
@@ -442,6 +444,8 @@ export const translations = {
     installAppInstalled: 'App installed',
     installAppOpening: 'Opening...',
     installAppBrowserHint: 'Install from your browser menu',
+    installAppBrowserMenuGuide: 'You can install from your browser menu',
+    installAppIosGuide: 'On iPhone: tap Share, then Add to Home Screen',
     installAppHelperHint:
       'If the install dialog did not open, install from your browser menu.',
     installAppDismissedSoft: 'Install cancelled — you can try again',

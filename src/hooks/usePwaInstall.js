@@ -23,6 +23,9 @@ export function usePwaInstall() {
   const isInstalledRef = useRef(isInstalled)
   isInstalledRef.current = isInstalled
 
+  const isStandalone = isStandaloneDisplay()
+  const isInstalledView = isInstalled || isStandalone
+
   useEffect(() => {
     return subscribeDeferredInstallPrompt((event) => {
       if (isInstalledRef.current) return
@@ -48,7 +51,8 @@ export function usePwaInstall() {
   const promptInstall = useCallback(async () => {
     console.log('[PWA] install clicked')
 
-    if (isInstalledRef.current) {
+    if (isInstalledRef.current || isStandaloneDisplay()) {
+      console.log('[PWA] app already installed (standalone)')
       return { ok: false, reason: 'installed' }
     }
 
@@ -59,7 +63,7 @@ export function usePwaInstall() {
       return { ok: false, reason: 'unavailable' }
     }
 
-    console.log('[PWA] prompt exists')
+    console.log('[PWA] prompt exists — opening install dialog')
 
     try {
       await deferredPrompt.prompt()
@@ -83,12 +87,12 @@ export function usePwaInstall() {
   }, [])
 
   const hasPrompt = Boolean(deferredPromptEvent ?? deferredPromptRef.current)
-  const showInstallButton = isInstalled || !isStandaloneDisplay()
+  const showInstallButton = true
 
   return {
     hasPrompt,
     showInstallButton,
-    isInstalled,
+    isInstalledView,
     promptInstall,
   }
 }
