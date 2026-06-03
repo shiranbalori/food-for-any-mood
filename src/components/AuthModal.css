@@ -106,8 +106,47 @@
   color: #059669;
 }
 
-.auth-modal__submit {
+/* Primary CTA — fixed app blue (not page category theme) */
+.auth-modal__submit.btn--primary {
   margin-top: 0.25rem;
+  width: 100%;
+  min-height: 52px;
+  height: 52px;
+  padding: 0 1.25rem;
+  border-radius: 16px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  background: linear-gradient(135deg, #93c5fd 0%, #3b82f6 42%, #2563eb 100%);
+  box-shadow:
+    0 10px 28px rgba(37, 99, 235, 0.38),
+    0 4px 12px rgba(15, 23, 42, 0.1);
+  filter: none;
+}
+
+.auth-modal__submit.btn--primary:hover:not(:disabled) {
+  transform: translateY(-2px);
+  filter: brightness(1.05);
+  box-shadow:
+    0 14px 34px rgba(37, 99, 235, 0.45),
+    0 6px 16px rgba(15, 23, 42, 0.12);
+}
+
+.auth-modal__submit.btn--primary:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.auth-modal__submit.btn--primary:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
+  color: rgba(255, 255, 255, 0.9);
+  background: linear-gradient(135deg, #cbd5e1 0%, #94a3b8 100%);
+  border-color: transparent;
+  box-shadow: none;
+  filter: none;
 }
 
 .auth-modal__switch {
