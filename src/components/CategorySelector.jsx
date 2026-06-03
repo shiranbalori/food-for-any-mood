@@ -7,6 +7,9 @@ const RECIPE_TYPES = [
   { id: 'dessert', emoji: '🍰' },
 ]
 
+/** Display order: פרווה, בשרי, חלבי, ללא העדפה */
+const CATEGORY_DISPLAY_ORDER = ['parve', 'meat', 'dairy', 'any']
+
 export default function CategorySelector({ selected, onSelect, recipeType, onRecipeTypeChange }) {
   const { t } = useLanguage()
 
@@ -35,7 +38,7 @@ export default function CategorySelector({ selected, onSelect, recipeType, onRec
       </div>
 
       <div className="category-selector__grid">
-        {Object.values(CATEGORIES).map((cat) => (
+        {CATEGORY_DISPLAY_ORDER.map((id) => CATEGORIES[id]).map((cat) => (
           <button
             key={cat.id}
             type="button"

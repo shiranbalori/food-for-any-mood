@@ -1,20 +1,45 @@
-/** Kosher category validation — mirrors backend/recipe_quality.py */
+/**
+ * Kosher category validation — mirrors backend/recipe_quality.py
+ *
+ * Dairy: milk, cheese, yogurt, cream, butter.
+ * Meat: meat, chicken, turkey, fish.
+ * Parve: neither dairy nor meat.
+ * Any: inferred from recipe after generation.
+ */
 
 const MEAT_PATTERNS = [
   /עוף/,
+  /חזה\s*עוף/,
   /בשר/,
+  /בקר/,
+  /כבש/,
+  /הודו/,
+  /דג(?:ים)?/,
+  /סלמון/,
+  /טונה/,
+  /נקניק/,
+  /קבב/,
+  /סטייק/,
   /chicken/i,
   /beef/i,
   /\bmeat\b/i,
   /steak/i,
   /turkey/i,
   /lamb/i,
+  /pork/i,
+  /\bfish\b/i,
+  /salmon/i,
+  /tuna/i,
   /ground beef/i,
 ]
 
 const DAIRY_PATTERNS = [
   /חלב/,
   /גבינ/,
+  /שמנת/,
+  /חמאה/,
+  /יוגורט/,
+  /קוטג/,
   /\bmilk\b/i,
   /cheese/i,
   /cream/i,
@@ -66,8 +91,32 @@ const DAIRY_DESSERT_SIGNALS = [
   'cream',
 ]
 
+export const KOSHER_CATEGORIES = ['dairy', 'meat', 'parve']
+
+export function isAnyCategory(category) {
+  return category === 'any'
+}
+
 export function isInvalidRecipeSelection(recipeType, category) {
   return recipeType === 'dessert' && category === 'meat'
+}
+
+/**
+ * Classify generated recipe as dairy / meat / parve from ingredients and steps.
+ * Used when the user selected «ללא העדפה» (any).
+ */
+export function inferRecipeCategory(recipe) {
+  const hasMeat = recipeHasMeat(recipe)
+  const hasDairy = recipeHasDairy(recipe)
+  if (hasMeat && !hasDairy) return 'meat'
+  if (hasDairy && !hasMeat) return 'dairy'
+  return 'parve'
+}
+
+/** Kosher category used for validation, tags, and UI after generation. */
+export function resolveKosherCategory(selectedCategory, recipe) {
+  if (!isAnyCategory(selectedCategory)) return selectedCategory
+  return inferRecipeCategory(recipe)
 }
 
 function recipeTextBlob(recipe) {
@@ -129,23 +178,25 @@ function isParveMealValid(recipe) {
 export function validateRecipeCategory(recipeType, category, recipe) {
   if (isInvalidRecipeSelection(recipeType, category)) return false
 
+  const effectiveCategory = isAnyCategory(category) ? inferRecipeCategory(recipe) : category
+
   const tags = (recipe?.tags ?? []).map((tag) => String(tag).toLowerCase())
   if (tags.includes('vegetarian') && recipeHasMeat(recipe)) return false
 
-  if (category === 'meat' && recipeHasDairy(recipe)) return false
-  if (category === 'dairy' && recipeHasMeat(recipe)) return false
-  if (category === 'parve' && (recipeHasMeat(recipe) || recipeHasDairy(recipe))) return false
+  if (effectiveCategory === 'meat' && recipeHasDairy(recipe)) return false
+  if (effectiveCategory === 'dairy' && recipeHasMeat(recipe)) return false
+  if (effectiveCategory === 'parve' && (recipeHasMeat(recipe) || recipeHasDairy(recipe))) return false
 
   if (recipeType === 'dessert') {
-    if (category === 'dairy') return isDairyDessertValid(recipe)
-    if (category === 'parve') return isParveDessertValid(recipe)
+    if (effectiveCategory === 'dairy') return isDairyDessertValid(recipe)
+    if (effectiveCategory === 'parve') return isParveDessertValid(recipe)
     return false
   }
 
   if (recipeType === 'meal') {
-    if (category === 'meat') return isMeatMealValid(recipe)
-    if (category === 'dairy') return isDairyMealValid(recipe)
-    if (category === 'parve') return isParveMealValid(recipe)
+    if (effectiveCategory === 'meat') return isMeatMealValid(recipe)
+    if (effectiveCategory === 'dairy') return isDairyMealValid(recipe)
+    if (effectiveCategory === 'parve') return isParveMealValid(recipe)
   }
 
   return true

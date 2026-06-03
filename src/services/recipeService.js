@@ -3,7 +3,7 @@ import { generateAIRecipe } from './aiRecipeService'
 import { buildMockRecipe } from './mockRecipeProvider'
 
 /**
- * @typedef {'dairy' | 'meat' | 'parve'} RecipeCategory
+ * @typedef {'dairy' | 'meat' | 'parve' | 'any'} RecipeCategory
  * @typedef {'spotify' | 'youtube'} MusicPlatform
  *
  * @typedef {Object} GenerateRecipeParams
@@ -172,7 +172,7 @@ function toAppRecipe(recipe, meta) {
   return {
     id: meta.id,
     templateKey: meta.templateKey,
-    category: meta.category,
+    category: recipe.category ?? meta.category,
     mood: meta.mood,
     time: meta.cookingTime,
     glutenFree: meta.isGlutenFree,

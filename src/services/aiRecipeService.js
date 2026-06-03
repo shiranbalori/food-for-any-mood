@@ -11,6 +11,7 @@ import { enforceRecipeTypeTitle } from '../utils/recipeTypeGuard'
 import {
   getEffectiveRecipeType,
   logRecipeValidation,
+  resolveKosherCategory,
   validateRecipeCategory,
 } from '../utils/recipeCategoryGuard'
 import { detectRecipeLanguage, validateRecipeLanguage } from '../utils/recipeLanguage'
@@ -273,11 +274,18 @@ async function fetchRecipeFromBackend(payload, timer = null) {
     `source=${data.source ?? 'unknown'} gemini=${data.source === 'gemini'}`,
   )
 
+  const resolvedCategory = data.resolvedCategory ?? null
+  const recipeWithCategory =
+    resolvedCategory && recipe
+      ? { ...recipe, category: resolvedCategory }
+      : recipe
+
   return {
-    recipe,
+    recipe: recipeWithCategory,
     recipePossible: true,
     source: data.source ?? 'unknown',
     geminiError: data.geminiError ?? null,
+    resolvedCategory,
   }
 }
 
@@ -337,7 +345,9 @@ function finalizeRecipeForUser(userInput, recipe, meta = {}) {
 
   console.log('PARSED_RECIPE', parsed)
 
-  const typed = enforceRecipeTypeTitle(parsed, userInput.recipeType, userInput.category, userInput.language)
+  const kosherCategory = resolveKosherCategory(userInput.category, parsed)
+  const typed = enforceRecipeTypeTitle(parsed, userInput.recipeType, kosherCategory, userInput.language)
+  const displayCategory = resolveKosherCategory(userInput.category, typed)
   const categoryPassed = validateRecipeCategory(userInput.recipeType, userInput.category, typed)
   const languagePassed = validateRecipeLanguage(userInput.language, typed)
   const recipeLanguageUsed = detectRecipeLanguage(typed)
@@ -404,6 +414,7 @@ function finalizeRecipeForUser(userInput, recipe, meta = {}) {
   return {
     recipe: {
       ...typed,
+      category: displayCategory,
       generatedFromPreferences: preferenceBased,
       optionalUpgrades: preferenceBased ? [] : (typed.optionalUpgrades ?? []),
     },

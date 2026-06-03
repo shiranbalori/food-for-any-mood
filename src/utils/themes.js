@@ -35,6 +35,18 @@ export const CATEGORIES = {
     cardBg: 'rgba(209, 250, 229, 0.6)',
     shadow: '0 24px 48px rgba(5, 150, 105, 0.18), 0 0 0 1px rgba(255,255,255,0.5) inset',
   },
+  any: {
+    id: 'any',
+    emoji: '🎯',
+    gradient: 'linear-gradient(135deg, #e9d5ff 0%, #c4b5fd 45%, #8b5cf6 100%)',
+    mesh: 'radial-gradient(at 30% 20%, rgba(233, 213, 255, 0.45) 0%, transparent 50%), radial-gradient(at 80% 70%, rgba(167, 139, 250, 0.3) 0%, transparent 45%)',
+    accent: '#7c3aed',
+    accentLight: 'rgba(237, 233, 254, 0.85)',
+    accentDark: '#5b21b6',
+    glow: 'rgba(139, 92, 246, 0.4)',
+    cardBg: 'rgba(237, 233, 254, 0.6)',
+    shadow: '0 24px 48px rgba(124, 58, 237, 0.18), 0 0 0 1px rgba(255,255,255,0.5) inset',
+  },
 }
 
 export const MOODS = [

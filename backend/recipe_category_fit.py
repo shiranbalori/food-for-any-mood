@@ -1,4 +1,11 @@
-"""Validate that user ingredients match the selected kosher category."""
+"""Validate that user ingredients match the selected kosher category.
+
+Definitions:
+- dairy: milk, cheese, yogurt, cream, butter (no meat/fish/poultry).
+- meat: meat, chicken, turkey, fish (no dairy).
+- parve: neither dairy nor meat.
+- any: no user preference; category inferred after generation.
+"""
 
 from __future__ import annotations
 
@@ -98,12 +105,15 @@ def assess_category_fit(
 ) -> dict:
     user_ingredients = parse_user_ingredients(user_ingredients_raw)
     if not user_ingredients:
-        return {"category_ok": True, "reason": "", "suggested_category": category, "missing_ingredients": []}
+        suggested = "parve" if category == "any" else category
+        return {"category_ok": True, "reason": "", "suggested_category": suggested, "missing_ingredients": []}
 
     profile = _ingredient_profile(user_ingredients)
     is_he = language == "he"
     suggested = _suggest_category(profile)
-    selected_label = _category_label(category, language=language)
+    selected_label = "ללא העדפה" if category == "any" and is_he else (
+        "no preference" if category == "any" else _category_label(category, language=language)
+    )
     suggested_label = _category_label(suggested, language=language)
 
     if is_gluten_free and profile["has_gluten"]:
@@ -133,6 +143,9 @@ def assess_category_fit(
             "suggested_category": suggested,
             "missing_ingredients": [],
         }
+
+    if category == "any":
+        return {"category_ok": True, "reason": "", "suggested_category": suggested, "missing_ingredients": []}
 
     if category == "dairy" and not profile["has_dairy"]:
         missing = ["חלב, גבינה, שמנת, חמאה או יוגורט"] if is_he else ["milk, cheese, cream, butter, or yogurt"]

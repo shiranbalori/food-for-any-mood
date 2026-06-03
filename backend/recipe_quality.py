@@ -11,6 +11,7 @@ from ingredient_relevance import MIN_INGREDIENT_MATCH_RATIO, validate_recipe_rel
 
 RecipeType = Literal["meal", "dessert"]
 Category = Literal["dairy", "meat", "parve"]
+UserCategory = Literal["dairy", "meat", "parve", "any"]
 
 TIME_BUFFER_RATIO = 1.35
 TIME_BUFFER_MINUTES = 15
@@ -137,7 +138,9 @@ MEAT_PATTERNS = (
     r"בקר",
     r"כבש",
     r"הודו",
-    r"טורק",
+    r"דג(?:ים)?",
+    r"סלמון",
+    r"טונה",
     r"נקניק",
     r"קבב",
     r"סטייק",
@@ -151,6 +154,9 @@ MEAT_PATTERNS = (
     r"turkey",
     r"lamb",
     r"pork",
+    r"\bfish\b",
+    r"salmon",
+    r"tuna",
     r"ground beef",
 )
 
@@ -265,9 +271,26 @@ def recipe_has_dairy(recipe: dict) -> bool:
     return any(re.search(pattern, text) for pattern in DAIRY_PATTERNS)
 
 
-def is_invalid_recipe_selection(recipe_type: RecipeType, category: Category) -> bool:
+def is_invalid_recipe_selection(recipe_type: RecipeType, category: str) -> bool:
     """Dessert + meat category is never allowed."""
     return recipe_type == "dessert" and category == "meat"
+
+
+def infer_recipe_category(recipe: dict) -> Category:
+    """Classify recipe as dairy, meat, or parve from ingredients (for «ללא העדפה»)."""
+    has_meat = recipe_has_meat(recipe)
+    has_dairy = recipe_has_dairy(recipe)
+    if has_meat and not has_dairy:
+        return "meat"
+    if has_dairy and not has_meat:
+        return "dairy"
+    return "parve"
+
+
+def resolve_kosher_category(selected_category: str, recipe: dict) -> Category:
+    if selected_category == "any":
+        return infer_recipe_category(recipe)
+    return selected_category  # type: ignore[return-value]
 
 
 def is_dairy_dessert_valid(recipe: dict) -> bool:
@@ -334,32 +357,34 @@ def validateRecipeCategory(
 
 def validate_recipe_category(
     recipe_type: RecipeType,
-    category: Category,
+    category: str,
     recipe: dict,
 ) -> bool:
     if is_invalid_recipe_selection(recipe_type, category):
         return False
 
+    effective = resolve_kosher_category(category, recipe)
+
     tags = [str(tag).lower() for tag in (recipe.get("tags") or [])]
     if "vegetarian" in tags and recipe_has_meat(recipe):
         return False
 
-    if violates_kosher_category(category, recipe):
+    if violates_kosher_category(effective, recipe):
         return False
 
     if recipe_type == "dessert":
-        if category == "dairy":
+        if effective == "dairy":
             return is_dairy_dessert_valid(recipe)
-        if category == "parve":
+        if effective == "parve":
             return is_parve_dessert_valid(recipe)
         return False
 
     if recipe_type == "meal":
-        if category == "meat":
+        if effective == "meat":
             return is_meat_meal_valid(recipe)
-        if category == "dairy":
+        if effective == "dairy":
             return is_dairy_meal_valid(recipe)
-        if category == "parve":
+        if effective == "parve":
             return is_parve_meal_valid(recipe)
 
     return True
@@ -404,7 +429,9 @@ def validate_cooking_time(recipe: dict, max_minutes: int) -> bool:
     return estimated <= allowed
 
 
-def violates_kosher_category(category: Category, recipe: dict) -> bool:
+def violates_kosher_category(category: str, recipe: dict) -> bool:
+    if category == "any":
+        return False
     text = recipe_text_blob(recipe)
     has_meat = any(re.search(pattern, text) for pattern in MEAT_PATTERNS)
     has_dairy = any(re.search(pattern, text) for pattern in DAIRY_PATTERNS)
@@ -431,6 +458,8 @@ def validate_gemini_recipe_quality(
     if not validate_recipe_type(recipe_type, recipe):
         reasons.append("wrong_recipe_type")
 
+    effective = resolve_kosher_category(category, recipe)
+
     if not validate_recipe_category(recipe_type, category, recipe):
         reasons.append("wrong_category")
 
@@ -440,7 +469,7 @@ def validate_gemini_recipe_quality(
     if not validate_cooking_time(recipe, cooking_time):
         reasons.append("time_mismatch")
 
-    if violates_kosher_category(category, recipe):
+    if violates_kosher_category(effective, recipe):
         reasons.append("kosher_violation")
 
     unauthorized = find_unauthorized_recipe_ingredients(recipe, ",".join(user_ingredients))

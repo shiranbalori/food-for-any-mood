@@ -57,10 +57,14 @@ from recipe_pre_return_validation import (
 )
 from recipe_tags import apply_derived_recipe_tags
 from recipe_diversity import build_regeneration_prompt_section, validate_recipe_diversity
+from kosher_category_definitions import build_kosher_rules_en, build_kosher_rules_he
+from recipe_category_fit import _ingredient_profile, _suggest_category
 from recipe_quality import (
+    infer_recipe_category,
     is_invalid_recipe_selection,
     log_quality_rejections,
     log_recipe_validation,
+    resolve_kosher_category,
     validateRecipeCategory,
     validateRecipeType,
     validate_gemini_recipe_quality,
@@ -203,7 +207,8 @@ async def log_incoming_requests(request, call_next):
 # ---------------------------------------------------------------------------
 # Request / response models (match frontend GeneratedRecipe contract)
 # ---------------------------------------------------------------------------
-Category = Literal["dairy", "meat", "parve"]
+KosherCategory = Literal["dairy", "meat", "parve"]
+Category = Literal["dairy", "meat", "parve", "any"]
 MusicPlatform = Literal["spotify", "youtube"]
 Mood = Literal["happy", "cozy", "energetic", "relaxed", "adventurous", "comfort"]
 ServingsCount = Literal[1, 2, 4, 6, 8]
@@ -273,6 +278,7 @@ class GenerateRecipeResponse(BaseModel):
     source: Literal["gemini", "mock", "none"] = "gemini"
     fallbackUsed: bool = False
     geminiError: str | None = None
+    resolvedCategory: KosherCategory | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -427,7 +433,25 @@ CATEGORY_LABELS: dict[Category, str] = {
     "dairy": "חלבי",
     "meat": "בשרי",
     "parve": "פרווה",
+    "any": "ללא העדפה",
 }
+
+
+def _template_category(payload: GenerateRecipeRequest) -> KosherCategory:
+    """Map user selection to a kosher template key (dairy/meat/parve)."""
+    if payload.category != "any":
+        return payload.category  # type: ignore[return-value]
+    user_ingredients = parse_user_ingredients(payload.ingredients)
+    if not user_ingredients:
+        return "parve"
+    profile = _ingredient_profile(user_ingredients)
+    return _suggest_category(profile)  # type: ignore[return-value]
+
+
+def _resolved_category(payload: GenerateRecipeRequest, recipe_dict: dict) -> KosherCategory | None:
+    if payload.category != "any":
+        return None
+    return infer_recipe_category(recipe_dict)
 
 MOOD_LABELS: dict[Mood, str] = {
     "happy": "שמח",
@@ -618,13 +642,10 @@ def _build_gemini_prompt_he(payload: GenerateRecipeRequest, *, strict: bool = Fa
 - שם המנה חייב לשקף את הקינוח (עוגה, עוגיות, מוס, בראוניז וכו').
 """
 
-    kosher_rules = f"""
-כללי כשרות (חובה — קטגוריה: {category_label}):
-- dairy: אסור בשר, עוף, כבש, הודו, נקניק, קבב, סטייק.
-- meat: אסור חלב, גבינה, שמנת, חמאה, יוגורט, קוטג', פרמזן.
-- parve: אסור גם בשר/עוף וגם מוצרי חלב — רק פרווה.
-- המרכיבים והשלבים חייבים לעמוד בקטגוריה שנבחרה: {payload.category}.
-"""
+    kosher_rules = build_kosher_rules_he(
+        category=payload.category,
+        category_label=category_label,
+    )
 
     mood_time_rules = f"""
 כללי מצב רוח, זמן ומנות (חובה):
@@ -700,7 +721,7 @@ def _build_gemini_prompt_he(payload: GenerateRecipeRequest, *, strict: bool = Fa
 
 
 def _build_gemini_prompt_en(payload: GenerateRecipeRequest, *, strict: bool = False) -> str:
-    category_labels = {"dairy": "Dairy", "meat": "Meat", "parve": "Parve"}
+    category_labels = {"dairy": "Dairy", "meat": "Meat", "parve": "Parve", "any": "No preference"}
     mood_labels = {
         "happy": "Happy",
         "cozy": "Cozy",
@@ -772,7 +793,7 @@ LANGUAGE (mandatory):
 RECIPE TYPE (mandatory): {recipe_type_label} ({payload.recipeType})
 
 USER PREFERENCES:
-- Category: {category_label} ({payload.category}) — kosher rules apply
+- Category: {category_label} ({payload.category}) — {"choose the best kosher category for the dish; recipe must be consistently dairy, meat, or parve" if payload.category == "any" else "kosher rules apply"}
 - Mood: {mood_label} ({payload.mood})
 - Max cooking time: {payload.cookingTime} minutes
 - Gluten-free: {gluten_note}
@@ -785,10 +806,7 @@ STEP RULES:
 - Quantities in ingredient list only — not repeated in steps.
 - Each step: action, technique, time when relevant, expected result.
 
-CATEGORY RULES:
-- dairy: no meat or poultry; dairy ingredients allowed.
-- meat: no dairy; meat-based savory meals only.
-- parve: no meat and no dairy; vegetarian-friendly.
+{build_kosher_rules_en(category=payload.category, category_label=category_label)}
 
 CONTENT:
 - Dish name must sound like a real dish — never an ingredient list. Maximum 4 words.
@@ -938,13 +956,14 @@ def _post_process_recipe(
     """Hebrewize ingredients, split merged entries, and validate step usage."""
     raw = _recipe_to_validation_dict(recipe)
     raw["matchPercentage"] = recipe.matchPercentage
+    parser_category = _template_category(payload) if payload.category == "any" else payload.category
     processed, validation = apply_recipe_ingredient_parser(
         raw,
         payload.ingredients,
         cooking_time=payload.cookingTime,
         servings=payload.servings,
         recipe_type=payload.recipeType,
-        category=payload.category,
+        category=parser_category,
         is_gluten_free=payload.isGlutenFree,
         language=payload.language,
         preserve_original_steps=preserve_original_steps,
@@ -979,9 +998,13 @@ def _post_process_recipe(
         has_user_ingredients=bool(user_ingredients),
     )
 
+    tag_category = resolve_kosher_category(
+        payload.category,
+        {**processed, "tags": processed.get("tags") or []},
+    )
     tagged = apply_derived_recipe_tags(
         processed,
-        category=payload.category,
+        category=tag_category,
         is_gluten_free=payload.isGlutenFree,
         recipe_type=payload.recipeType,
         spice_level=recipe.spiceLevel,
@@ -1032,7 +1055,7 @@ def _fallback_recipe_from_ingredients(payload: GenerateRecipeRequest) -> Generat
 
     raw = build_ingredient_fallback_recipe(
         user_ingredients=user_ingredients,
-        category=payload.category,
+        category=_template_category(payload),
         mood=payload.mood,
         cooking_time=payload.cookingTime,
         is_gluten_free=payload.isGlutenFree,
@@ -1192,7 +1215,8 @@ def generate_recipe_with_ingredient_validation(
             return recipe, "gemini"
 
         recipe_dict = _recipe_to_validation_dict(recipe)
-        if violates_kosher_category(payload.category, recipe_dict):
+        effective = resolve_kosher_category(payload.category, recipe_dict)
+        if violates_kosher_category(effective, recipe_dict):
             print("[FOOD FOR ANY MOOD] Gemini rejected: kosher category violation")
         else:
             print("[FOOD FOR ANY MOOD] Gemini attempt failed validation — using fallback")
@@ -1279,7 +1303,8 @@ def generate_mock_recipe(payload: GenerateRecipeRequest) -> GeneratedRecipe:
         return _fallback_recipe_from_ingredients(payload)
 
     template_source = get_category_templates(payload.language, payload.recipeType)
-    template = template_source[payload.category]
+    template_key = _template_category(payload)
+    template = template_source[template_key]
 
     ingredients = list(template["base_ingredients"])
     if payload.isGlutenFree:
@@ -1461,12 +1486,15 @@ async def generate_recipe(payload: GenerateRecipeRequest):
         )
     timer.mark("response", "Success", f"source={source}")
     timer.print_table()
+    recipe_dict = _recipe_to_validation_dict(recipe)
+    resolved = _resolved_category(payload, recipe_dict)
     return GenerateRecipeResponse(
         recipe=recipe,
         recipePossible=True,
         source=source,
         fallbackUsed=source == "mock",
         geminiError=gemini_error,
+        resolvedCategory=resolved,
     )
 
 

@@ -27,7 +27,8 @@ import { buildStepsFromUserIngredients } from '../utils/userIngredientSteps'
 import { buildOptionalUpgrades } from '../utils/optionalUpgrades'
 import { pickAlternateDessertVariant, pickAlternateMealVariant } from '../utils/recipeDiversity'
 import { calculateHealthScoreFromRecipe } from '../utils/nutritionScore'
-import { getEffectiveRecipeType, isInvalidRecipeSelection } from '../utils/recipeCategoryGuard'
+import { assessCategoryFit } from '../utils/recipeCategoryFit'
+import { getEffectiveRecipeType, isAnyCategory, isInvalidRecipeSelection } from '../utils/recipeCategoryGuard'
 import {
   canonicalIngredient,
   getIngredientNutrition,
@@ -263,6 +264,12 @@ function scoreTemplate(template, userIngredients, time, mood, preferredStyles, g
       styleScore * 0.14
 
   return glutenFree ? base * 0.72 + glutenScore * 0.28 : base
+}
+
+function resolveTemplateCategory(category, ingredientsRaw) {
+  if (!isAnyCategory(category)) return category
+  const { suggestedCategory } = assessCategoryFit(ingredientsRaw, { category: 'any' })
+  return suggestedCategory === 'any' ? 'parve' : suggestedCategory
 }
 
 function weightedRandomPick(items) {
@@ -682,6 +689,7 @@ export function buildIngredientFirstFallbackRecipe(
     excludeDessertCategories = [],
   } = {},
 ) {
+  const kosherCategory = resolveTemplateCategory(category, ingredients)
   const rawUserList = parseUserIngredients(ingredients)
   const filteredUserIngredients = isGlutenFree
     ? rawUserList.filter((item) => !isGlutenIngredient(normalizeIngredient(item)))
@@ -756,7 +764,7 @@ export function buildIngredientFirstFallbackRecipe(
     })
     name = variant.name
     recipeSteps = variant.steps
-  } else if (category === 'meat') {
+  } else if (kosherCategory === 'meat') {
     name = buildGroundedChefTitle(filteredUserIngredients, finalIngredients, language, { excludeTitles })
   } else {
     name = buildGroundedChefTitle(filteredUserIngredients, finalIngredients, language, { excludeTitles })
@@ -778,7 +786,7 @@ export function buildIngredientFirstFallbackRecipe(
   const matchPercentage = Math.min(99, Math.max(72, Math.round(matchRatio * 100)))
 
   const playlist = recommendPlaylist(
-    { mood, category, style: 'quick', cookTime: cookingTime, spiceLevel: 1, recipeName: name },
+    { mood, category: kosherCategory, style: 'quick', cookTime: cookingTime, spiceLevel: 1, recipeName: name },
     musicPlatform,
     language,
   )
@@ -789,7 +797,7 @@ export function buildIngredientFirstFallbackRecipe(
     ingredients: finalIngredients,
     steps: recipeSteps,
     matchPercentage,
-    spiceLevel: recipeType === 'dessert' ? 0 : category === 'parve' ? 1 : 0,
+    spiceLevel: recipeType === 'dessert' ? 0 : kosherCategory === 'parve' ? 1 : 0,
     optionalUpgrades: buildOptionalUpgrades(filteredUserIngredients, { language, recipeType }),
     nutrition: {
       calories: 360 + displayNames.length * 25,
@@ -981,11 +989,12 @@ export function buildMockRecipe(
     excludeDessertCategories = [],
   } = {},
 ) {
+  const templateCategory = resolveTemplateCategory(category, ingredients)
   const effectiveRecipeType = getEffectiveRecipeType(recipeType, category)
 
   if (effectiveRecipeType === 'dessert') {
     return buildDessertMockRecipe(
-      { category, ingredients, cookingTime, mood, isGlutenFree, musicPlatform, servings },
+      { category: templateCategory, ingredients, cookingTime, mood, isGlutenFree, musicPlatform, servings },
       {
         language,
         pantrySuffix,
@@ -1029,7 +1038,7 @@ export function buildMockRecipe(
     : userIngredients
 
   const { template, templateKey, primaryStyle, score } = pickTemplate(
-    category,
+    templateCategory,
     filteredUserIngredients,
     time,
     mood,
@@ -1042,7 +1051,7 @@ export function buildMockRecipe(
   const matchData = countIngredientMatches(filteredUserIngredients, workingTemplate)
   const cookTime = Math.min(time, Math.max(template.minTime, template.idealTime))
   const nutrition = computeNutrition(workingTemplate, matchData, servings)
-  const tags = deriveTags(template, category, nutrition, cookTime, primaryStyle)
+  const tags = deriveTags(template, templateCategory, nutrition, cookTime, primaryStyle)
   const matchPercentage = computeMatchPercent(
     score,
     matchData,

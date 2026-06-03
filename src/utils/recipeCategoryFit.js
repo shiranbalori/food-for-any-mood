@@ -1,5 +1,7 @@
 /**
  * Category fit for user ingredients — mirrors backend/recipe_category_fit.py
+ *
+ * Dairy / meat / parve / any — see kosherCategoryDefinitions.js
  */
 
 import { canonicalIngredient } from '../data/ingredientKnowledge'
@@ -45,13 +47,14 @@ function categoryLabel(category, language) {
 export function assessCategoryFit(userIngredientsRaw, { category = 'dairy', isGlutenFree = false, language = 'he' } = {}) {
   const userIngredients = parseUserIngredients(userIngredientsRaw)
   if (userIngredients.length === 0) {
-    return { categoryOk: true, reason: '', suggestedCategory: category, missingIngredients: [] }
+    const suggestedCategory = category === 'any' ? 'parve' : category
+    return { categoryOk: true, reason: '', suggestedCategory, missingIngredients: [] }
   }
 
   const profile = ingredientProfile(userIngredients)
   const isHe = language === 'he'
   const suggested = suggestCategory(profile)
-  const selectedLabel = categoryLabel(category, language)
+  const selectedLabel = category === 'any' ? (isHe ? 'ללא העדפה' : 'no preference') : categoryLabel(category, language)
   const suggestedLabel = categoryLabel(suggested, language)
 
   if (isGlutenFree && profile.hasGluten) {
@@ -75,6 +78,10 @@ export function assessCategoryFit(userIngredientsRaw, { category = 'dairy', isGl
       suggestedCategory: suggested,
       missingIngredients: [],
     }
+  }
+
+  if (category === 'any') {
+    return { categoryOk: true, reason: '', suggestedCategory: suggested, missingIngredients: [] }
   }
 
   if (category === 'dairy' && !profile.hasDairy) {
