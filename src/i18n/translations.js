@@ -34,6 +34,14 @@ export const translations = {
     },
     subtitle:
       'ספרו לנו מה יש במטבח, כמה זמן יש לכם, ואנחנו נבשל לכם את הווייב.',
+    myAreaMenu: 'האזור שלי',
+    myAreaTitle: 'האזור שלי',
+    myAreaBack: 'חזרה',
+    myAreaClose: 'סגירה',
+    myAreaNavWeekly: 'תכנון שבועי',
+    myAreaNavSaved: 'מתכונים שמורים',
+    myAreaNavFavorites: 'מתכונים מועדפים',
+    myAreaNavCommunity: 'מתכונים מהקהילה',
     chooseCategory: 'בחרו קטגוריה',
     recipeTypeLabel: 'סוג מתכון',
     recipeTypes: {
@@ -291,6 +299,14 @@ export const translations = {
     },
     subtitle:
       "Tell us what you have, how you feel, and how much time you've got — we'll craft the perfect recipe.",
+    myAreaMenu: 'My area',
+    myAreaTitle: 'My area',
+    myAreaBack: 'Back',
+    myAreaClose: 'Close',
+    myAreaNavWeekly: 'Weekly meal plan',
+    myAreaNavSaved: 'Saved recipes',
+    myAreaNavFavorites: 'Favorite recipes',
+    myAreaNavCommunity: 'Community recipes',
     chooseCategory: 'Choose your category',
     recipeTypeLabel: 'Recipe type',
     recipeTypes: {

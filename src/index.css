@@ -21,8 +21,8 @@
   --radius-xs: 10px;
   --transition: 0.35s cubic-bezier(0.4, 0, 0.2, 1);
   --ease-spring: 0.55s cubic-bezier(0.34, 1.4, 0.64, 1);
-  --space-section: 2rem;
-  --space-card: 1.75rem;
+  --space-section: 1.25rem;
+  --space-card: 1.35rem;
 }
 
 html {
@@ -67,9 +67,9 @@ input {
 }
 
 .section-title {
-  font-size: 1.2rem;
+  font-size: 1.1rem;
   font-weight: 700;
-  margin-bottom: 1.15rem;
+  margin-bottom: 0.75rem;
   color: var(--text);
   letter-spacing: -0.01em;
 }
@@ -178,8 +178,8 @@ html[dir='ltr'] .spice-level__label {
 
 @media (max-width: 640px) {
   :root {
-    --space-section: 1.5rem;
-    --space-card: 1.35rem;
+    --space-section: 1rem;
+    --space-card: 1.15rem;
     --radius: 20px;
   }
 }

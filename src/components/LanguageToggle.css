@@ -39,20 +39,6 @@
 }
 
 @media (max-width: 768px) {
-  .header .language-toggle {
-    height: 26px;
-    padding: 0 0.32rem;
-    font-size: 11px;
-    gap: 0.12rem;
-    margin-bottom: 0;
-    background: rgba(255, 255, 255, 0.2);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    border: 1px solid rgba(255, 255, 255, 0.3);
-    border-radius: 999px;
-    box-shadow: none;
-  }
-
   .header .language-toggle__btn {
     padding: 0 0.18rem;
     font-size: 11px;

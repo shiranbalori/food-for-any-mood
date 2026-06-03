@@ -6,7 +6,7 @@ import InstallAppButton from './InstallAppButton'
 import AuthModal from './AuthModal'
 import './Header.css'
 
-export default function Header() {
+export default function Header({ onOpenMyArea }) {
   const { t } = useLanguage()
   const { isAuthenticated, displayName, signOut, isSupabaseReady, loading } = useAuth()
   const [authOpen, setAuthOpen] = useState(false)
@@ -28,10 +28,6 @@ export default function Header() {
   return (
     <header className="header">
       <div className="header__top">
-        <div className="header__top-end">
-          <LanguageToggle />
-          <InstallAppButton />
-        </div>
         {!loading && isSupabaseReady && (
           <div className="header__auth">
             {isAuthenticated ? (
@@ -57,6 +53,27 @@ export default function Header() {
             )}
           </div>
         )}
+        <div className="header__toolbar">
+          {onOpenMyArea && (
+            <button type="button" className="header__my-area-btn" onClick={onOpenMyArea}>
+              <span className="header__my-area-icon" aria-hidden="true">
+                <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path
+                    d="M3 5h14M3 10h14M3 15h14"
+                    stroke="currentColor"
+                    strokeWidth="1.6"
+                    strokeLinecap="round"
+                  />
+                </svg>
+              </span>
+              <span className="header__my-area-label">{t('myAreaMenu')}</span>
+            </button>
+          )}
+          <div className="header__top-end">
+            <LanguageToggle />
+            <InstallAppButton />
+          </div>
+        </div>
       </div>
 
       <p className="header__badge">{t('badge')}</p>

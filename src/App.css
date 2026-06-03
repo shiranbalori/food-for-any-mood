@@ -28,14 +28,14 @@
   z-index: 1;
   max-width: 680px;
   margin: 0 auto;
-  padding: max(1.25rem, env(safe-area-inset-top)) 1.15rem max(2.5rem, env(safe-area-inset-bottom));
+  padding: max(0.85rem, env(safe-area-inset-top)) 1rem max(1.75rem, env(safe-area-inset-bottom));
 }
 
 .app__footer {
   position: relative;
   z-index: 1;
   text-align: center;
-  padding: 1.75rem 1.15rem max(1.5rem, env(safe-area-inset-bottom));
+  padding: 1rem 1rem max(1rem, env(safe-area-inset-bottom));
   color: var(--text-muted);
   font-size: 0.85rem;
   opacity: 0.85;
@@ -175,7 +175,7 @@ html[dir='rtl'] .btn:hover::after {
 
 @media (min-width: 640px) {
   .app__main {
-    padding: max(2rem, env(safe-area-inset-top)) 1.75rem max(3.5rem, env(safe-area-inset-bottom));
+    padding: max(1.25rem, env(safe-area-inset-top)) 1.5rem max(2.25rem, env(safe-area-inset-bottom));
   }
 
   .btn {

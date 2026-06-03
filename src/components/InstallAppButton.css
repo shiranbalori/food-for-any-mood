@@ -55,53 +55,18 @@
 }
 
 @media (max-width: 768px) {
-  .header .install-app-pill {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: fit-content;
-    max-width: none;
-    height: 22px;
-    padding: 3px 6px;
-    font-size: 10px;
-    margin-bottom: 0;
-    white-space: nowrap;
-    background: rgba(255, 255, 255, 0.08);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
-    border: 1px solid rgba(255, 255, 255, 0.24);
-    border-radius: 999px;
-    box-shadow: none;
-    opacity: 0.9;
-  }
-
   .header .install-app-pill__btn,
   .header .install-app-pill__label {
-    padding: 0;
-    gap: 0.18rem;
-    font-size: 10px;
-    font-weight: 500;
-    line-height: 1;
     white-space: nowrap;
-    color: color-mix(in srgb, var(--text-muted) 85%, transparent);
   }
 
   .header .install-app-pill__btn:hover:not(:disabled) {
-    background: transparent;
-    color: var(--text-muted);
+    background: rgba(255, 255, 255, 0.45);
+    color: var(--text);
   }
 
   .header .install-app-pill__icon {
-    width: 0.5rem;
-    height: 0.5rem;
-    opacity: 0.72;
-  }
-
-  .header .install-app-pill--installed {
-    height: 22px;
-    padding: 3px 6px;
-    font-size: 10px;
-    white-space: nowrap;
-    background: rgba(255, 255, 255, 0.08);
+    width: 0.75rem;
+    height: 0.75rem;
   }
 }

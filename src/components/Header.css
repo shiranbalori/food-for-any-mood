@@ -1,47 +1,153 @@
 .header {
   text-align: center;
-  margin-bottom: calc(var(--space-section) + 0.5rem);
+  margin-bottom: var(--space-section);
   animation: fadeInUp 0.65s var(--ease-spring) both;
 }
 
+/* Two-row header: auth on top, toolbar below (all breakpoints) */
 .header__top {
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 0.75rem;
-  margin-bottom: 0.75rem;
-}
-
-.header__top-end {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.35rem;
-}
-
-html[dir='ltr'] .header__top-end .install-app-pill {
-  order: 1;
-}
-
-html[dir='ltr'] .header__top-end .language-toggle {
-  order: 2;
-}
-
-html[dir='rtl'] .header__top-end .install-app-pill {
-  order: 2;
-}
-
-html[dir='rtl'] .header__top-end .language-toggle {
-  order: 1;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.45rem;
+  width: 100%;
+  margin-bottom: 1.75rem;
 }
 
 .header__auth {
+  order: 1;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: flex-start;
   gap: 0.35rem;
-  max-width: 62%;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  margin-inline: 0;
+}
+
+html[dir='rtl'] .header__auth {
+  justify-content: flex-end;
+}
+
+.header__toolbar {
+  order: 2;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.35rem;
+  width: 100%;
+}
+
+/* RTL: flex-start = right edge — order האזור שלי → עברית → התקנה */
+html[dir='rtl'] .header__toolbar {
+  justify-content: flex-start;
+}
+
+html[dir='ltr'] .header__toolbar {
+  justify-content: flex-start;
+}
+
+.header__top-end {
+  display: contents;
+}
+
+/* Shared header glass pills (desktop + mobile base) */
+.header .header__my-area-btn,
+.header .language-toggle,
+.header .install-app-pill,
+.header .header__auth-btn.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 32px;
+  min-height: 32px;
+  padding: 0 0.65rem;
+  font-size: 0.78rem;
+  font-weight: 500;
+  line-height: 1.2;
+  color: var(--text-muted);
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.82), rgba(219, 234, 254, 0.58));
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  box-shadow:
+    0 4px 16px rgba(37, 99, 235, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  flex-shrink: 0;
+  margin-bottom: 0;
+  transition:
+    color var(--transition),
+    background var(--transition),
+    box-shadow var(--transition);
+}
+
+.header .header__my-area-btn {
+  gap: 0.35rem;
+}
+
+.header .header__my-area-btn:hover,
+.header .language-toggle:hover,
+.header .install-app-pill:hover {
+  color: var(--text);
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.94), rgba(224, 242, 254, 0.75));
+  transform: none;
+}
+
+.header .header__auth-btn.btn:hover {
+  transform: none;
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.94), rgba(224, 242, 254, 0.75));
+  box-shadow:
+    0 4px 16px rgba(37, 99, 235, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.95);
+}
+
+.header .language-toggle {
+  gap: 0.35rem;
+}
+
+.header .language-toggle__btn {
+  padding: 0.15rem 0.4rem;
+  font-size: inherit;
+  font-weight: 500;
+  border-radius: 8px;
+}
+
+.header .language-toggle__btn--active {
+  font-weight: 700;
+}
+
+.header .install-app-pill__btn,
+.header .install-app-pill__label {
+  padding: 0.15rem 0.25rem;
+  font-size: inherit;
+  font-weight: 500;
+  gap: 0.3rem;
+}
+
+.header .install-app-pill__btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.45);
+}
+
+.header__my-area-icon {
+  display: flex;
+  width: 0.85rem;
+  height: 0.85rem;
+  flex-shrink: 0;
+  opacity: 0.85;
+}
+
+.header__my-area-icon svg {
+  width: 100%;
+  height: 100%;
+}
+
+.header__my-area-label {
+  white-space: nowrap;
+  font-weight: 500;
 }
 
 .header__user {
@@ -51,19 +157,13 @@ html[dir='rtl'] .header__top-end .language-toggle {
   white-space: nowrap;
 }
 
-.header__auth-btn {
-  width: auto;
-  padding: 0.4rem 0.65rem;
-  font-size: 0.78rem;
-}
-
 .header__auth-btn--primary {
   color: var(--theme-accent, #6366f1);
 }
 
 .header__badge {
   display: block;
-  margin: 0 auto 1.15rem;
+  margin: 0 auto 0.6rem;
   padding: 0;
   background: none;
   border: none;
@@ -80,11 +180,11 @@ html[dir='rtl'] .header__top-end .language-toggle {
 
 .header__title {
   font-family: var(--font-brand);
-  font-size: clamp(1.85rem, 6vw, 3rem);
+  font-size: clamp(1.65rem, 5.5vw, 2.85rem);
   font-weight: 800;
   letter-spacing: -0.03em;
   line-height: 1.1;
-  margin-bottom: 0.85rem;
+  margin-bottom: 0.45rem;
   direction: ltr;
   unicode-bidi: isolate;
   animation: fadeInUp 0.65s 0.15s var(--ease-spring) both;
@@ -101,115 +201,88 @@ html[dir='rtl'] .header__top-end .language-toggle {
 .header__subtitle {
   color: var(--text-muted);
   font-size: clamp(0.95rem, 2.5vw, 1.05rem);
-  max-width: 420px;
+  max-width: 380px;
   margin: 0 auto;
   font-weight: 400;
-  line-height: 1.7;
+  line-height: 1.55;
   animation: fadeInUp 0.65s 0.22s var(--ease-spring) both;
+}
+
+.header__top:not(:has(.header__auth)) .header__toolbar {
+  order: 1;
 }
 
 @media (max-width: 768px) {
   .header__top {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    grid-template-rows: auto auto;
-    align-items: start;
-    width: 100%;
-    gap: 0.26rem 0.32rem;
-    margin-bottom: 0.35rem;
-  }
-
-  .header__top-end {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 0.26rem;
-    grid-row: 1 / span 2;
-    grid-column: 2;
-    justify-self: end;
-  }
-
-  html[dir='rtl'] .header__top-end {
-    grid-column: 1;
-    justify-self: start;
-  }
-
-  html[dir='ltr'] .header__top-end {
-    grid-column: 2;
-    justify-self: end;
-  }
-
-  html[dir='rtl'] .header__top-end .language-toggle,
-  html[dir='rtl'] .header__top-end .install-app-pill,
-  html[dir='ltr'] .header__top-end .language-toggle,
-  html[dir='ltr'] .header__top-end .install-app-pill {
-    order: unset;
-  }
-
-  .header__auth {
-    grid-row: 1;
-    grid-column: 1;
-    justify-content: flex-start;
-    align-items: center;
-    flex-wrap: nowrap;
-    gap: 0.2rem;
-    max-width: 100%;
-    min-width: 0;
-  }
-
-  html[dir='rtl'] .header__auth {
-    grid-column: 2;
-    justify-content: flex-end;
-  }
-
-  html[dir='ltr'] .header__auth {
-    grid-column: 1;
-    justify-content: flex-start;
-  }
-
-  .header__top:not(:has(.header__auth)) .header__top-end {
-    grid-column: 1 / -1;
-    justify-self: center;
+    gap: 0.4rem;
   }
 
   .header__user {
     font-size: 11px;
     line-height: 1.2;
-    max-width: 38vw;
+    max-width: min(42vw, 9rem);
     overflow: hidden;
     text-overflow: ellipsis;
   }
 
-  .header__auth-btn.btn {
-    min-height: unset;
-    height: 26px;
-    width: auto;
-    flex-shrink: 0;
-    padding: 0 0.4rem;
-    font-size: 11px;
-    font-weight: 500;
-    line-height: 1;
-    border-radius: 999px;
-    background: rgba(255, 255, 255, 0.2);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    border: 1px solid rgba(255, 255, 255, 0.3);
-    box-shadow: none;
-  }
-
-  .header__auth-btn.btn:hover {
-    transform: none;
-    box-shadow: none;
-    background: rgba(255, 255, 255, 0.26);
-  }
-
   .header .language-toggle,
+  .header .install-app-pill,
+  .header .header__my-area-btn,
+  .header .header__auth-btn.btn {
+    height: 22px;
+    min-height: 22px;
+    padding: 0 0.47rem;
+    font-size: 10px;
+    background: linear-gradient(145deg, rgba(255, 255, 255, 0.78), rgba(219, 234, 254, 0.52));
+    border: 1px solid rgba(255, 255, 255, 0.68);
+    box-shadow:
+      0 3px 12px rgba(37, 99, 235, 0.08),
+      inset 0 1px 0 rgba(255, 255, 255, 0.85);
+    gap: 0.24rem;
+  }
+
+  .header .language-toggle {
+    gap: 0.1rem;
+    padding: 0 0.36rem;
+  }
+
+  .header .language-toggle__btn {
+    padding: 0 0.16rem;
+    font-size: 10px;
+  }
+
+  .header .language-toggle__sep {
+    font-size: 9px;
+  }
+
   .header .install-app-pill {
-    margin-bottom: 0;
+    padding: 0 0.42rem;
+  }
+
+  .header .install-app-pill__btn,
+  .header .install-app-pill__label {
+    font-size: 10px;
+    padding: 0;
+    gap: 0.22rem;
+  }
+
+  .header .install-app-pill__icon {
+    width: 0.65rem;
+    height: 0.65rem;
+  }
+
+  .header .header__my-area-icon {
+    width: 0.65rem;
+    height: 0.65rem;
+  }
+
+  .header__my-area-label {
+    font-size: 10px;
+    font-weight: 500;
   }
 
   .header__badge {
-    margin-bottom: 0.8rem;
+    margin-bottom: 0.45rem;
     font-size: 0.56rem;
     line-height: 1.2;
   }

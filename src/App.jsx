@@ -11,6 +11,7 @@ import SavedRecipes from './components/SavedRecipes'
 import CommunityRecipes from './components/CommunityRecipes'
 import FavoriteRecipes from './components/FavoriteRecipes'
 import WeeklyMealPlanner from './components/WeeklyMealPlanner'
+import MyAreaDrawer, { MY_AREA_PANELS } from './components/MyAreaDrawer'
 import { useLanguage } from './i18n/useLanguage'
 import { getTheme } from './utils/themes'
 import { generateAppRecipe } from './services/recipeService'
@@ -64,6 +65,8 @@ export default function App() {
   const [recipeIdeas, setRecipeIdeas] = useState(null)
   const [ideasLoading, setIdeasLoading] = useState(false)
   const [mealPlan, setMealPlan] = useState(getMealPlan)
+  const [myAreaOpen, setMyAreaOpen] = useState(false)
+  const [myAreaPanel, setMyAreaPanel] = useState(null)
 
   const theme = getTheme(category)
   const isSaved = recipe ? savedRecipes.some((r) => r.id === recipe.id) : false
@@ -243,8 +246,14 @@ export default function App() {
     }
   }, [recipe, ideasLoading, category, form])
 
+  const closeMyArea = () => {
+    setMyAreaOpen(false)
+    setMyAreaPanel(null)
+  }
+
   const handleSelectSaved = (saved) => {
     if (!saved?.id) return
+    closeMyArea()
     setCategory(saved.category ?? 'dairy')
     setForm({
       ingredients: '',
@@ -275,7 +284,7 @@ export default function App() {
       <div className="app__bg" />
 
       <main className="app__main">
-        <Header />
+        <Header onOpenMyArea={() => setMyAreaOpen(true)} />
 
         <CategorySelector
           selected={category}
@@ -349,27 +358,39 @@ export default function App() {
           />
         )}
 
-        <WeeklyMealPlanner
-          plan={mealPlan}
-          onRemoveSlot={handleRemoveFromMealPlan}
-          onClear={handleClearMealPlan}
-          onSelectRecipe={handleSelectSaved}
-        />
-
-        <FavoriteRecipes
-          recipes={favoriteRecipes}
-          onRemove={handleRemoveFavorite}
-          onSelect={handleSelectSaved}
-        />
-
-        <SavedRecipes
-          recipes={savedRecipes}
-          onRemove={handleRemove}
-          onSelect={handleSelectSaved}
-        />
-
-        <CommunityRecipes />
       </main>
+
+      <MyAreaDrawer
+        open={myAreaOpen}
+        activePanel={myAreaPanel}
+        onClose={closeMyArea}
+        onSelectPanel={setMyAreaPanel}
+        onBack={() => setMyAreaPanel(null)}
+      >
+        {myAreaPanel === MY_AREA_PANELS.weekly && (
+          <WeeklyMealPlanner
+            plan={mealPlan}
+            onRemoveSlot={handleRemoveFromMealPlan}
+            onClear={handleClearMealPlan}
+            onSelectRecipe={handleSelectSaved}
+          />
+        )}
+        {myAreaPanel === MY_AREA_PANELS.favorites && (
+          <FavoriteRecipes
+            recipes={favoriteRecipes}
+            onRemove={handleRemoveFavorite}
+            onSelect={handleSelectSaved}
+          />
+        )}
+        {myAreaPanel === MY_AREA_PANELS.saved && (
+          <SavedRecipes
+            recipes={savedRecipes}
+            onRemove={handleRemove}
+            onSelect={handleSelectSaved}
+          />
+        )}
+        {myAreaPanel === MY_AREA_PANELS.community && <CommunityRecipes />}
+      </MyAreaDrawer>
 
       <footer className="app__footer">
         <p>{t('footer')}</p>
