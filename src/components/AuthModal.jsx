@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useAuth } from '../context/AuthContext'
 import { useLanguage } from '../i18n/useLanguage'
 import './AuthModal.css'
@@ -70,7 +71,7 @@ export default function AuthModal({ open, onClose, initialMode = 'login' }) {
     }
   }
 
-  return (
+  return createPortal(
     <div className="auth-modal" role="dialog" aria-modal="true" aria-labelledby="auth-modal-title">
       <button type="button" className="auth-modal__backdrop" onClick={onClose} aria-label={t('close')} />
       <div className="auth-modal__panel">
@@ -145,6 +146,7 @@ export default function AuthModal({ open, onClose, initialMode = 'login' }) {
           </button>
         </p>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }

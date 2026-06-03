@@ -189,6 +189,10 @@ export const translations = {
     installApp: 'התקנת אפליקציה',
     installAppInstalled: 'האפליקציה מותקנת',
     installAppOpening: 'פותח...',
+    installAppBrowserHint: 'התקנה זמינה דרך תפריט הדפדפן',
+    installAppHelperHint:
+      'אם לא נפתח חלון התקנה, התקינו דרך תפריט הדפדפן.',
+    installAppDismissedSoft: 'ההתקנה בוטלה — אפשר לנסות שוב',
     authHello: 'שלום, {{name}}',
     authLoginTitle: 'התחברות',
     authSignupTitle: 'יצירת חשבון',
@@ -437,6 +441,10 @@ export const translations = {
     installApp: 'Install App',
     installAppInstalled: 'App installed',
     installAppOpening: 'Opening...',
+    installAppBrowserHint: 'Install from your browser menu',
+    installAppHelperHint:
+      'If the install dialog did not open, install from your browser menu.',
+    installAppDismissedSoft: 'Install cancelled — you can try again',
     authHello: 'Hello, {{name}}',
     authLoginTitle: 'Log in',
     authSignupTitle: 'Create account',

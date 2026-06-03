@@ -30,34 +30,28 @@ function InstallIcon() {
 
 export default function InstallAppButton() {
   const { t } = useLanguage()
-  const { showInstallButton, canInstall, isInstalled, promptInstall } = usePwaInstall()
+  const { showInstallButton, isInstalled, promptInstall } = usePwaInstall()
 
   if (!showInstallButton) return null
 
-  const handleClick = () => {
-    console.log('Install button clicked')
-    if (isInstalled) return
-    if (!canInstall) {
-      console.log('Install prompt not available')
-      return
-    }
+  const handleClick = (event) => {
+    event.preventDefault()
+    event.stopPropagation()
     void promptInstall()
   }
 
-  if (isInstalled) {
-    return (
-      <div className="install-app-pill install-app-pill--installed" aria-live="polite">
-        <span className="install-app-pill__status">{t('installAppInstalled')}</span>
-      </div>
-    )
-  }
-
   return (
-    <div className="install-app-pill">
-      <button type="button" className="install-app-pill__btn" onClick={handleClick}>
-        <InstallIcon />
-        {t('installApp')}
-      </button>
+    <div className={`install-app-pill${isInstalled ? ' install-app-pill--installed' : ''}`}>
+      {isInstalled ? (
+        <span className="install-app-pill__btn install-app-pill__label" aria-live="polite">
+          {t('installAppInstalled')}
+        </span>
+      ) : (
+        <button type="button" className="install-app-pill__btn" onClick={handleClick}>
+          <InstallIcon />
+          {t('installApp')}
+        </button>
+      )}
     </div>
   )
 }

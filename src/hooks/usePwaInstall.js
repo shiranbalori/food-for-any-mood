@@ -1,4 +1,9 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import {
+  clearDeferredInstallPrompt,
+  getDeferredInstallPrompt,
+  subscribeDeferredInstallPrompt,
+} from '../pwa/installPromptCapture'
 
 function isStandaloneDisplay() {
   if (typeof window === 'undefined') return false
@@ -12,50 +17,76 @@ function isStandaloneDisplay() {
  * Captures the browser install prompt for PWA installation.
  */
 export function usePwaInstall() {
-  const [installPrompt, setInstallPrompt] = useState(null)
+  const deferredPromptRef = useRef(getDeferredInstallPrompt())
+  const [deferredPromptEvent, setDeferredPromptEvent] = useState(getDeferredInstallPrompt)
   const [isInstalled, setIsInstalled] = useState(isStandaloneDisplay)
+  const isInstalledRef = useRef(isInstalled)
+  isInstalledRef.current = isInstalled
 
   useEffect(() => {
-    const onBeforeInstallPrompt = (event) => {
-      event.preventDefault()
-      setInstallPrompt(event)
-    }
+    return subscribeDeferredInstallPrompt((event) => {
+      if (isInstalledRef.current) return
+      deferredPromptRef.current = event
+      setDeferredPromptEvent(event)
+      console.log('[PWA] prompt exists:', Boolean(event))
+    })
+  }, [])
 
+  useEffect(() => {
     const onAppInstalled = () => {
-      setInstallPrompt(null)
+      deferredPromptRef.current = null
+      setDeferredPromptEvent(null)
+      clearDeferredInstallPrompt()
       setIsInstalled(true)
+      console.log('[PWA] appinstalled — installed state set')
     }
 
-    window.addEventListener('beforeinstallprompt', onBeforeInstallPrompt)
     window.addEventListener('appinstalled', onAppInstalled)
-
-    return () => {
-      window.removeEventListener('beforeinstallprompt', onBeforeInstallPrompt)
-      window.removeEventListener('appinstalled', onAppInstalled)
-    }
+    return () => window.removeEventListener('appinstalled', onAppInstalled)
   }, [])
 
   const promptInstall = useCallback(async () => {
-    if (!installPrompt || isInstalled) return false
+    console.log('[PWA] install clicked')
 
-    await installPrompt.prompt()
-    const { outcome } = await installPrompt.userChoice
-    if (outcome === 'accepted') {
-      setInstallPrompt(null)
-      setIsInstalled(true)
-      return true
+    if (isInstalledRef.current) {
+      return { ok: false, reason: 'installed' }
     }
 
-    return false
-  }, [installPrompt, isInstalled])
+    const deferredPrompt = deferredPromptRef.current ?? getDeferredInstallPrompt()
 
-  const showInstallButton =
-    typeof window !== 'undefined' &&
-    'serviceWorker' in navigator &&
-    (isInstalled || !isStandaloneDisplay())
+    if (!deferredPrompt) {
+      console.log('[PWA] prompt missing')
+      return { ok: false, reason: 'unavailable' }
+    }
+
+    console.log('[PWA] prompt exists')
+
+    try {
+      await deferredPrompt.prompt()
+      const choice = await deferredPrompt.userChoice
+      console.log('[PWA] user choice:', choice.outcome)
+
+      deferredPromptRef.current = null
+      setDeferredPromptEvent(null)
+      clearDeferredInstallPrompt()
+
+      if (choice.outcome === 'accepted') {
+        setIsInstalled(true)
+        return { ok: true, outcome: 'accepted' }
+      }
+
+      return { ok: false, outcome: 'dismissed' }
+    } catch (error) {
+      console.log('[PWA] prompt() error:', error)
+      return { ok: false, reason: 'error' }
+    }
+  }, [])
+
+  const hasPrompt = Boolean(deferredPromptEvent ?? deferredPromptRef.current)
+  const showInstallButton = isInstalled || !isStandaloneDisplay()
 
   return {
-    canInstall: Boolean(installPrompt) && !isInstalled,
+    hasPrompt,
     showInstallButton,
     isInstalled,
     promptInstall,
