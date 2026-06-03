@@ -366,6 +366,8 @@ export default function App() {
         onClose={closeMyArea}
         onSelectPanel={setMyAreaPanel}
         onBack={() => setMyAreaPanel(null)}
+        savedCount={savedRecipes.length}
+        favoritesCount={favoriteRecipes.length}
       >
         {myAreaPanel === MY_AREA_PANELS.weekly && (
           <WeeklyMealPlanner

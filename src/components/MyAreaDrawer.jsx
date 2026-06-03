@@ -11,12 +11,21 @@ export const MY_AREA_PANELS = {
 
 const NAV_ITEMS = [
   { id: MY_AREA_PANELS.weekly, icon: '📅', labelKey: 'myAreaNavWeekly' },
-  { id: MY_AREA_PANELS.saved, icon: '🔖', labelKey: 'myAreaNavSaved' },
-  { id: MY_AREA_PANELS.favorites, icon: '⭐', labelKey: 'myAreaNavFavorites' },
+  { id: MY_AREA_PANELS.saved, icon: '📌', labelKey: 'myAreaNavSaved', badgeKey: 'saved' },
+  { id: MY_AREA_PANELS.favorites, icon: '❤️', labelKey: 'myAreaNavFavorites', badgeKey: 'favorites' },
   { id: MY_AREA_PANELS.community, icon: '👥', labelKey: 'myAreaNavCommunity' },
 ]
 
-export default function MyAreaDrawer({ open, activePanel, onClose, onSelectPanel, onBack, children }) {
+export default function MyAreaDrawer({
+  open,
+  activePanel,
+  onClose,
+  onSelectPanel,
+  onBack,
+  savedCount = 0,
+  favoritesCount = 0,
+  children,
+}) {
   const { t } = useLanguage()
 
   useEffect(() => {
@@ -42,7 +51,11 @@ export default function MyAreaDrawer({ open, activePanel, onClose, onSelectPanel
 
   if (!open) return null
 
-  const activeItem = NAV_ITEMS.find((item) => item.id === activePanel)
+  const getBadgeCount = (badgeKey) => {
+    if (badgeKey === 'saved') return savedCount
+    if (badgeKey === 'favorites') return favoritesCount
+    return null
+  }
 
   return (
     <div className="my-area-drawer" role="presentation">
@@ -60,16 +73,9 @@ export default function MyAreaDrawer({ open, activePanel, onClose, onSelectPanel
         aria-labelledby="my-area-drawer-title"
       >
         <header className="my-area-drawer__header">
-          {activePanel ? (
-            <button type="button" className="my-area-drawer__back" onClick={onBack}>
-              <span aria-hidden="true">→</span>
-              {t('myAreaBack')}
-            </button>
-          ) : (
-            <h2 id="my-area-drawer-title" className="my-area-drawer__title">
-              {t('myAreaTitle')}
-            </h2>
-          )}
+          <h2 id="my-area-drawer-title" className="my-area-drawer__title">
+            {t('myAreaTitle')}
+          </h2>
           <button
             type="button"
             className="my-area-drawer__close"
@@ -80,38 +86,48 @@ export default function MyAreaDrawer({ open, activePanel, onClose, onSelectPanel
           </button>
         </header>
 
-        {!activePanel ? (
-          <nav className="my-area-drawer__nav" aria-label={t('myAreaTitle')}>
-            {NAV_ITEMS.map((item) => (
+        <nav className="my-area-drawer__tabs" aria-label={t('myAreaTitle')}>
+          {NAV_ITEMS.map((item) => {
+            const isActive = activePanel === item.id
+            const badgeCount = item.badgeKey ? getBadgeCount(item.badgeKey) : null
+
+            return (
               <button
                 key={item.id}
                 type="button"
-                className="my-area-drawer__nav-item"
+                className={`my-area-drawer__tab ${isActive ? 'my-area-drawer__tab--active' : ''} ${badgeCount !== null ? 'my-area-drawer__tab--has-badge' : ''}`}
                 onClick={() => onSelectPanel(item.id)}
+                aria-pressed={isActive}
+                aria-current={isActive ? 'page' : undefined}
               >
-                <span className="my-area-drawer__nav-icon-wrap" aria-hidden="true">
-                  <span className="my-area-drawer__nav-icon">{item.icon}</span>
-                </span>
-                <span className="my-area-drawer__nav-text">
-                  <span className="my-area-drawer__nav-label">{t(item.labelKey)}</span>
-                </span>
-                <span className="my-area-drawer__nav-chevron" aria-hidden="true">
-                  ‹
+                {badgeCount !== null && (
+                  <span
+                    className={`my-area-drawer__tab-badge ${badgeCount === 0 ? 'my-area-drawer__tab-badge--empty' : ''}`}
+                    aria-label={String(badgeCount)}
+                  >
+                    {badgeCount}
+                  </span>
+                )}
+                <span className="my-area-drawer__tab-main">
+                  <span className="my-area-drawer__tab-icon" aria-hidden="true">
+                    {item.icon}
+                  </span>
+                  <span className="my-area-drawer__tab-label">{t(item.labelKey)}</span>
                 </span>
               </button>
-            ))}
-          </nav>
-        ) : (
-          <div className="my-area-drawer__body">
-            {activeItem && (
-              <h3 className="my-area-drawer__panel-title">
-                <span aria-hidden="true">{activeItem.icon}</span>
-                {t(activeItem.labelKey)}
-              </h3>
-            )}
-            <div className="my-area-drawer__content">{children}</div>
-          </div>
-        )}
+            )
+          })}
+        </nav>
+
+        <div className="my-area-drawer__body">
+          {activePanel ? (
+            <div key={activePanel} className="my-area-drawer__content my-area-drawer__content--animate">
+              {children}
+            </div>
+          ) : (
+            <p className="my-area-drawer__hint">{t('myAreaSelectTab')}</p>
+          )}
+        </div>
       </aside>
     </div>
   )
