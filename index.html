@@ -21,6 +21,22 @@
         } catch (e) {}
       })()
     </script>
+    <script>
+      ;(function () {
+        window.__FOOD_MOOD_PWA__ = window.__FOOD_MOOD_PWA__ || { deferredPrompt: null }
+        window.addEventListener('beforeinstallprompt', function (e) {
+          e.preventDefault()
+          window.__FOOD_MOOD_PWA__.deferredPrompt = e
+          console.log('[PWA] beforeinstallprompt captured (inline)')
+          window.dispatchEvent(new Event('food-mood-pwa:install-prompt-ready'))
+        })
+        window.addEventListener('appinstalled', function () {
+          window.__FOOD_MOOD_PWA__.deferredPrompt = null
+          console.log('[PWA] appinstalled (inline)')
+          window.dispatchEvent(new Event('food-mood-pwa:app-installed'))
+        })
+      })()
+    </script>
   </head>
   <body>
     <div id="root"></div>

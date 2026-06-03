@@ -20,7 +20,21 @@ export function reloadForPwaUpdate() {
   void applyUpdate(true)
 }
 
+async function unregisterDevServiceWorkers() {
+  if (!('serviceWorker' in navigator)) return
+  const registrations = await navigator.serviceWorker.getRegistrations()
+  if (!registrations.length) return
+  await Promise.all(registrations.map((registration) => registration.unregister()))
+  console.log('[PWA] unregistered service worker(s) in development')
+}
+
 export function initPwaUpdateRegistration() {
+  if (!import.meta.env.PROD) {
+    void unregisterDevServiceWorkers()
+    console.log('[PWA] service worker registration skipped (development)')
+    return
+  }
+
   applyUpdate = registerSW({
     immediate: true,
     onNeedRefresh() {

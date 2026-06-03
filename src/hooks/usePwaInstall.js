@@ -27,12 +27,16 @@ export function usePwaInstall() {
   const isInstalledView = isInstalled || isStandalone
 
   useEffect(() => {
-    return subscribeDeferredInstallPrompt((event) => {
+    const syncPrompt = (event) => {
       if (isInstalledRef.current) return
       deferredPromptRef.current = event
       setDeferredPromptEvent(event)
       console.log('[PWA] prompt exists:', Boolean(event))
-    })
+    }
+
+    syncPrompt(getDeferredInstallPrompt())
+
+    return subscribeDeferredInstallPrompt(syncPrompt)
   }, [])
 
   useEffect(() => {
