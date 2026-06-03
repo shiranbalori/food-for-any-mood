@@ -37,6 +37,7 @@ export function deriveRecipeTags(
   const calories = nutrition.calories ?? 0
   const protein = nutrition.protein ?? 0
   const fat = nutrition.fat ?? 0
+  const sugar = nutrition.sugar ?? nutrition.sugars ?? 0
   const healthScore = recipe.healthScore ?? nutrition.healthScore ?? 50
   const canons = ingredientCanons(recipe)
   const hasMeatFish = canons.some((item) => MEAT_FISH_CANON.has(item))
@@ -67,25 +68,43 @@ export function deriveRecipeTags(
     !isIndulgentDessert &&
     healthScore >= RECIPE_TAGS.healthy.minHealthScore &&
     calories <= 550 &&
-    fat <= 24
+    fat <= 24 &&
+    sugar <= 22
   ) {
     tags.add('healthy')
   }
 
-  if (!isIndulgentDessert && calories <= 420 && fat <= 18 && healthScore >= 70) {
+  if (
+    !isIndulgentDessert &&
+    calories <= 420 &&
+    fat <= 18 &&
+    healthScore >= 70 &&
+    sugar <= 18
+  ) {
     tags.add('dietFriendly')
+  }
+
+  if (
+    recipeType === 'meal' &&
+    protein >= 28 &&
+    calories <= 580 &&
+    fat <= 22 &&
+    sugar <= 25
+  ) {
+    tags.add('postWorkout')
   }
 
   if (
     spiceLevel === 0 &&
     !hasSpicyIng &&
     calories <= 650 &&
-    recipeType !== 'dessert'
+    recipeType !== 'dessert' &&
+    sugar <= 20
   ) {
     tags.add('childFriendly')
   }
 
-  if (isHighCalorie || healthScore < 62 || (recipe.tags ?? []).includes('comfortFood')) {
+  if (isHighCalorie || healthScore < 62) {
     tags.add('comfortFood')
   }
 
@@ -93,6 +112,7 @@ export function deriveRecipeTags(
     tags.delete('healthy')
     tags.delete('dietFriendly')
     tags.delete('childFriendly')
+    tags.delete('postWorkout')
   }
 
   if (spiceLevel >= 2 || hasSpicyIng) {
@@ -122,10 +142,12 @@ export function validateRecipeTags(recipe, derivedTags) {
     'healthy',
     'dietFriendly',
     'childFriendly',
+    'postWorkout',
     'vegetarian',
     'vegan',
     'glutenFree',
     'comfortFood',
+    'highProtein',
   ])
   const invalid = (recipe.tags ?? []).filter((tag) => guarded.has(tag) && !derived.has(tag))
   return {

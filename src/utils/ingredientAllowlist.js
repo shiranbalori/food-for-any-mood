@@ -7,11 +7,20 @@ export const SYSTEM_PANTRY_CANONICAL = new Set([
   'water',
   'salt',
   'black pepper',
+  'pepper',
   'oil',
   'olive',
   'olive oil',
   'garlic',
   'baking powder',
+  'paprika',
+  'cumin',
+  'oregano',
+  'basil',
+  'thyme',
+  'cinnamon',
+  'nutmeg',
+  'ginger',
 ])
 
 /** Highlights for prompts — not allowed unless the user provided them. */

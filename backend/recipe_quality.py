@@ -369,7 +369,18 @@ def validate_main_ingredients(user_ingredients: list[str], recipe: dict) -> bool
     if not user_ingredients:
         return True
     result = validate_recipe_relevance(user_ingredients, recipe)
-    return result["ok"] and result["match_ratio"] >= MIN_INGREDIENT_MATCH_RATIO
+    if not result["ok"] or result["match_ratio"] < MIN_INGREDIENT_MATCH_RATIO:
+        return False
+    from ingredient_relevance import ingredient_appears_in_text, ingredients_match
+
+    recipe_ingredients = recipe.get("ingredients") or []
+    steps_text = "\n".join(recipe.get("steps") or [])
+    for user_item in user_ingredients:
+        in_list = any(ingredients_match(line, user_item) for line in recipe_ingredients)
+        in_steps = ingredient_appears_in_text(user_item, steps_text)
+        if not in_list or not in_steps:
+            return False
+    return True
 
 
 def estimate_recipe_minutes(recipe: dict) -> int | None:

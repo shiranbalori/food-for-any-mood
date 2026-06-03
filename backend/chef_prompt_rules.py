@@ -61,7 +61,8 @@ CHEF_RULES_HE = """
 
 כללי מרכיבים:
 - עדיפות למרכיבים שהמשתמש סיפק.
-- מותר להוסיף רק מצרכי מזוון מערכתיים: מים, מלח, פלפל שחור, שמן, אבקת אפייה; תמצית וניל רק אם המשתמש ציין וניל.
+- מותר להוסיף רק מצרכי מזוון בסיסיים: מים, מלח, פלפל, שמן, תבלינים בסיסיים (כמו פפריקה, כמון, אורגנו), אבקת אפייה; תמצית וניל רק אם המשתמש ציין וניל.
+- חובה להשתמש בכל המרכיבים העיקריים שהמשתמש הזין — אל תדלג על מרכיב מרכזי.
 - אסור (אלא אם המשתמש הזין): פירות/berries, עוגיות, שוקולד, אגוזים, גבינת שמנת, יוגורט, חלב, חמאה.
 - אל תמציא מרכיבים מרכזיים — רק אופציונליים מסומנים ב-optionalUpgrades.
 - כל מרכיב ברשימה חייב להופיע בשלבי ההכנה.
@@ -92,6 +93,8 @@ CHEF_RULES_HE = """
 - אסור שלבים רובוטיים: "מערבבים", "מבשלים", "מגישים" בלבד.
 - דוגמה טובה: "ממיסים את המרשמלו על אש נמוכה תוך ערבוב עד לקבלת תערובת חלקה."
 - דוגמה גרועה: "מערבבים מרכיבים."
+- אסור: אל דנטה, אמולסיה, קרמול עמוק, טכניקות שף מורכבות.
+- כל שלב: מה עושים, כמה זמן (בערך), ואיך זה אמור להיראות בסוף.
 
 בדיקה לפני החזרה:
 - לכל מרכיב יש כמות; כל מרכיב בשימוש; כל שלב פעולה אמיתית.
@@ -124,7 +127,8 @@ General:
 
 Ingredients:
 - Prioritize user-provided ingredients.
-- You may add ONLY system pantry staples: water, salt, black pepper, oil, baking powder; vanilla extract ONLY if the user listed vanilla.
+- You may add ONLY basic pantry staples: water, salt, pepper, oil, basic spices (paprika, cumin, oregano, etc.), baking powder; vanilla extract ONLY if the user listed vanilla.
+- Use every main ingredient the user listed — do not skip a central ingredient.
 - NEVER add unless the user provided them: berries, cookies, chocolate, fruits, nuts, cream cheese, yogurt, milk, butter.
 - Do not invent major ingredients unless clearly marked optional in optionalUpgrades.
 - Every listed ingredient must appear in the steps.

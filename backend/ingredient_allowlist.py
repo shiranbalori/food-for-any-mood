@@ -9,11 +9,20 @@ SYSTEM_PANTRY_CANONICAL = {
     "water",
     "salt",
     "black pepper",
+    "pepper",
     "oil",
     "olive",
     "olive oil",
     "garlic",
     "baking powder",
+    "paprika",
+    "cumin",
+    "oregano",
+    "basil",
+    "thyme",
+    "cinnamon",
+    "nutmeg",
+    "ginger",
 }
 
 FORBIDDEN_UNLESS_USER_HINTS = (
@@ -39,7 +48,23 @@ def _user_provided_vanilla(user_ingredients: list[str]) -> bool:
 
 
 def get_system_pantry_items(user_ingredients: list[str] | None = None) -> list[str]:
-    items = ["water", "salt", "black pepper", "oil", "olive oil", "garlic", "baking powder"]
+    items = [
+        "water",
+        "salt",
+        "black pepper",
+        "oil",
+        "olive oil",
+        "garlic",
+        "baking powder",
+        "paprika",
+        "cumin",
+        "oregano",
+        "basil",
+        "thyme",
+        "cinnamon",
+        "nutmeg",
+        "ginger",
+    ]
     if user_ingredients and _user_provided_vanilla(user_ingredients):
         items.extend(["vanilla", "vanilla extract"])
     return items

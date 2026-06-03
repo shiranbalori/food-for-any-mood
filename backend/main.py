@@ -55,6 +55,7 @@ from recipe_pre_return_validation import (
     build_validation_failure_message,
     validate_recipe_before_return,
 )
+from recipe_tags import apply_derived_recipe_tags
 from recipe_diversity import build_regeneration_prompt_section, validate_recipe_diversity
 from recipe_quality import (
     is_invalid_recipe_selection,
@@ -536,7 +537,8 @@ def _build_gemini_prompt_he(payload: GenerateRecipeRequest, *, strict: bool = Fa
 {strict_note}כללי מרכיבים (חובה מוחלטת — עדיפות על קטגוריה ומצב רוח):
 - המשתמש ציין מרכיבים: {ingredient_list}
 - לפחות {threshold}% מהמרכיבים האלה חייבים להופיע ברשימת המרכיבים של המתכון.
-- השתמש אך ורק במרכיבים שהמשתמש הזין, ובמצרכי מזוון מערכתיים בלבד: מים, מלח, פלפל שחור, שמן, אבקת אפייה; תמצית וניל רק אם המשתמש ציין וניל.
+- השתמש אך ורק במרכיבים שהמשתמש הזין, ובמצרכי מזוון בסיסיים בלבד: מים, מלח, פלפל, שמן, תבלינים בסיסיים, אבקת אפייה; תמצית וניל רק אם המשתמש ציין וניל.
+- חובה לכלול את כל המרכיבים העיקריים שהמשתמש הזין.
 - אסור בהחלט (אלא אם המשתמש הזין): פירות/berries, עוגיות, שוקולד, אגוזים, גבינת שמנת, יוגורט, חלב, חמאה.
 - שם המנה חייב לכלול לפחות אחד מהמרכיבים שציין המשתמש (בעברית, כפי שהזין או בניסוח קרוב).
 - אל תציע מנה גנרית לפי קטגוריה/מצב רוח בלבד — המרכיבים הם הבסיס למנה.
@@ -690,7 +692,7 @@ def _build_gemini_prompt_he(payload: GenerateRecipeRequest, *, strict: bool = Fa
 - spiceLevel: 0–3 (0=לא חריף, 3=חריף).
 - nutrition: הערכה סבירה ל-{payload.servings} מנות; nutrition.servings חייב להיות {payload.servings}.
 - healthScore: 0–100 — computed from calories/protein/sugar/fiber per portion and ingredient quality (system may recalculate).
-- tags: מערך קצר של תגיות (מחרוזות בעברית או מפתחות קצרים באנגלית).
+- tags: מפתחות קצרים באנגלית בלבד (highProtein, healthy, quick וכו') — המערכת מחשבת מחדש לפי ערכי התזונה; אל תמציא תגיות שלא נתמכות בנתונים.
 - playlist.title ו-playlist.description בעברית; playlist.platform = "{payload.musicPlatform}";
   playlist.url = קישור חיפוש אמיתי ל-Spotify או YouTube המתאים למצב הרוח.
 {regeneration_rules}
@@ -943,6 +945,7 @@ def _post_process_recipe(
         servings=payload.servings,
         recipe_type=payload.recipeType,
         category=payload.category,
+        is_gluten_free=payload.isGlutenFree,
         language=payload.language,
         preserve_original_steps=preserve_original_steps,
     )
@@ -976,16 +979,25 @@ def _post_process_recipe(
         has_user_ingredients=bool(user_ingredients),
     )
 
+    tagged = apply_derived_recipe_tags(
+        processed,
+        category=payload.category,
+        is_gluten_free=payload.isGlutenFree,
+        recipe_type=payload.recipeType,
+        spice_level=recipe.spiceLevel,
+        cook_time=payload.cookingTime,
+    )
+
     return GeneratedRecipe(
-        name=processed["name"],
+        name=tagged["name"],
         description=description,
-        ingredients=processed["ingredients"],
-        steps=processed["steps"],
-        matchPercentage=processed["matchPercentage"],
+        ingredients=tagged["ingredients"],
+        steps=tagged["steps"],
+        matchPercentage=tagged["matchPercentage"],
         spiceLevel=recipe.spiceLevel,
-        nutrition=Nutrition(**processed["nutrition"]),
-        healthScore=processed.get("healthScore", recipe.healthScore),
-        tags=recipe.tags,
+        nutrition=Nutrition(**tagged["nutrition"]),
+        healthScore=tagged.get("healthScore", recipe.healthScore),
+        tags=tagged["tags"],
         playlist=recipe.playlist,
         optionalUpgrades=[] if preference_based else (recipe.optionalUpgrades or []),
         generatedFromPreferences=processed.get("generatedFromPreferences", preference_based),
@@ -1042,6 +1054,7 @@ def _fallback_recipe_from_ingredients(payload: GenerateRecipeRequest) -> Generat
         servings=payload.servings,
         recipe_type=payload.recipeType,
         category=payload.category,
+        is_gluten_free=payload.isGlutenFree,
         language=payload.language,
     )
     return GeneratedRecipe(
@@ -1380,6 +1393,7 @@ async def generate_recipe(payload: GenerateRecipeRequest):
         payload.ingredients,
         recipe_type=payload.recipeType,
         category=payload.category,
+        is_gluten_free=payload.isGlutenFree,
         language=payload.language or "he",
     )
     timer.mark("assessIngredientFeasibility", "Success" if feasibility["recipe_possible"] else "Failed")

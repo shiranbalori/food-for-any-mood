@@ -137,17 +137,9 @@ def build_grounded_chef_title(
     canon = [canonical_ingredient(strip_quantity_prefix(str(item))) for item in source]
     canon = [item for item in canon if item and item not in HELPER_PANTRY_CANONICAL]
 
-    if "pasta" in canon and ("egg" in canon or "eggs" in canon):
-        return "פסטה זהובה עם ביצים" if language == "he" else "Golden pasta with eggs"
-    if "pasta" in canon:
-        return "פסטה ביתית" if language == "he" else "Homestyle pasta"
-    if len(source) >= 2:
-        first, second = source[0], source[1]
-        return f"{first} עם {second}" if language == "he" else f"{first} with {second}"
-    if source:
-        first = source[0]
-        return f"{first} במחבת" if language == "he" else f"{first} skillet"
-    return "מנה ביתית מהמטבח" if language == "he" else "Homestyle dish"
+    from recipe_title import build_title_from_ingredients
+
+    return build_title_from_ingredients(source or recipe_ingredients, language=language, recipe_type="meal")
 
 
 def repair_recipe_grounding(recipe: dict, user_ingredients_raw: str, language: str = "he") -> dict:

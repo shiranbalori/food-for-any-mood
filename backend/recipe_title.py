@@ -71,6 +71,8 @@ KNOWN_DISH_PREFIXES = [
 ]
 
 FORBIDDEN_GENERIC_TITLES = {
+    "קמח במחבת",
+    "ביצה עם משהו",
     "תבשיל ביתי",
     "קינוח גבינה",
     "עוגה ביתית",
@@ -178,19 +180,32 @@ def build_title_from_ingredients(
     main_names = [name for name in main_names if name]
     main_canon = _main_canon(ingredients)
 
+    canon_set = set(main_canon)
+
     if not main_names:
         return "Homemade Dish" if language == "en" else "מנה ביתית מהמטבח"
-    if "chicken" in main_canon:
-        return "Homemade Chicken Dish" if language == "en" else "עוף ביתי"
-    if {"beef", "steak"} & set(main_canon):
-        return "Homemade Beef Dish" if language == "en" else "בשר בקר ביתי"
-    if "pasta" in main_canon:
-        return "Creamy Pasta" if language == "en" else "פסטה ביתית"
-    if "rice" in main_canon:
-        return "Homemade Rice Dish" if language == "en" else "אורז ביתי"
 
-    first = main_names[0]
-    return f"{first} Skillet" if language == "en" else f"{first} במחבת"
+    if "flour" in canon_set and ("egg" in canon_set or "eggs" in canon_set):
+        return "Quick flour and egg fritters" if language == "en" else "לביבות קמח וביצה מהירות"
+    if "cheese" in canon_set and ("egg" in canon_set or "eggs" in canon_set):
+        return "Soft cheese omelette" if language == "en" else "חביתת גבינה רכה"
+    if "pasta" in canon_set and ("egg" in canon_set or "eggs" in canon_set):
+        return "Pasta with egg and herbs" if language == "en" else "פסטה עם ביצה ועשבי תיבול"
+    if "cheese" in canon_set:
+        return "Soft cheese omelette" if language == "en" else "חביתת גבינה רכה"
+    if "egg" in canon_set or "eggs" in canon_set:
+        return "Quick omelette" if language == "en" else "חביתה מהירה"
+    if "chicken" in canon_set:
+        return "Simple chicken skillet" if language == "en" else "עוף במחבת פשוט"
+    if {"beef", "steak"} & canon_set:
+        return "Simple beef skillet" if language == "en" else "בשר במחבת פשוט"
+    if "pasta" in canon_set:
+        return "Homestyle pasta" if language == "en" else "פסטה ביתית"
+    if "rice" in canon_set:
+        return "Homestyle rice" if language == "en" else "אורז ביתי"
+
+    joined = _join_english_names(main_names) if language == "en" else _join_hebrew_names(main_names)
+    return f"Quick {joined} dish" if language == "en" else f"מנה מהירה עם {joined}"
 
 
 GENERIC_DISH_TITLES = {

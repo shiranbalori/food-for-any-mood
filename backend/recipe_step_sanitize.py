@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import re
 
+from home_cooking_language import sanitize_home_cooking_step
+
 PLACEHOLDER_PATTERNS = (
     r"\(strawberry\)",
     r"\[ingredient\]",
@@ -35,5 +37,6 @@ def light_sanitize_step_text(text: str) -> str:
     return re.sub(r"\s{2,}", " ", line).strip()
 
 
-def light_sanitize_recipe_steps(steps: list[str]) -> list[str]:
-    return [step for step in (light_sanitize_step_text(s) for s in (steps or [])) if step]
+def light_sanitize_recipe_steps(steps: list[str], *, language: str = "he") -> list[str]:
+    cleaned = [step for step in (light_sanitize_step_text(s) for s in (steps or [])) if step]
+    return [sanitize_home_cooking_step(step, language) for step in cleaned]

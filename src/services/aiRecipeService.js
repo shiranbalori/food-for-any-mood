@@ -513,6 +513,8 @@ async function generateAIRecipeCore(userInput) {
 
   const feasibility = assessIngredientFeasibility(normalized.ingredients, {
     recipeType: normalized.recipeType,
+    category: normalized.category,
+    isGlutenFree: normalized.isGlutenFree,
     language: normalized.language,
   })
   timer.mark('assessIngredientFeasibility', feasibility.recipePossible ? 'Success' : 'Failed')

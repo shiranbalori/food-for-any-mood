@@ -7,6 +7,7 @@ import { ingredientAppearsInText, parseUserIngredients } from './ingredientRelev
 import { parseAnyLeadingMeasurement } from './measurementUnits'
 import { hasRepeatedParentheticalIngredients } from './ingredientFormatting'
 import { findUnauthorizedRecipeIngredients, SYSTEM_PANTRY_CANONICAL } from './ingredientAllowlist'
+import { assessCategoryFit } from './recipeCategoryFit'
 
 const PLACEHOLDER_PATTERNS = [
   /\(strawberry\)/i,
@@ -127,7 +128,10 @@ function classifyCanons(canons) {
   }
 }
 
-export function assessIngredientFeasibility(userIngredientsRaw, { recipeType = 'meal', language = 'he' } = {}) {
+export function assessIngredientFeasibility(
+  userIngredientsRaw,
+  { recipeType = 'meal', category = 'dairy', isGlutenFree = false, language = 'he' } = {},
+) {
   const userIngredients = parseUserIngredients(userIngredientsRaw)
   const isHe = language === 'he'
 
@@ -187,6 +191,16 @@ export function assessIngredientFeasibility(userIngredientsRaw, { recipeType = '
           : 'These ingredients cannot make a full meal — main components are missing.',
         missingIngredients: isHe ? ['חלבון', 'פחמימה', 'או ירק מרכזי'] : ['protein', 'starch, or a main vegetable'],
       }
+    }
+  }
+
+  const categoryCheck = assessCategoryFit(userIngredientsRaw, { category, isGlutenFree, language })
+  if (!categoryCheck.categoryOk) {
+    return {
+      recipePossible: false,
+      reason: categoryCheck.reason,
+      missingIngredients: categoryCheck.missingIngredients ?? [],
+      suggestedCategory: categoryCheck.suggestedCategory,
     }
   }
 

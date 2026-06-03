@@ -19,6 +19,7 @@ from recipe_grounding import repair_recipe_grounding, validate_recipe_grounding
 from recipe_quantities import apply_recipe_quantities
 from recipe_pre_return_validation import validate_recipe_before_return
 from recipe_step_sanitize import light_sanitize_recipe_steps
+from recipe_tags import apply_derived_recipe_tags
 from recipe_utils import is_staple
 from measurement_units import (
     format_hebrew_measurement,
@@ -398,6 +399,7 @@ def apply_recipe_ingredient_parser(
     servings: int | None = None,
     recipe_type: str | None = None,
     category: str | None = None,
+    is_gluten_free: bool = False,
     language: str = "he",
     preserve_original_steps: bool = False,
 ) -> tuple[dict, dict]:
@@ -419,9 +421,20 @@ def apply_recipe_ingredient_parser(
     user_ingredients = parse_user_ingredients(user_ingredients_raw)
     quantified["ingredients"] = _dedupe_ingredients(list(quantified.get("ingredients") or []))
     if preserve_original_steps:
-        quantified["steps"] = light_sanitize_recipe_steps(quantified.get("steps") or [])
+        quantified["steps"] = light_sanitize_recipe_steps(
+            quantified.get("steps") or [],
+            language=language,
+        )
     if user_ingredients:
         quantified = repair_recipe_grounding(quantified, user_ingredients_raw, language)
+    quantified = apply_derived_recipe_tags(
+        quantified,
+        category=category or "dairy",
+        is_gluten_free=is_gluten_free,
+        recipe_type=recipe_type or "meal",
+        spice_level=int(quantified.get("spiceLevel") or 0),
+        cook_time=int(cooking_time or 30),
+    )
     validation = validate_recipe_quality(
         user_ingredients,
         quantified,

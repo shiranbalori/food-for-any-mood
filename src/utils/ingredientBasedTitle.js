@@ -154,6 +154,23 @@ export function buildTitleFromIngredients(
   if (mainCanon.includes('beef') || mainCanon.includes('steak')) {
     return language === 'en' ? 'Homemade Beef Dish' : 'בשר בקר ביתי'
   }
+  const canonSet = new Set(mainCanon)
+
+  if (canonSet.has('flour') && (canonSet.has('egg') || canonSet.has('eggs'))) {
+    return language === 'en' ? 'Quick flour and egg fritters' : 'לביבות קמח וביצה מהירות'
+  }
+  if (canonSet.has('cheese') && (canonSet.has('egg') || canonSet.has('eggs'))) {
+    return language === 'en' ? 'Soft cheese omelette' : 'חביתת גבינה רכה'
+  }
+  if (canonSet.has('pasta') && (canonSet.has('egg') || canonSet.has('eggs'))) {
+    return language === 'en' ? 'Pasta with egg and herbs' : 'פסטה עם ביצה ועשבי תיבול'
+  }
+  if (canonSet.has('cheese')) {
+    return language === 'en' ? 'Soft cheese omelette' : 'חביתת גבינה רכה'
+  }
+  if (canonSet.has('egg') || canonSet.has('eggs')) {
+    return language === 'en' ? 'Quick omelette' : 'חביתה מהירה'
+  }
   if (mainCanon.includes('pasta')) {
     return buildGroundedChefTitle(ingredients, ingredients, language)
   }
@@ -161,6 +178,6 @@ export function buildTitleFromIngredients(
     return language === 'en' ? 'Homestyle Rice Dish' : 'אורז ביתי'
   }
 
-  const first = mainNames[0]
-  return language === 'en' ? `${first} Skillet` : `${first} במחבת`
+  const joined = language === 'en' ? joinEnglishNames(mainNames) : joinHebrewNames(mainNames)
+  return language === 'en' ? `Quick ${joined} dish` : `מנה מהירה עם ${joined}`
 }
