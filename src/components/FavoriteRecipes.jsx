@@ -23,7 +23,7 @@ export default function FavoriteRecipes({ recipes, onRemove, onSelect }) {
       <section className="favorite-recipes favorite-recipes--empty">
         <h2 className="section-title">{t('favoriteRecipesTitle')}</h2>
         <div className="favorite-recipes__empty">
-          <span>⭐</span>
+          <span aria-hidden="true">❤️</span>
           <p>{t('favoritesEmpty')}</p>
         </div>
       </section>

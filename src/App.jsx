@@ -352,10 +352,6 @@ export default function App() {
     }
   }, [recipe, ideasLoading, category, form])
 
-  const closeMyAreaPage = () => {
-    setActiveMyAreaPage(null)
-  }
-
   const goHome = () => {
     setMyAreaOpen(false)
     setActiveMyAreaPage(null)
@@ -460,11 +456,7 @@ export default function App() {
         <Header onOpenMyArea={() => setMyAreaOpen(true)} onGoHome={goHome} />
 
         {activeMyAreaPage ? (
-          <MyAreaPageSection
-            titleKey={getMyAreaNavItem(activeMyAreaPage)?.labelKey}
-            onBack={closeMyAreaPage}
-            onHome={goHome}
-          >
+          <MyAreaPageSection titleKey={getMyAreaNavItem(activeMyAreaPage)?.labelKey}>
             {renderMyAreaPageContent()}
           </MyAreaPageSection>
         ) : (
