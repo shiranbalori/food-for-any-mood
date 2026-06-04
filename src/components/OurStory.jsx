@@ -30,8 +30,6 @@ export default function OurStory() {
 
         <header className="our-story__brand">
           <p className="our-story__app-name">FOOD FOR ANY MOOD</p>
-          <p className="our-story__byline">{t('ourStoryByline')}</p>
-          <p className="our-story__author">Shiran Balori</p>
         </header>
 
         <div className="our-story__body">
