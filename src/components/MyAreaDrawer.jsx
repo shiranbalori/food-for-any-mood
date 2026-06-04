@@ -12,7 +12,11 @@ export const MY_AREA_PANELS = {
   story: 'story',
 }
 
-const NAV_ITEMS = [
+export function getMyAreaNavItem(panelId) {
+  return MY_AREA_PANEL_NAV.find((item) => item.id === panelId) ?? null
+}
+
+export const MY_AREA_PANEL_NAV = [
   { id: MY_AREA_PANELS.weekly, icon: '📅', labelKey: 'myAreaNavWeekly' },
   { id: MY_AREA_PANELS.saved, icon: '📌', labelKey: 'myAreaNavSaved', badgeKey: 'saved' },
   { id: MY_AREA_PANELS.favorites, icon: '❤️', labelKey: 'myAreaNavFavorites', badgeKey: 'favorites' },
@@ -23,10 +27,8 @@ const NAV_ITEMS = [
 
 export default function MyAreaDrawer({
   open,
-  activePanel,
   onClose,
   onSelectPanel,
-  onBack,
   savedCount = 0,
   favoritesCount = 0,
   myRecipesCount = 0,
@@ -36,7 +38,6 @@ export default function MyAreaDrawer({
   searchPrivateRecipes = [],
   searchCommunityRecipes = [],
   onSearchSelect,
-  children,
 }) {
   const { t } = useLanguage()
 
@@ -52,14 +53,11 @@ export default function MyAreaDrawer({
   useEffect(() => {
     if (!open) return undefined
     const onKeyDown = (event) => {
-      if (event.key === 'Escape') {
-        if (activePanel) onBack()
-        else onClose()
-      }
+      if (event.key === 'Escape') onClose()
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [open, activePanel, onBack, onClose])
+  }, [open, onClose])
 
   if (!open) return null
 
@@ -109,18 +107,15 @@ export default function MyAreaDrawer({
         />
 
         <nav className="my-area-drawer__tabs" aria-label={t('myAreaTitle')}>
-          {NAV_ITEMS.map((item) => {
-            const isActive = activePanel === item.id
+          {MY_AREA_PANEL_NAV.map((item) => {
             const badgeCount = item.badgeKey ? getBadgeCount(item.badgeKey) : null
 
             return (
               <button
                 key={item.id}
                 type="button"
-                className={`my-area-drawer__tab ${isActive ? 'my-area-drawer__tab--active' : ''} ${badgeCount !== null ? 'my-area-drawer__tab--has-badge' : ''}`}
+                className={`my-area-drawer__tab ${badgeCount !== null ? 'my-area-drawer__tab--has-badge' : ''}`}
                 onClick={() => onSelectPanel(item.id)}
-                aria-pressed={isActive}
-                aria-current={isActive ? 'page' : undefined}
               >
                 {badgeCount !== null && (
                   <span
@@ -140,16 +135,6 @@ export default function MyAreaDrawer({
             )
           })}
         </nav>
-
-        <div className="my-area-drawer__body">
-          {activePanel ? (
-            <div key={activePanel} className="my-area-drawer__content my-area-drawer__content--animate">
-              {children}
-            </div>
-          ) : (
-            <p className="my-area-drawer__hint">{t('myAreaSelectTab')}</p>
-          )}
-        </div>
       </aside>
     </div>
   )

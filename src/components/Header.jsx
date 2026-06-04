@@ -4,9 +4,10 @@ import { useLanguage } from '../i18n/useLanguage'
 import LanguageToggle from './LanguageToggle'
 import InstallAppButton from './InstallAppButton'
 import AuthModal from './AuthModal'
+import HomeIcon from './HomeIcon'
 import './Header.css'
 
-export default function Header({ onOpenMyArea }) {
+export default function Header({ onOpenMyArea, onGoHome }) {
   const { t } = useLanguage()
   const { isAuthenticated, displayName, signOut, isSupabaseReady, loading } = useAuth()
   const [authOpen, setAuthOpen] = useState(false)
@@ -54,6 +55,16 @@ export default function Header({ onOpenMyArea }) {
           </div>
         )}
         <div className="header__toolbar">
+          {onGoHome && (
+            <button
+              type="button"
+              className="header__home-btn"
+              onClick={onGoHome}
+              aria-label={t('myAreaHomeLabel')}
+            >
+              <HomeIcon size={19} className="header__home-btn-icon" />
+            </button>
+          )}
           {onOpenMyArea && (
             <button type="button" className="header__my-area-btn" onClick={onOpenMyArea}>
               <span className="header__my-area-icon" aria-hidden="true">

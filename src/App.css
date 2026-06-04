@@ -31,6 +31,11 @@
   padding: max(0.85rem, env(safe-area-inset-top)) 1rem max(1.75rem, env(safe-area-inset-bottom));
 }
 
+.app__main--my-area-page {
+  max-width: min(1200px, 100%);
+  width: 100%;
+}
+
 .app__footer {
   position: relative;
   z-index: 1;

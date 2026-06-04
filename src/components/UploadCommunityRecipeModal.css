@@ -3,63 +3,118 @@
   inset: 0;
   z-index: 1100;
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   justify-content: center;
-  padding: 1rem;
+  padding: max(0.75rem, env(safe-area-inset-top)) 0.75rem max(0.75rem, env(safe-area-inset-bottom));
 }
 
 .upload-recipe-modal__backdrop {
   position: absolute;
   inset: 0;
   border: none;
-  background: rgba(15, 23, 42, 0.45);
-  backdrop-filter: blur(4px);
+  background: rgba(59, 130, 246, 0.14);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   cursor: pointer;
 }
 
 .upload-recipe-modal__panel {
   position: relative;
-  width: min(100%, 480px);
-  max-height: min(90vh, 720px);
-  overflow: auto;
-  background: var(--surface);
-  border-radius: var(--radius);
-  border: 1px solid var(--glass-border);
-  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.2);
-  padding: 1.25rem 1.35rem 1.35rem;
-  animation: mealPlanSlideUp 0.28s var(--ease-spring);
+  z-index: 1;
+  width: 92vw;
+  max-width: 620px;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: linear-gradient(
+    165deg,
+    rgba(239, 246, 255, 0.97) 0%,
+    rgba(219, 234, 254, 0.95) 42%,
+    rgba(248, 250, 252, 0.98) 100%
+  );
+  backdrop-filter: blur(28px) saturate(1.2);
+  -webkit-backdrop-filter: blur(28px) saturate(1.2);
+  border: 1px solid rgba(255, 255, 255, 0.88);
+  border-radius: 1.25rem;
+  box-shadow:
+    0 24px 64px rgba(37, 99, 235, 0.18),
+    0 8px 24px rgba(15, 23, 42, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.75);
+  padding: 0;
+  animation: uploadRecipeModalIn 0.3s var(--ease-spring) both;
+}
+
+.upload-recipe-modal__panel::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background:
+    radial-gradient(at 18% 12%, rgba(147, 197, 253, 0.32) 0%, transparent 52%),
+    radial-gradient(at 88% 82%, rgba(96, 165, 250, 0.18) 0%, transparent 46%);
+  pointer-events: none;
 }
 
 .upload-recipe-modal__header {
   position: relative;
-  margin-bottom: 1rem;
-  padding-inline-end: 2rem;
+  z-index: 1;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin: 0;
+  padding: 1rem 1.1rem 0.85rem;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.18);
 }
 
 .upload-recipe-modal__header h2 {
   margin: 0;
   font-size: 1.05rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
 }
 
 .upload-recipe-modal__close {
-  position: absolute;
-  top: 0;
-  inset-inline-end: 0;
-  width: 2rem;
-  height: 2rem;
+  position: static;
+  flex-shrink: 0;
+  width: 2.25rem;
+  height: 2.25rem;
   border-radius: 50%;
-  border: none;
-  background: rgba(148, 163, 184, 0.15);
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  background: rgba(255, 255, 255, 0.7);
   color: var(--text-muted);
-  font-size: 1.35rem;
+  font-size: 1.3rem;
   line-height: 1;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition:
+    background var(--transition),
+    color var(--transition),
+    box-shadow var(--transition);
+}
+
+.upload-recipe-modal__close:hover {
+  background: rgba(255, 255, 255, 0.95);
+  color: var(--theme-accent, #2563eb);
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.12);
 }
 
 .upload-recipe-modal__form {
+  position: relative;
+  z-index: 1;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   display: flex;
   flex-direction: column;
   gap: 0.85rem;
+  padding: 1rem 1.1rem 1.15rem;
+  padding-bottom: max(1.15rem, env(safe-area-inset-bottom));
 }
 
 .upload-recipe-modal__field {
@@ -80,7 +135,7 @@
   border: 1.5px solid rgba(148, 163, 184, 0.25);
   border-radius: var(--radius-xs);
   font-size: 0.92rem;
-  background: var(--surface-solid);
+  background: rgba(255, 255, 255, 0.82);
   resize: vertical;
 }
 
@@ -102,7 +157,7 @@
   font-size: 0.78rem;
   font-weight: 600;
   border: 1.5px solid rgba(148, 163, 184, 0.2);
-  background: var(--surface-solid);
+  background: rgba(255, 255, 255, 0.82);
   color: var(--text);
 }
 
@@ -191,8 +246,33 @@ html[dir='rtl'] .upload-recipe-modal__dietary-toggle .dietary-toggle__switch--on
   border: 1.5px solid rgba(148, 163, 184, 0.2);
 }
 
+@keyframes uploadRecipeModalIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .upload-recipe-modal__panel {
+    animation: none;
+  }
+}
+
 @media (min-width: 640px) {
   .upload-recipe-modal {
-    align-items: center;
+    padding: 1.25rem;
+  }
+
+  .upload-recipe-modal__header {
+    padding: 1.1rem 1.25rem 0.95rem;
+  }
+
+  .upload-recipe-modal__form {
+    padding: 1.1rem 1.25rem 1.35rem;
   }
 }

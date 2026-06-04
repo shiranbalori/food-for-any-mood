@@ -1,11 +1,13 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { useLanguage } from '../i18n/useLanguage'
 import { fetchCommunityRecipes } from '../services/communityRecipeService'
 import AuthModal from './AuthModal'
-import UploadCommunityRecipeModal from './UploadCommunityRecipeModal'
+import UploadCommunityRecipeForm from './UploadCommunityRecipeForm'
 import CommunityRecipeCard from './CommunityRecipeCard'
 import './CommunityRecipes.css'
+
+const UPLOAD_SECTION_ID = 'community-upload-section'
 
 export default function CommunityRecipes() {
   const { t } = useLanguage()
@@ -15,7 +17,8 @@ export default function CommunityRecipes() {
   const [error, setError] = useState('')
   const [authOpen, setAuthOpen] = useState(false)
   const [authMode, setAuthMode] = useState('login')
-  const [uploadOpen, setUploadOpen] = useState(false)
+  const [uploadExpanded, setUploadExpanded] = useState(false)
+  const uploadSectionRef = useRef(null)
 
   const loadRecipes = useCallback(async () => {
     setLoading(true)
@@ -41,6 +44,13 @@ export default function CommunityRecipes() {
     setAuthOpen(true)
   }
 
+  const scrollToUploadSection = () => {
+    setUploadExpanded(true)
+    window.requestAnimationFrame(() => {
+      uploadSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    })
+  }
+
   const handleUploadClick = () => {
     if (!isSupabaseReady) {
       window.alert(t('authSupabaseMissing'))
@@ -50,13 +60,12 @@ export default function CommunityRecipes() {
       openAuth('login')
       return
     }
-    setUploadOpen(true)
+    scrollToUploadSection()
   }
 
   return (
     <section className="community-recipes">
       <div className="community-recipes__header">
-        <h2 className="section-title">{t('communityRecipesTitle')}</h2>
         <button
           type="button"
           className="btn btn--ghost community-recipes__upload"
@@ -94,16 +103,23 @@ export default function CommunityRecipes() {
         ))}
       </div>
 
-      <AuthModal open={authOpen} onClose={() => setAuthOpen(false)} initialMode={authMode} />
-
       {isAuthenticated && (
-        <UploadCommunityRecipeModal
-          open={uploadOpen}
-          onClose={() => setUploadOpen(false)}
-          userId={user.id}
-          onUploaded={loadRecipes}
-        />
+        <section
+          ref={uploadSectionRef}
+          id={UPLOAD_SECTION_ID}
+          className={`community-upload ${uploadExpanded ? 'community-upload--expanded' : ''}`}
+          aria-labelledby="community-upload-title"
+        >
+          <h2 id="community-upload-title" className="community-upload__title">
+            {t('communityUploadRecipe')}
+          </h2>
+          <div className="community-upload__body">
+            <UploadCommunityRecipeForm userId={user.id} onUploaded={loadRecipes} />
+          </div>
+        </section>
       )}
+
+      <AuthModal open={authOpen} onClose={() => setAuthOpen(false)} initialMode={authMode} />
     </section>
   )
 }

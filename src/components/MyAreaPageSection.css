@@ -1,0 +1,176 @@
+.my-area-page {
+  width: 100%;
+  animation: fadeInUp 0.4s var(--ease-spring) both;
+}
+
+.my-area-page__header {
+  position: sticky;
+  top: max(0.35rem, env(safe-area-inset-top));
+  z-index: 12;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.65rem 0.75rem;
+  margin-bottom: 1.15rem;
+  padding: 0.75rem 0.9rem;
+  background: linear-gradient(
+    165deg,
+    rgba(239, 246, 255, 0.96) 0%,
+    rgba(248, 250, 252, 0.94) 100%
+  );
+  backdrop-filter: blur(22px) saturate(1.15);
+  -webkit-backdrop-filter: blur(22px) saturate(1.15);
+  border-radius: var(--radius);
+  border: 1px solid var(--glass-border);
+  box-shadow:
+    0 4px 24px rgba(15, 23, 42, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.75);
+}
+
+.my-area-page__nav {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex-shrink: 0;
+}
+
+.my-area-page__home,
+.my-area-page__back {
+  flex-shrink: 0;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  background: rgba(255, 255, 255, 0.72);
+  cursor: pointer;
+  transition:
+    background var(--transition),
+    box-shadow var(--transition),
+    transform 0.2s var(--ease-spring);
+}
+
+.my-area-page__home {
+  width: 2.35rem;
+  height: 2.35rem;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  box-shadow: 0 2px 10px rgba(37, 99, 235, 0.1);
+}
+
+.my-area-page__home-icon {
+  font-size: 1.05rem;
+  line-height: 1;
+}
+
+.my-area-page__home:hover,
+.my-area-page__back:hover {
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.14);
+}
+
+.my-area-page__home:active,
+.my-area-page__back:active {
+  transform: scale(0.97);
+}
+
+.my-area-page__back {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.4rem 0.8rem;
+  border-radius: 999px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--theme-accent, #2563eb);
+}
+
+.my-area-page__back-arrow {
+  font-size: 0.95rem;
+  line-height: 1;
+}
+
+html[dir='rtl'] .my-area-page__back-arrow {
+  transform: scaleX(-1);
+}
+
+.my-area-page__title {
+  flex: 1 1 100%;
+  min-width: 0;
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--text);
+  text-align: start;
+}
+
+@media (min-width: 480px) {
+  .my-area-page__header {
+    flex-wrap: nowrap;
+    padding: 0.85rem 1rem;
+  }
+
+  .my-area-page__title {
+    flex: 1 1 auto;
+  }
+}
+
+.my-area-page__content > .weekly-plan,
+.my-area-page__content > .saved-recipes,
+.my-area-page__content > .favorite-recipes,
+.my-area-page__content > .community-recipes,
+.my-area-page__content > .my-recipes,
+.my-area-page__content > .our-story {
+  margin-bottom: 0;
+  animation: none;
+}
+
+.my-area-page__content .section-title,
+.my-area-page__content .our-story__section-title {
+  display: none;
+}
+
+.my-area-page__content .weekly-plan__header .section-title {
+  display: block;
+  font-size: 1rem;
+  margin-bottom: 0;
+}
+
+.my-area-page__content .weekly-plan__header {
+  margin-bottom: 0.85rem;
+}
+
+.my-area-page__content .my-recipes__header,
+.my-area-page__content .community-recipes__header {
+  justify-content: flex-end;
+  margin-bottom: 1rem;
+}
+
+.my-area-page__content .community-recipes__grid {
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 640px) {
+  .my-area-page__content .community-recipes__grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1024px) {
+  .my-area-page__content .community-recipes__grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 640px) {
+  .my-area-page__content .saved-recipes__grid,
+  .my-area-page__content .favorite-recipes__grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .my-area-page {
+    animation: none;
+  }
+}

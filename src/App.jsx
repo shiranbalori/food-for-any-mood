@@ -16,7 +16,8 @@ import { fetchUserRecipes, isUserRecipesAvailable } from './services/userRecipeS
 import { fetchCommunityRecipes } from './services/communityRecipeService'
 import FavoriteRecipes from './components/FavoriteRecipes'
 import WeeklyMealPlanner from './components/WeeklyMealPlanner'
-import MyAreaDrawer, { MY_AREA_PANELS } from './components/MyAreaDrawer'
+import MyAreaDrawer, { MY_AREA_PANELS, getMyAreaNavItem } from './components/MyAreaDrawer'
+import MyAreaPageSection from './components/MyAreaPageSection'
 import { useLanguage } from './i18n/useLanguage'
 import { getTheme } from './utils/themes'
 import { generateAppRecipe } from './services/recipeService'
@@ -74,7 +75,7 @@ export default function App() {
   const [ideasLoading, setIdeasLoading] = useState(false)
   const [mealPlan, setMealPlan] = useState(getMealPlan)
   const [myAreaOpen, setMyAreaOpen] = useState(false)
-  const [myAreaPanel, setMyAreaPanel] = useState(null)
+  const [activeMyAreaPage, setActiveMyAreaPage] = useState(null)
   const [searchCommunityRecipes, setSearchCommunityRecipes] = useState([])
   const [searchPrivateRecipes, setSearchPrivateRecipes] = useState([])
   const [stepsRegenerating, setStepsRegenerating] = useState(false)
@@ -351,16 +352,70 @@ export default function App() {
     }
   }, [recipe, ideasLoading, category, form])
 
+  const closeMyAreaPage = () => {
+    setActiveMyAreaPage(null)
+  }
+
+  const goHome = () => {
+    setMyAreaOpen(false)
+    setActiveMyAreaPage(null)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
   const closeMyArea = () => {
     setMyAreaOpen(false)
-    setMyAreaPanel(null)
+    setActiveMyAreaPage(null)
+  }
+
+  const openMyAreaPanel = (panelId) => {
+    setMyAreaOpen(false)
+    setActiveMyAreaPage(panelId)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  const renderMyAreaPageContent = () => {
+    switch (activeMyAreaPage) {
+      case MY_AREA_PANELS.weekly:
+        return (
+          <WeeklyMealPlanner
+            plan={mealPlan}
+            onRemoveSlot={handleRemoveFromMealPlan}
+            onClear={handleClearMealPlan}
+            onSelectRecipe={handleSelectSaved}
+          />
+        )
+      case MY_AREA_PANELS.favorites:
+        return (
+          <FavoriteRecipes
+            recipes={favoriteRecipes}
+            onRemove={handleRemoveFavorite}
+            onSelect={handleSelectSaved}
+          />
+        )
+      case MY_AREA_PANELS.saved:
+        return (
+          <SavedRecipes
+            recipes={savedRecipes}
+            onRemove={handleRemove}
+            onSelect={handleSelectSaved}
+          />
+        )
+      case MY_AREA_PANELS.myRecipes:
+        return <MyRecipes onRecipesChanged={refreshMyRecipesCount} />
+      case MY_AREA_PANELS.community:
+        return <CommunityRecipes />
+      case MY_AREA_PANELS.story:
+        return <OurStory />
+      default:
+        return null
+    }
   }
 
   const handleSearchSelect = (result) => {
     if (!result) return
 
     if (result.type === 'section') {
-      setMyAreaPanel(result.panelId)
+      openMyAreaPanel(result.panelId)
       return
     }
 
@@ -401,9 +456,19 @@ export default function App() {
       <BackgroundDecor theme={theme} />
       <div className="app__bg" />
 
-      <main className="app__main">
-        <Header onOpenMyArea={() => setMyAreaOpen(true)} />
+      <main className={`app__main ${activeMyAreaPage ? 'app__main--my-area-page' : ''}`}>
+        <Header onOpenMyArea={() => setMyAreaOpen(true)} onGoHome={goHome} />
 
+        {activeMyAreaPage ? (
+          <MyAreaPageSection
+            titleKey={getMyAreaNavItem(activeMyAreaPage)?.labelKey}
+            onBack={closeMyAreaPage}
+            onHome={goHome}
+          >
+            {renderMyAreaPageContent()}
+          </MyAreaPageSection>
+        ) : (
+          <>
         <CategorySelector
           selected={category}
           onSelect={setCategory}
@@ -480,15 +545,15 @@ export default function App() {
             onMealPlanUpdated={handleMealPlanUpdated}
           />
         )}
+          </>
+        )}
 
       </main>
 
       <MyAreaDrawer
         open={myAreaOpen}
-        activePanel={myAreaPanel}
-        onClose={closeMyArea}
-        onSelectPanel={setMyAreaPanel}
-        onBack={() => setMyAreaPanel(null)}
+        onClose={() => setMyAreaOpen(false)}
+        onSelectPanel={openMyAreaPanel}
         savedCount={savedRecipes.length}
         favoritesCount={favoriteRecipes.length}
         myRecipesCount={myRecipesCount}
@@ -498,35 +563,7 @@ export default function App() {
         searchPrivateRecipes={searchPrivateRecipes}
         searchCommunityRecipes={searchCommunityRecipes}
         onSearchSelect={handleSearchSelect}
-      >
-        {myAreaPanel === MY_AREA_PANELS.weekly && (
-          <WeeklyMealPlanner
-            plan={mealPlan}
-            onRemoveSlot={handleRemoveFromMealPlan}
-            onClear={handleClearMealPlan}
-            onSelectRecipe={handleSelectSaved}
-          />
-        )}
-        {myAreaPanel === MY_AREA_PANELS.favorites && (
-          <FavoriteRecipes
-            recipes={favoriteRecipes}
-            onRemove={handleRemoveFavorite}
-            onSelect={handleSelectSaved}
-          />
-        )}
-        {myAreaPanel === MY_AREA_PANELS.saved && (
-          <SavedRecipes
-            recipes={savedRecipes}
-            onRemove={handleRemove}
-            onSelect={handleSelectSaved}
-          />
-        )}
-        {myAreaPanel === MY_AREA_PANELS.myRecipes && (
-          <MyRecipes onRecipesChanged={refreshMyRecipesCount} />
-        )}
-        {myAreaPanel === MY_AREA_PANELS.community && <CommunityRecipes />}
-        {myAreaPanel === MY_AREA_PANELS.story && <OurStory />}
-      </MyAreaDrawer>
+      />
 
       <footer className="app__footer">
         <p>{t('footer')}</p>

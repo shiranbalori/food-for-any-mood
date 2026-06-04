@@ -4,6 +4,62 @@
 }
 
 .community-recipes__header {
+  justify-content: flex-end;
+}
+
+.community-upload {
+  margin-top: 2rem;
+  scroll-margin-top: max(1rem, env(safe-area-inset-top));
+  padding: 1rem 1.1rem;
+  background: var(--surface);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-radius: var(--radius);
+  border: 1px solid var(--glass-border);
+  box-shadow: 0 4px 24px rgba(15, 23, 42, 0.06);
+}
+
+.community-upload__title {
+  margin: 0 0 0.85rem;
+  font-size: 1.05rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--text);
+  text-align: start;
+}
+
+.community-upload__body {
+  max-height: 0;
+  overflow: hidden;
+  opacity: 0;
+  transition:
+    max-height 0.45s ease,
+    opacity 0.3s ease;
+}
+
+.community-upload--expanded .community-upload__body {
+  max-height: 8000px;
+  opacity: 1;
+}
+
+.community-upload__form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  flex: none;
+  min-height: 0;
+  max-height: none;
+  overflow: visible;
+  padding: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .community-upload__body {
+    transition: none;
+  }
+}
+
+.community-recipes__header {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
