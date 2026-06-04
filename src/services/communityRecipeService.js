@@ -1,5 +1,6 @@
 import { isSupabaseConfigured, supabase } from '../lib/supabaseClient'
 import { MOCK_COMMUNITY_RECIPES } from '../data/mockCommunityRecipes'
+import { enrichCommunityRecipe } from '../utils/communityRecipeRanking'
 
 export const COMMUNITY_RECIPE_IMAGE_BUCKET = 'community-recipe-images'
 export const COMMUNITY_RECIPE_IMAGE_MAX_BYTES = 5 * 1024 * 1024
@@ -18,7 +19,13 @@ function averageRating(ratings) {
 }
 
 function mapMockRecipe(recipe) {
-  return {
+  const ratingsCount = recipe.ratingCount ?? 0
+  const savesCount = recipe.likeCount ?? 0
+  const viewsCount = recipe.views ?? 0
+  const sharesCount = recipe.sharesCount ?? 0
+  const averageRatingValue = recipe.rating ?? 0
+
+  return enrichCommunityRecipe({
     id: recipe.id,
     title: recipe.title,
     description: '',
@@ -29,21 +36,32 @@ function mapMockRecipe(recipe) {
     imageUrl: recipe.imageUrl ?? null,
     authorId: null,
     authorName: recipe.authorName,
-    rating: recipe.rating ?? 0,
-    ratingCount: recipe.ratingCount ?? 0,
-    views: recipe.views ?? 0,
-    likeCount: recipe.likeCount ?? 0,
+    averageRating: averageRatingValue,
+    rating: averageRatingValue,
+    ratingCount: ratingsCount,
+    totalRatings: ratingsCount,
+    ratingsCount,
+    views: viewsCount,
+    viewsCount,
+    likeCount: savesCount,
+    savesCount,
+    sharesCount,
     userLiked: false,
     userRating: null,
     isGlutenFree: recipe.isGlutenFree ?? false,
-    createdAt: null,
-  }
+    createdAt: recipe.createdAt ?? null,
+  })
 }
 
-function mapDbRecipe(row, { profileMap, likeCountMap, ratingsByRecipe, userLikeSet, userRatingMap }) {
+function mapDbRecipe(row, { profileMap, likeCountMap, shareCountMap, ratingsByRecipe, userLikeSet, userRatingMap }) {
   const recipeRatings = ratingsByRecipe.get(row.id) ?? []
+  const ratingsCount = recipeRatings.length
+  const averageRatingValue = averageRating(recipeRatings)
+  const savesCount = likeCountMap.get(row.id) ?? 0
+  const viewsCount = row.view_count ?? 0
+  const sharesCount = shareCountMap.get(row.id) ?? 0
 
-  return {
+  return enrichCommunityRecipe({
     id: row.id,
     title: row.title,
     description: row.description ?? '',
@@ -54,15 +72,21 @@ function mapDbRecipe(row, { profileMap, likeCountMap, ratingsByRecipe, userLikeS
     imageUrl: row.image_url ?? null,
     authorId: row.user_id,
     authorName: profileMap.get(row.user_id) ?? '—',
-    rating: averageRating(recipeRatings),
-    ratingCount: recipeRatings.length,
-    views: row.view_count ?? 0,
-    likeCount: likeCountMap.get(row.id) ?? 0,
+    averageRating: averageRatingValue,
+    rating: averageRatingValue,
+    ratingCount: ratingsCount,
+    totalRatings: ratingsCount,
+    ratingsCount,
+    views: viewsCount,
+    viewsCount,
+    likeCount: savesCount,
+    savesCount,
+    sharesCount,
     userLiked: userLikeSet.has(row.id),
     userRating: userRatingMap.get(row.id) ?? null,
     isGlutenFree: Boolean(row.is_gluten_free),
     createdAt: row.created_at,
-  }
+  })
 }
 
 function buildCountMap(rows, key) {
@@ -169,6 +193,7 @@ export async function fetchCommunityRecipes(userId) {
       ? supabase.from('profiles').select('id, display_name').in('id', userIds)
       : Promise.resolve({ data: [], error: null }),
     supabase.from('recipe_likes').select('recipe_id').in('recipe_id', recipeIds),
+    supabase.from('recipe_shares').select('recipe_id').in('recipe_id', recipeIds),
     supabase.from('recipe_ratings').select('recipe_id, rating').in('recipe_id', recipeIds),
     userId
       ? supabase.from('recipe_likes').select('recipe_id').eq('user_id', userId)
@@ -178,7 +203,7 @@ export async function fetchCommunityRecipes(userId) {
       : Promise.resolve({ data: [], error: null }),
   ]
 
-  const [profilesRes, allLikesRes, allRatingsRes, userLikesRes, userRatingsRes] =
+  const [profilesRes, allLikesRes, allSharesRes, allRatingsRes, userLikesRes, userRatingsRes] =
     await Promise.all(fetches)
 
   if (profilesRes.error) {
@@ -186,6 +211,9 @@ export async function fetchCommunityRecipes(userId) {
   }
   if (allLikesRes.error) {
     console.error('[communityRecipeService] likes fetch:', allLikesRes.error)
+  }
+  if (allSharesRes.error) {
+    console.error('[communityRecipeService] shares fetch:', allSharesRes.error)
   }
   if (allRatingsRes.error) {
     console.error('[communityRecipeService] ratings fetch:', allRatingsRes.error)
@@ -201,6 +229,7 @@ export async function fetchCommunityRecipes(userId) {
     (profilesRes.data ?? []).map((profile) => [profile.id, profile.display_name]),
   )
   const likeCountMap = buildCountMap(allLikesRes.data, 'recipe_id')
+  const shareCountMap = buildCountMap(allSharesRes.data, 'recipe_id')
   const ratingsByRecipe = buildRatingsMap(allRatingsRes.data)
   const userLikeSet = new Set((userLikesRes.data ?? []).map((row) => row.recipe_id))
   const userRatingMap = new Map(
@@ -211,6 +240,7 @@ export async function fetchCommunityRecipes(userId) {
     mapDbRecipe(row, {
       profileMap,
       likeCountMap,
+      shareCountMap,
       ratingsByRecipe,
       userLikeSet,
       userRatingMap,
@@ -298,16 +328,15 @@ export async function toggleRecipeLike(userId, recipeId, currentlyLiked) {
 export async function rateCommunityRecipe(userId, recipeId, rating) {
   if (!supabase) throw new Error('SUPABASE_NOT_CONFIGURED')
 
-  const { error } = await supabase.from('recipe_ratings').upsert(
-    {
-      user_id: userId,
-      recipe_id: recipeId,
-      rating,
-      updated_at: new Date().toISOString(),
-    },
-    { onConflict: 'recipe_id,user_id' },
-  )
+  const { error } = await supabase.from('recipe_ratings').insert({
+    user_id: userId,
+    recipe_id: recipeId,
+    rating,
+  })
 
+  if (error?.code === '23505') {
+    throw new Error('ALREADY_RATED')
+  }
   if (error) throw error
 }
 
@@ -319,4 +348,19 @@ export async function incrementRecipeViews(recipeId) {
   })
 
   if (error) console.error('[communityRecipeService] increment views:', error)
+}
+
+/**
+ * @param {string | null | undefined} userId
+ * @param {string} recipeId
+ */
+export async function incrementRecipeShare(userId, recipeId) {
+  if (!supabase) return
+
+  const { error } = await supabase.from('recipe_shares').insert({
+    recipe_id: recipeId,
+    user_id: userId ?? null,
+  })
+
+  if (error) console.error('[communityRecipeService] increment share:', error)
 }

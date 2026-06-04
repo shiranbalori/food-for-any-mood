@@ -190,6 +190,28 @@ create policy "Users can update own ratings"
   with check (auth.uid() = user_id);
 
 -- ---------------------------------------------------------------------------
+-- Shares
+-- ---------------------------------------------------------------------------
+create table if not exists public.recipe_shares (
+  id uuid primary key default gen_random_uuid(),
+  recipe_id uuid not null references public.community_recipes (id) on delete cascade,
+  user_id uuid references auth.users (id) on delete set null,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists recipe_shares_recipe_id_idx on public.recipe_shares (recipe_id);
+
+alter table public.recipe_shares enable row level security;
+
+create policy "Shares are viewable by everyone"
+  on public.recipe_shares for select
+  using (true);
+
+create policy "Anyone can record a share"
+  on public.recipe_shares for insert
+  with check (user_id is null or auth.uid() = user_id);
+
+-- ---------------------------------------------------------------------------
 -- Helpers
 -- ---------------------------------------------------------------------------
 create or replace function public.increment_recipe_views(recipe_uuid uuid)
@@ -266,3 +288,4 @@ grant select on public.recipe_likes to anon, authenticated;
 grant insert, delete on public.recipe_likes to authenticated;
 grant select on public.recipe_ratings to anon, authenticated;
 grant insert, update on public.recipe_ratings to authenticated;
+grant select, insert on public.recipe_shares to anon, authenticated;

@@ -77,6 +77,41 @@
   padding: 0.45rem 0.75rem;
 }
 
+.community-recipes__categories {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin-bottom: 1rem;
+}
+
+.community-recipes__category-chip {
+  padding: 0.4rem 0.7rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: rgba(255, 255, 255, 0.65);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  cursor: pointer;
+  transition:
+    color var(--transition),
+    background var(--transition),
+    border-color var(--transition);
+}
+
+.community-recipes__category-chip:hover {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.community-recipes__category-chip--active {
+  color: var(--theme-accent, #2563eb);
+  background: var(--theme-accent-light, rgba(219, 234, 254, 0.9));
+  border-color: color-mix(in srgb, var(--theme-accent, #3b82f6) 35%, transparent);
+}
+
 .community-recipes__notice,
 .community-recipes__status,
 .community-recipes__error {
@@ -215,10 +250,24 @@
 }
 
 .community-card__rating {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.1rem;
   font-size: 0.78rem;
   font-weight: 700;
   color: var(--text);
-  white-space: nowrap;
+  text-align: end;
+}
+
+.community-card__rating-count {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.community-card__saves {
+  font-weight: 600;
 }
 
 .community-card__title {
@@ -273,10 +322,33 @@
   padding: 0.45rem 0.65rem;
 }
 
+.community-card__share {
+  font-size: 0.82rem;
+  padding: 0.45rem 0.65rem;
+}
+
 .community-card__stars {
   display: flex;
-  gap: 0.15rem;
+  flex-direction: column;
+  gap: 0.35rem;
   margin-bottom: 0.5rem;
+}
+
+.community-card__stars-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.community-card__stars-row {
+  display: flex;
+  gap: 0.15rem;
+}
+
+.community-card__rated-note {
+  margin: 0;
+  font-size: 0.72rem;
+  color: var(--text-muted);
 }
 
 .community-card__star {
@@ -291,6 +363,11 @@
 
 .community-card__star--active {
   color: #d97706;
+}
+
+.community-card__star:disabled {
+  cursor: default;
+  opacity: 0.85;
 }
 
 .community-card__details {

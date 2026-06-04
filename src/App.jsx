@@ -9,6 +9,7 @@ import LoadingAnimation from './components/LoadingAnimation'
 import RecipeCard from './components/RecipeCard'
 import SavedRecipes from './components/SavedRecipes'
 import CommunityRecipes from './components/CommunityRecipes'
+import CommunityTop5 from './components/CommunityTop5'
 import MyRecipes from './components/MyRecipes'
 import OurStory from './components/OurStory'
 import { useAuth } from './context/AuthContext'
@@ -537,6 +538,8 @@ export default function App() {
             onMealPlanUpdated={handleMealPlanUpdated}
           />
         )}
+
+        {!activeMyAreaPage && <CommunityTop5 />}
           </>
         )}
 

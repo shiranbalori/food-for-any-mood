@@ -1,13 +1,24 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { useLanguage } from '../i18n/useLanguage'
 import { fetchCommunityRecipes } from '../services/communityRecipeService'
+import {
+  COMMUNITY_RECIPE_CATEGORIES,
+  sortCommunityRecipesByCategory,
+} from '../utils/communityRecipeRanking'
 import AuthModal from './AuthModal'
 import UploadCommunityRecipeForm from './UploadCommunityRecipeForm'
 import CommunityRecipeCard from './CommunityRecipeCard'
 import './CommunityRecipes.css'
 
 const UPLOAD_SECTION_ID = 'community-upload-section'
+
+const CATEGORY_OPTIONS = [
+  { id: COMMUNITY_RECIPE_CATEGORIES.new, labelKey: 'communityCategoryNew' },
+  { id: COMMUNITY_RECIPE_CATEGORIES.popular, labelKey: 'communityCategoryPopular' },
+  { id: COMMUNITY_RECIPE_CATEGORIES.topRated, labelKey: 'communityCategoryTopRated' },
+  { id: COMMUNITY_RECIPE_CATEGORIES.mostSaved, labelKey: 'communityCategoryMostSaved' },
+]
 
 export default function CommunityRecipes() {
   const { t } = useLanguage()
@@ -18,6 +29,7 @@ export default function CommunityRecipes() {
   const [authOpen, setAuthOpen] = useState(false)
   const [authMode, setAuthMode] = useState('login')
   const [uploadExpanded, setUploadExpanded] = useState(false)
+  const [activeCategory, setActiveCategory] = useState(COMMUNITY_RECIPE_CATEGORIES.new)
   const uploadSectionRef = useRef(null)
 
   const loadRecipes = useCallback(async () => {
@@ -38,6 +50,11 @@ export default function CommunityRecipes() {
     if (authLoading) return
     loadRecipes()
   }, [authLoading, loadRecipes])
+
+  const sortedRecipes = useMemo(
+    () => sortCommunityRecipesByCategory(recipes, activeCategory),
+    [recipes, activeCategory],
+  )
 
   const openAuth = (mode = 'login') => {
     setAuthMode(mode)
@@ -75,6 +92,23 @@ export default function CommunityRecipes() {
         </button>
       </div>
 
+      <div className="community-recipes__categories" role="tablist" aria-label={t('communityCategoriesLabel')}>
+        {CATEGORY_OPTIONS.map((option) => (
+          <button
+            key={option.id}
+            type="button"
+            role="tab"
+            className={`community-recipes__category-chip ${
+              activeCategory === option.id ? 'community-recipes__category-chip--active' : ''
+            }`}
+            aria-selected={activeCategory === option.id}
+            onClick={() => setActiveCategory(option.id)}
+          >
+            {t(option.labelKey)}
+          </button>
+        ))}
+      </div>
+
       {!isSupabaseReady && (
         <p className="community-recipes__notice">{t('communityMockNotice')}</p>
       )}
@@ -82,7 +116,7 @@ export default function CommunityRecipes() {
       {loading && <p className="community-recipes__status">{t('communityLoading')}</p>}
       {error && <p className="community-recipes__error">{error}</p>}
 
-      {!loading && recipes.length === 0 && (
+      {!loading && sortedRecipes.length === 0 && (
         <div className="community-recipes__empty">
           <span>👥</span>
           <p>{t('communityEmpty')}</p>
@@ -90,7 +124,7 @@ export default function CommunityRecipes() {
       )}
 
       <div className="community-recipes__grid">
-        {recipes.map((recipe) => (
+        {sortedRecipes.map((recipe) => (
           <CommunityRecipeCard
             key={recipe.id}
             recipe={recipe}

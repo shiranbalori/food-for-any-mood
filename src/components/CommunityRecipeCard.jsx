@@ -3,6 +3,7 @@ import { getTheme } from '../utils/themes'
 import { useLanguage } from '../i18n/useLanguage'
 import { sanitizeIngredientList } from '../utils/ingredientFormatting'
 import {
+  incrementRecipeShare,
   incrementRecipeViews,
   rateCommunityRecipe,
   toggleRecipeLike,
@@ -28,15 +29,18 @@ export default function CommunityRecipeCard({
   const { t, language } = useLanguage()
   const [expanded, setExpanded] = useState(false)
   const [busy, setBusy] = useState(false)
-  const [localLikeCount, setLocalLikeCount] = useState(recipe.likeCount)
+  const [localSavesCount, setLocalSavesCount] = useState(recipe.savesCount ?? recipe.likeCount ?? 0)
   const [localLiked, setLocalLiked] = useState(recipe.userLiked)
-  const [localRating, setLocalRating] = useState(recipe.rating)
+  const [localRating, setLocalRating] = useState(recipe.averageRating ?? recipe.rating ?? 0)
+  const [localRatingCount, setLocalRatingCount] = useState(recipe.totalRatings ?? recipe.ratingCount ?? 0)
   const [localUserRating, setLocalUserRating] = useState(recipe.userRating)
+  const hasRated = localUserRating != null
 
   useEffect(() => {
-    setLocalLikeCount(recipe.likeCount)
+    setLocalSavesCount(recipe.savesCount ?? recipe.likeCount ?? 0)
     setLocalLiked(recipe.userLiked)
-    setLocalRating(recipe.rating)
+    setLocalRating(recipe.averageRating ?? recipe.rating ?? 0)
+    setLocalRatingCount(recipe.totalRatings ?? recipe.ratingCount ?? 0)
     setLocalUserRating(recipe.userRating)
   }, [recipe])
 
@@ -61,34 +65,63 @@ export default function CommunityRecipeCard({
     return true
   }
 
-  const handleLike = async () => {
+  const handleSave = async () => {
     if (!requireAuth() || !isSupabaseReady || recipe.id.startsWith('mock-')) return
 
     setBusy(true)
     try {
       const liked = await toggleRecipeLike(userId, recipe.id, localLiked)
       setLocalLiked(liked)
-      setLocalLikeCount((count) => Math.max(0, count + (liked ? 1 : -1)))
+      setLocalSavesCount((count) => Math.max(0, count + (liked ? 1 : -1)))
       onUpdated?.()
     } catch (error) {
-      console.error('[CommunityRecipeCard] like failed:', error)
+      console.error('[CommunityRecipeCard] save failed:', error)
     } finally {
       setBusy(false)
     }
   }
 
   const handleRate = async (stars) => {
-    if (!requireAuth() || !isSupabaseReady || recipe.id.startsWith('mock-')) return
+    if (hasRated || !requireAuth() || !isSupabaseReady || recipe.id.startsWith('mock-')) return
 
     setBusy(true)
     try {
       await rateCommunityRecipe(userId, recipe.id, stars)
       setLocalUserRating(stars)
+      setLocalRatingCount((count) => count + 1)
       onUpdated?.()
     } catch (error) {
+      if (error?.message === 'ALREADY_RATED') return
       console.error('[CommunityRecipeCard] rate failed:', error)
     } finally {
       setBusy(false)
+    }
+  }
+
+  const handleShare = async () => {
+    if (recipe.id.startsWith('mock-')) return
+
+    const shareUrl = window.location.href
+    const shareData = {
+      title: recipe.title,
+      text: recipe.title,
+      url: shareUrl,
+    }
+
+    try {
+      if (navigator.share) {
+        await navigator.share(shareData)
+      } else if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(shareUrl)
+      }
+    } catch (error) {
+      if (error?.name === 'AbortError') return
+      console.error('[CommunityRecipeCard] share failed:', error)
+    }
+
+    if (isSupabaseReady) {
+      await incrementRecipeShare(userId ?? null, recipe.id)
+      onUpdated?.()
     }
   }
 
@@ -129,9 +162,16 @@ export default function CommunityRecipeCard({
             <span className="community-card__gf-badge">{t('glutenFreeBadge')}</span>
           ) : null}
         </div>
-        <span className="community-card__rating">
-          ⭐ {localRating > 0 ? localRating.toFixed(1) : '—'}
-        </span>
+        <div className="community-card__rating" aria-label={t('communityRateLabel')}>
+          <span className="community-card__rating-value">
+            ⭐ {localRating > 0 ? localRating.toFixed(1) : '—'}
+          </span>
+          {localRatingCount > 0 ? (
+            <span className="community-card__rating-count">
+              {t('communityRatingsCount', { count: localRatingCount })}
+            </span>
+          ) : null}
+        </div>
       </div>
 
       <h3 className="community-card__title">{recipe.title}</h3>
@@ -139,39 +179,53 @@ export default function CommunityRecipeCard({
       <p className="community-card__author">{t('communityAuthor', { name: recipe.authorName })}</p>
 
       <div className="community-card__meta">
-        <span>{t('communityViews', { count: formatViews(recipe.views, language) })}</span>
-        <span>{t('communityLikes', { count: localLikeCount })}</span>
+        <span>{t('communityViews', { count: formatViews(recipe.viewsCount ?? recipe.views ?? 0, language) })}</span>
+        <span className="community-card__saves">❤️ {localSavesCount}</span>
       </div>
 
       <div className="community-card__actions">
         <button
           type="button"
           className={`community-card__like ${localLiked ? 'community-card__like--active' : ''}`}
-          onClick={handleLike}
+          onClick={handleSave}
           disabled={busy}
         >
-          {localLiked ? '❤️' : '🤍'} {t('communityLike')}
+          {localLiked ? '❤️' : '🤍'} {t('communitySave')}
+        </button>
+        <button
+          type="button"
+          className="btn btn--ghost community-card__share"
+          onClick={handleShare}
+          disabled={busy}
+        >
+          {t('communityShare')}
         </button>
         <button type="button" className="btn btn--ghost community-card__expand" onClick={handleExpand}>
           {expanded ? t('communityHideDetails') : t('communityViewDetails')}
         </button>
       </div>
 
-      <div className="community-card__stars" aria-label={t('communityRateLabel')}>
-        {[1, 2, 3, 4, 5].map((stars) => (
-          <button
-            key={stars}
-            type="button"
-            className={`community-card__star ${
-              (localUserRating ?? 0) >= stars ? 'community-card__star--active' : ''
-            }`}
-            onClick={() => handleRate(stars)}
-            disabled={busy}
-            aria-label={t('communityRateStars', { count: stars })}
-          >
-            ★
-          </button>
-        ))}
+      <div className="community-card__stars">
+        <span className="community-card__stars-label">{t('communityRateLabel')}</span>
+        <div className="community-card__stars-row" role="group" aria-label={t('communityRateLabel')}>
+          {[1, 2, 3, 4, 5].map((stars) => (
+            <button
+              key={stars}
+              type="button"
+              className={`community-card__star ${
+                (localUserRating ?? 0) >= stars ? 'community-card__star--active' : ''
+              }`}
+              onClick={() => handleRate(stars)}
+              disabled={busy || hasRated}
+              aria-label={t('communityRateStars', { count: stars })}
+            >
+              ★
+            </button>
+          ))}
+        </div>
+        {hasRated ? (
+          <p className="community-card__rated-note">{t('communityRatedOnce')}</p>
+        ) : null}
       </div>
 
       {expanded && (
