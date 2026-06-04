@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import BackgroundDecor from './components/BackgroundDecor'
 import Header from './components/Header'
 import CategorySelector from './components/CategorySelector'
@@ -9,6 +9,11 @@ import LoadingAnimation from './components/LoadingAnimation'
 import RecipeCard from './components/RecipeCard'
 import SavedRecipes from './components/SavedRecipes'
 import CommunityRecipes from './components/CommunityRecipes'
+import MyRecipes from './components/MyRecipes'
+import OurStory from './components/OurStory'
+import { useAuth } from './context/AuthContext'
+import { fetchUserRecipes, isUserRecipesAvailable } from './services/userRecipeService'
+import { fetchCommunityRecipes } from './services/communityRecipeService'
 import FavoriteRecipes from './components/FavoriteRecipes'
 import WeeklyMealPlanner from './components/WeeklyMealPlanner'
 import MyAreaDrawer, { MY_AREA_PANELS } from './components/MyAreaDrawer'
@@ -47,6 +52,8 @@ const INITIAL_FORM = {
 
 export default function App() {
   const { t, language } = useLanguage()
+  const { user, isAuthenticated } = useAuth()
+  const [myRecipesCount, setMyRecipesCount] = useState(0)
   const [category, setCategory] = useState('dairy')
   const [recipeType, setRecipeType] = useState('meal')
   const [form, setForm] = useState(INITIAL_FORM)
@@ -68,9 +75,61 @@ export default function App() {
   const [mealPlan, setMealPlan] = useState(getMealPlan)
   const [myAreaOpen, setMyAreaOpen] = useState(false)
   const [myAreaPanel, setMyAreaPanel] = useState(null)
+  const [searchCommunityRecipes, setSearchCommunityRecipes] = useState([])
+  const [searchPrivateRecipes, setSearchPrivateRecipes] = useState([])
   const [stepsRegenerating, setStepsRegenerating] = useState(false)
   const [stepsRegenerateError, setStepsRegenerateError] = useState(null)
   const [stepsGenerationKey, setStepsGenerationKey] = useState(0)
+
+  const refreshMyRecipesCount = useCallback(async () => {
+    if (!isAuthenticated || !user?.id || !isUserRecipesAvailable()) {
+      setMyRecipesCount(0)
+      return
+    }
+    try {
+      const list = await fetchUserRecipes(user.id)
+      setMyRecipesCount(list.length)
+    } catch {
+      setMyRecipesCount(0)
+    }
+  }, [isAuthenticated, user?.id])
+
+  useEffect(() => {
+    refreshMyRecipesCount()
+  }, [refreshMyRecipesCount])
+
+  useEffect(() => {
+    if (!myAreaOpen) return undefined
+
+    let cancelled = false
+
+    const loadSearchSources = async () => {
+      try {
+        const community = await fetchCommunityRecipes(user?.id)
+        if (!cancelled) setSearchCommunityRecipes(community)
+      } catch (error) {
+        console.error('[App] Search community recipes load failed:', error)
+        if (!cancelled) setSearchCommunityRecipes([])
+      }
+
+      if (isAuthenticated && user?.id && isUserRecipesAvailable()) {
+        try {
+          const privateRecipes = await fetchUserRecipes(user.id)
+          if (!cancelled) setSearchPrivateRecipes(privateRecipes)
+        } catch (error) {
+          console.error('[App] Search private recipes load failed:', error)
+          if (!cancelled) setSearchPrivateRecipes([])
+        }
+      } else if (!cancelled) {
+        setSearchPrivateRecipes([])
+      }
+    }
+
+    loadSearchSources()
+    return () => {
+      cancelled = true
+    }
+  }, [myAreaOpen, user?.id, isAuthenticated])
 
   const theme = getTheme(category)
   const isSaved = recipe ? savedRecipes.some((r) => r.id === recipe.id) : false
@@ -297,6 +356,19 @@ export default function App() {
     setMyAreaPanel(null)
   }
 
+  const handleSearchSelect = (result) => {
+    if (!result) return
+
+    if (result.type === 'section') {
+      setMyAreaPanel(result.panelId)
+      return
+    }
+
+    if (result.recipe) {
+      handleSelectSaved(result.recipe)
+    }
+  }
+
   const handleSelectSaved = (saved) => {
     if (!saved?.id) return
     closeMyArea()
@@ -419,6 +491,13 @@ export default function App() {
         onBack={() => setMyAreaPanel(null)}
         savedCount={savedRecipes.length}
         favoritesCount={favoriteRecipes.length}
+        myRecipesCount={myRecipesCount}
+        searchSavedRecipes={savedRecipes}
+        searchFavoriteRecipes={favoriteRecipes}
+        searchMealPlan={mealPlan}
+        searchPrivateRecipes={searchPrivateRecipes}
+        searchCommunityRecipes={searchCommunityRecipes}
+        onSearchSelect={handleSearchSelect}
       >
         {myAreaPanel === MY_AREA_PANELS.weekly && (
           <WeeklyMealPlanner
@@ -442,7 +521,11 @@ export default function App() {
             onSelect={handleSelectSaved}
           />
         )}
+        {myAreaPanel === MY_AREA_PANELS.myRecipes && (
+          <MyRecipes onRecipesChanged={refreshMyRecipesCount} />
+        )}
         {myAreaPanel === MY_AREA_PANELS.community && <CommunityRecipes />}
+        {myAreaPanel === MY_AREA_PANELS.story && <OurStory />}
       </MyAreaDrawer>
 
       <footer className="app__footer">

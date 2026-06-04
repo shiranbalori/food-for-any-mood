@@ -1,17 +1,13 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { CATEGORIES, getTheme } from '../utils/themes'
 import { useLanguage } from '../i18n/useLanguage'
-import {
-  COMMUNITY_RECIPE_IMAGE_ACCEPT,
-  uploadCommunityRecipe,
-  validateCommunityRecipeImage,
-} from '../services/communityRecipeService'
+import { createUserRecipe } from '../services/userRecipeService'
 import { mergeTranscriptIntoField } from '../utils/speechTranscription'
 import VoiceInputButton from './VoiceInputButton'
 import './UploadCommunityRecipeModal.css'
-import './DietaryPreferences.css'
 
 const RECIPE_TYPES = ['meal', 'dessert']
+const SERVING_OPTIONS = [1, 2, 4, 6, 8]
 
 const INITIAL_FORM = {
   title: '',
@@ -20,28 +16,20 @@ const INITIAL_FORM = {
   steps: '',
   category: 'dairy',
   recipeType: 'meal',
-  isGlutenFree: false,
+  cookingTime: 30,
+  servings: 4,
 }
 
-export default function UploadCommunityRecipeModal({ open, onClose, userId, onUploaded }) {
+export default function PrivateRecipeFormModal({ open, onClose, userId, onSaved }) {
   const { t } = useLanguage()
   const [form, setForm] = useState(INITIAL_FORM)
-  const [imageFile, setImageFile] = useState(null)
-  const [imagePreviewUrl, setImagePreviewUrl] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  const fileInputRef = useRef(null)
 
   useEffect(() => {
     if (open) {
       setForm(INITIAL_FORM)
       setError('')
-      setImageFile(null)
-      setImagePreviewUrl((prev) => {
-        if (prev) URL.revokeObjectURL(prev)
-        return ''
-      })
-      if (fileInputRef.current) fileInputRef.current.value = ''
     }
   }, [open])
 
@@ -61,13 +49,6 @@ export default function UploadCommunityRecipeModal({ open, onClose, userId, onUp
     }
   }, [open, onClose])
 
-  useEffect(
-    () => () => {
-      if (imagePreviewUrl) URL.revokeObjectURL(imagePreviewUrl)
-    },
-    [imagePreviewUrl],
-  )
-
   if (!open) return null
 
   const categoryTheme = getTheme(form.category)
@@ -76,54 +57,20 @@ export default function UploadCommunityRecipeModal({ open, onClose, userId, onUp
     setForm((prev) => ({ ...prev, [field]: value }))
   }
 
-  const clearImage = () => {
-    setImageFile(null)
-    setImagePreviewUrl((prev) => {
-      if (prev) URL.revokeObjectURL(prev)
-      return ''
-    })
-    if (fileInputRef.current) fileInputRef.current.value = ''
-  }
-
-  const handleImageChange = (event) => {
-    const file = event.target.files?.[0]
-    if (!file) return
-
-    const validation = validateCommunityRecipeImage(file)
-    if (!validation.ok) {
-      setError(
-        t(validation.code === 'TOO_LARGE' ? 'communityRecipeImageTooLarge' : 'communityRecipeImageInvalidType'),
-      )
-      event.target.value = ''
-      return
-    }
-
-    setError('')
-    setImageFile(file)
-    setImagePreviewUrl((prev) => {
-      if (prev) URL.revokeObjectURL(prev)
-      return URL.createObjectURL(file)
-    })
-  }
-
   const handleSubmit = async (event) => {
     event.preventDefault()
     setError('')
     setLoading(true)
 
     try {
-      await uploadCommunityRecipe(userId, { ...form, imageFile })
-      clearImage()
-      onUploaded?.()
+      await createUserRecipe(userId, form)
+      onSaved?.()
       onClose()
     } catch (err) {
-      const code = err?.message
-      if (code === 'INVALID_TYPE' || code === 'INVALID_IMAGE_TYPE') {
-        setError(t('communityRecipeImageInvalidType'))
-      } else if (code === 'TOO_LARGE') {
-        setError(t('communityRecipeImageTooLarge'))
+      if (err?.message === 'VALIDATION_FAILED') {
+        setError(t('myRecipesValidationError'))
       } else {
-        setError(err?.message ?? t('communityUploadError'))
+        setError(err?.message ?? t('myRecipesSaveError'))
       }
     } finally {
       setLoading(false)
@@ -131,11 +78,11 @@ export default function UploadCommunityRecipeModal({ open, onClose, userId, onUp
   }
 
   return (
-    <div className="upload-recipe-modal" role="dialog" aria-modal="true" aria-labelledby="upload-recipe-title">
+    <div className="upload-recipe-modal" role="dialog" aria-modal="true" aria-labelledby="private-recipe-title">
       <button type="button" className="upload-recipe-modal__backdrop" onClick={onClose} aria-label={t('close')} />
       <div className="upload-recipe-modal__panel">
         <div className="upload-recipe-modal__header">
-          <h2 id="upload-recipe-title">{t('communityUploadRecipe')}</h2>
+          <h2 id="private-recipe-title">{t('myRecipesAddRecipe')}</h2>
           <button type="button" className="upload-recipe-modal__close" onClick={onClose} aria-label={t('close')}>
             ×
           </button>
@@ -170,38 +117,6 @@ export default function UploadCommunityRecipeModal({ open, onClose, userId, onUp
               onChange={(e) => handleChange('description', e.target.value)}
               rows={2}
             />
-          </div>
-
-          <div className="upload-recipe-modal__field">
-            <span>{t('communityRecipeImage')}</span>
-            <p className="upload-recipe-modal__hint">{t('communityRecipeImageHint')}</p>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept={COMMUNITY_RECIPE_IMAGE_ACCEPT}
-              onChange={handleImageChange}
-              className="upload-recipe-modal__file-input"
-            />
-            {imagePreviewUrl ? (
-              <div className="upload-recipe-modal__preview">
-                <img src={imagePreviewUrl} alt={t('communityRecipeImagePreviewAlt')} />
-                <button
-                  type="button"
-                  className="btn btn--ghost upload-recipe-modal__remove-image"
-                  onClick={clearImage}
-                >
-                  {t('communityRecipeImageRemove')}
-                </button>
-              </div>
-            ) : (
-              <button
-                type="button"
-                className="btn btn--ghost upload-recipe-modal__choose-image"
-                onClick={() => fileInputRef.current?.click()}
-              >
-                {t('communityRecipeImageChoose')}
-              </button>
-            )}
           </div>
 
           <div className="upload-recipe-modal__field">
@@ -250,23 +165,38 @@ export default function UploadCommunityRecipeModal({ open, onClose, userId, onUp
               '--theme-glow': categoryTheme.glow,
             }}
           >
-            <button
-              type="button"
-              className={`dietary-toggle upload-recipe-modal__dietary-toggle ${
-                form.isGlutenFree ? 'dietary-toggle--active' : ''
-              }`}
-              onClick={() => handleChange('isGlutenFree', !form.isGlutenFree)}
-              aria-pressed={form.isGlutenFree}
-            >
-              <span className="dietary-toggle__icon">🌾🚫</span>
-              <span className="dietary-toggle__text">
-                <strong>{t('glutenFreeLabel')}</strong>
-                <small>{t('glutenFreeHint')}</small>
+            <label className="upload-recipe-modal__field">
+              <span>
+                {t('timeLabel')}: <strong>{t('timeMinutes', { count: form.cookingTime })}</strong>
               </span>
-              <span className={`dietary-toggle__switch ${form.isGlutenFree ? 'dietary-toggle__switch--on' : ''}`}>
-                <span className="dietary-toggle__knob" />
-              </span>
-            </button>
+              <input
+                type="range"
+                min={5}
+                max={120}
+                step={5}
+                value={form.cookingTime}
+                onChange={(e) => handleChange('cookingTime', Number(e.target.value))}
+              />
+            </label>
+          </div>
+
+          <div className="upload-recipe-modal__field">
+            <span>{t('servingsLabel')}</span>
+            <div className="upload-recipe-modal__chips">
+              {SERVING_OPTIONS.map((count) => (
+                <button
+                  key={count}
+                  type="button"
+                  className={`upload-recipe-modal__chip ${
+                    form.servings === count ? 'upload-recipe-modal__chip--active' : ''
+                  }`}
+                  onClick={() => handleChange('servings', count)}
+                  aria-pressed={form.servings === count}
+                >
+                  {count}
+                </button>
+              ))}
+            </div>
           </div>
 
           <div className="upload-recipe-modal__field">
@@ -312,7 +242,7 @@ export default function UploadCommunityRecipeModal({ open, onClose, userId, onUp
           {error && <p className="upload-recipe-modal__error">{error}</p>}
 
           <button type="submit" className="btn btn--primary" disabled={loading}>
-            {loading ? t('communityUploadLoading') : t('communityUploadSubmit')}
+            {loading ? t('myRecipesSaveLoading') : t('myRecipesSaveSubmit')}
           </button>
         </form>
       </div>

@@ -1,0 +1,226 @@
+.my-recipes {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  width: 100%;
+  min-width: 0;
+}
+
+.my-recipes__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.my-recipes__add {
+  flex-shrink: 0;
+}
+
+.my-recipes__notice,
+.my-recipes__status,
+.my-recipes__error {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.my-recipes__error {
+  color: #b91c1c;
+}
+
+.my-recipes__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 2rem 1rem;
+  text-align: center;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.35);
+  border: 1px dashed rgba(255, 255, 255, 0.55);
+}
+
+.my-recipes__empty span {
+  font-size: 2rem;
+}
+
+.my-recipes__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.my-recipes__card {
+  padding: 1rem 1.1rem;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.42);
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+  backdrop-filter: blur(12px);
+}
+
+.my-recipes__card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.my-recipes__card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.my-recipes__badge {
+  font-size: 0.75rem;
+  padding: 0.2rem 0.5rem;
+  border-radius: 999px;
+  background: var(--theme-accent-light, rgba(255, 255, 255, 0.6));
+  color: var(--theme-accent, #334155);
+  font-weight: 600;
+}
+
+.my-recipes__remove {
+  border: none;
+  background: transparent;
+  font-size: 1.35rem;
+  line-height: 1;
+  cursor: pointer;
+  color: #64748b;
+  padding: 0 0.25rem;
+}
+
+.my-recipes__card-title {
+  margin: 0.5rem 0 0.25rem;
+  font-size: 1.05rem;
+}
+
+.my-recipes__card-desc {
+  margin: 0 0 0.65rem;
+  font-size: 0.88rem;
+  color: #475569;
+  line-height: 1.45;
+}
+
+.my-recipes__success {
+  margin: 0 0 0.5rem;
+  padding: 0.45rem 0.65rem;
+  border-radius: 10px;
+  background: rgba(16, 185, 129, 0.15);
+  color: #047857;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.my-recipes__card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.my-recipes__share-btn,
+.my-recipes__unshare-btn {
+  min-height: 40px;
+  padding-inline: 1rem;
+  font-size: 0.88rem;
+}
+
+.my-recipes__shared-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #059669;
+}
+
+.my-recipes__details {
+  margin-top: 0.85rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.45);
+  font-size: 0.88rem;
+}
+
+.my-recipes__details h4 {
+  margin: 0.5rem 0 0.35rem;
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  color: #64748b;
+}
+
+.my-recipes__details ul,
+.my-recipes__details ol {
+  margin: 0 0 0.5rem;
+  padding-inline-start: 1.25rem;
+}
+
+.my-recipes__details li {
+  margin-bottom: 0.25rem;
+  line-height: 1.45;
+}
+
+.my-recipes__confirm {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.my-recipes__confirm-backdrop {
+  position: absolute;
+  inset: 0;
+  border: none;
+  background: rgba(15, 23, 42, 0.45);
+  cursor: pointer;
+}
+
+.my-recipes__confirm-panel {
+  position: relative;
+  z-index: 1;
+  width: min(100%, 360px);
+  padding: 1.25rem;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  box-shadow: 0 20px 48px rgba(15, 23, 42, 0.18);
+  backdrop-filter: blur(16px);
+  text-align: center;
+}
+
+.my-recipes__confirm-panel h3 {
+  margin: 0 0 0.5rem;
+  font-size: 1.05rem;
+}
+
+.my-recipes__confirm-panel p {
+  margin: 0 0 1rem;
+  font-size: 0.92rem;
+  line-height: 1.5;
+  color: #475569;
+}
+
+.my-recipes__confirm-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: center;
+}
+
+@media (max-width: 480px) {
+  .my-recipes__card-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .my-recipes__card-actions .btn {
+    width: 100%;
+  }
+}

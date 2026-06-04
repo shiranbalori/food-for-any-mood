@@ -1,6 +1,8 @@
 import { MOODS } from '../utils/themes'
 import { useLanguage } from '../i18n/useLanguage'
+import { mergeTranscriptIntoField } from '../utils/speechTranscription'
 import IngredientImageUpload from './IngredientImageUpload'
+import VoiceInputButton from './VoiceInputButton'
 import './RecipeForm.css'
 
 const SERVING_OPTIONS = [1, 2, 4, 6, 8]
@@ -20,7 +22,18 @@ export default function RecipeForm({ form, onChange, onSubmit, disabled, theme }
       <h2 className="section-title">{t('formTitle')}</h2>
 
       <div className="recipe-form__field">
-        <label htmlFor="ingredients">{t('ingredientsLabel')}</label>
+        <div className="voice-field__label-row">
+          <label htmlFor="ingredients">{t('ingredientsLabel')}</label>
+          <VoiceInputButton
+            disabled={disabled}
+            onTranscript={(text) =>
+              onChange(
+                'ingredients',
+                mergeTranscriptIntoField(form.ingredients, text, 'ingredients'),
+              )
+            }
+          />
+        </div>
         <IngredientImageUpload
           disabled={disabled}
           onIngredientsDetected={(value) => onChange('ingredients', value)}

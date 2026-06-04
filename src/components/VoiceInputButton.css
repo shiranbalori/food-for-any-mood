@@ -1,0 +1,119 @@
+.voice-input {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.25rem;
+  flex-shrink: 0;
+}
+
+.voice-input__controls {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.voice-input__mic,
+.voice-input__stop {
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  cursor: pointer;
+  transition:
+    background 0.2s ease,
+    transform 0.2s var(--ease-spring),
+    box-shadow 0.2s ease;
+}
+
+.voice-input__mic {
+  width: 2.1rem;
+  height: 2.1rem;
+  border-radius: 50%;
+  font-size: 1rem;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.12);
+}
+
+.voice-input__mic:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.95);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(37, 99, 235, 0.18);
+}
+
+.voice-input__mic:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.voice-input__status {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #dc2626;
+  animation: voiceInputPulse 1.2s ease-in-out infinite;
+}
+
+.voice-input__stop {
+  padding: 0.25rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #1e3a8a;
+}
+
+.voice-input__stop:hover {
+  background: rgba(219, 234, 254, 0.95);
+}
+
+.voice-input__error {
+  margin: 0;
+  max-width: 12rem;
+  font-size: 0.72rem;
+  line-height: 1.35;
+  color: #b91c1c;
+  text-align: end;
+}
+
+.voice-field__label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.55rem;
+}
+
+.voice-field__label-row label,
+.voice-field__label-row > span:first-child {
+  margin-bottom: 0;
+  flex: 1;
+  min-width: 0;
+}
+
+.upload-recipe-modal__field .voice-field__label-row {
+  margin-bottom: 0;
+}
+
+.upload-recipe-modal__field .voice-field__label-row + textarea,
+.upload-recipe-modal__field .voice-field__label-row + input {
+  margin-top: 0.4rem;
+}
+
+@keyframes voiceInputPulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .voice-input__status {
+    animation: none;
+  }
+}

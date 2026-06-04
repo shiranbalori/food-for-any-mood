@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { useLanguage } from '../i18n/useLanguage'
+import MyAreaSearch from './MyAreaSearch'
 import './MyAreaDrawer.css'
 
 export const MY_AREA_PANELS = {
@@ -7,6 +8,8 @@ export const MY_AREA_PANELS = {
   saved: 'saved',
   favorites: 'favorites',
   community: 'community',
+  myRecipes: 'myRecipes',
+  story: 'story',
 }
 
 const NAV_ITEMS = [
@@ -14,6 +17,8 @@ const NAV_ITEMS = [
   { id: MY_AREA_PANELS.saved, icon: '📌', labelKey: 'myAreaNavSaved', badgeKey: 'saved' },
   { id: MY_AREA_PANELS.favorites, icon: '❤️', labelKey: 'myAreaNavFavorites', badgeKey: 'favorites' },
   { id: MY_AREA_PANELS.community, icon: '👥', labelKey: 'myAreaNavCommunity' },
+  { id: MY_AREA_PANELS.myRecipes, icon: '📒', labelKey: 'myAreaNavMyRecipes', badgeKey: 'myRecipes' },
+  { id: MY_AREA_PANELS.story, icon: '✨', labelKey: 'myAreaNavStory' },
 ]
 
 export default function MyAreaDrawer({
@@ -24,6 +29,13 @@ export default function MyAreaDrawer({
   onBack,
   savedCount = 0,
   favoritesCount = 0,
+  myRecipesCount = 0,
+  searchSavedRecipes = [],
+  searchFavoriteRecipes = [],
+  searchMealPlan = {},
+  searchPrivateRecipes = [],
+  searchCommunityRecipes = [],
+  onSearchSelect,
   children,
 }) {
   const { t } = useLanguage()
@@ -54,6 +66,7 @@ export default function MyAreaDrawer({
   const getBadgeCount = (badgeKey) => {
     if (badgeKey === 'saved') return savedCount
     if (badgeKey === 'favorites') return favoritesCount
+    if (badgeKey === 'myRecipes') return myRecipesCount
     return null
   }
 
@@ -85,6 +98,15 @@ export default function MyAreaDrawer({
             ×
           </button>
         </header>
+
+        <MyAreaSearch
+          savedRecipes={searchSavedRecipes}
+          favoriteRecipes={searchFavoriteRecipes}
+          mealPlan={searchMealPlan}
+          privateRecipes={searchPrivateRecipes}
+          communityRecipes={searchCommunityRecipes}
+          onSelectResult={onSearchSelect}
+        />
 
         <nav className="my-area-drawer__tabs" aria-label={t('myAreaTitle')}>
           {NAV_ITEMS.map((item) => {

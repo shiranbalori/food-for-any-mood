@@ -1,0 +1,218 @@
+.our-story {
+  width: 100%;
+  min-width: 0;
+}
+
+.our-story__section-title {
+  margin-bottom: 0.85rem;
+}
+
+.our-story__card {
+  position: relative;
+  padding: 1.15rem 1.1rem 1.25rem;
+  border-radius: 18px;
+  background: linear-gradient(
+    155deg,
+    rgba(255, 255, 255, 0.72) 0%,
+    rgba(237, 233, 254, 0.55) 38%,
+    rgba(219, 234, 254, 0.62) 100%
+  );
+  border: 1px solid rgba(255, 255, 255, 0.75);
+  box-shadow:
+    0 14px 36px rgba(124, 58, 237, 0.12),
+    0 6px 18px rgba(37, 99, 235, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(14px) saturate(1.15);
+  -webkit-backdrop-filter: blur(14px) saturate(1.15);
+  animation: ourStoryCardIn 0.45s var(--ease-spring, cubic-bezier(0.34, 1.2, 0.64, 1)) both;
+}
+
+.our-story__hero {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 5.5rem;
+  margin-bottom: 0.85rem;
+}
+
+.our-story__hero-glow {
+  position: absolute;
+  width: 7rem;
+  height: 7rem;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    rgba(139, 92, 246, 0.35) 0%,
+    rgba(59, 130, 246, 0.18) 45%,
+    transparent 70%
+  );
+  animation: ourStoryGlowPulse 3s ease-in-out infinite;
+}
+
+.our-story__hero-icon {
+  position: relative;
+  z-index: 1;
+  font-size: 2.6rem;
+  filter: drop-shadow(0 6px 14px rgba(37, 99, 235, 0.25));
+}
+
+.our-story__hero-orbit {
+  position: absolute;
+  font-size: 1.35rem;
+  opacity: 0.92;
+}
+
+.our-story__hero-orbit--a {
+  top: 0.15rem;
+  inset-inline-end: 1.2rem;
+  animation: ourStoryOrbitA 4s ease-in-out infinite;
+}
+
+.our-story__hero-orbit--b {
+  bottom: 0.1rem;
+  inset-inline-start: 1rem;
+  animation: ourStoryOrbitB 4.2s ease-in-out infinite;
+}
+
+.our-story__hero-orbit--c {
+  top: 1.4rem;
+  inset-inline-start: 2rem;
+  animation: ourStoryOrbitC 3.6s ease-in-out infinite;
+}
+
+.our-story__brand {
+  text-align: center;
+  margin-bottom: 1rem;
+  padding-bottom: 0.85rem;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+.our-story__app-name {
+  margin: 0 0 0.35rem;
+  font-size: 1rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  background: linear-gradient(135deg, #3b82f6 0%, #7c3aed 55%, #2563eb 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.our-story__byline {
+  margin: 0 0 0.2rem;
+  font-size: 0.88rem;
+  color: #475569;
+  line-height: 1.45;
+}
+
+.our-story__author {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #1e3a8a;
+}
+
+.our-story__body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.our-story__paragraph {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.65;
+  color: #334155;
+}
+
+.our-story__footer {
+  margin-top: 1rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid rgba(148, 163, 184, 0.2);
+  text-align: center;
+}
+
+.our-story__toast {
+  margin: 0 0 0.35rem;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #5b21b6;
+}
+
+.our-story__credit {
+  margin: 0;
+  font-size: 0.82rem;
+  color: #64748b;
+}
+
+@keyframes ourStoryCardIn {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes ourStoryGlowPulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.85;
+  }
+  50% {
+    transform: scale(1.08);
+    opacity: 1;
+  }
+}
+
+@keyframes ourStoryOrbitA {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+@keyframes ourStoryOrbitB {
+  0%,
+  100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  50% {
+    transform: translateY(3px) rotate(-6deg);
+  }
+}
+
+@keyframes ourStoryOrbitC {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.12);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .our-story__card,
+  .our-story__hero-glow,
+  .our-story__hero-orbit {
+    animation: none;
+  }
+}
+
+@media (min-width: 480px) {
+  .our-story__card {
+    padding: 1.35rem 1.25rem 1.4rem;
+  }
+
+  .our-story__paragraph {
+    font-size: 0.92rem;
+  }
+}
