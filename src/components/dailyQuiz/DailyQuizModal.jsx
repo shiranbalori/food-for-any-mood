@@ -6,7 +6,6 @@ import {
   getTodayQuiz,
   submitDailyQuizAnswer,
 } from '../../services/dailyQuizService'
-import AuthModal from '../AuthModal'
 import './DailyQuiz.css'
 
 export default function DailyQuizModal({ open, onClose, onAnswered }) {
@@ -16,7 +15,6 @@ export default function DailyQuizModal({ open, onClose, onAnswered }) {
   const [selectedIndex, setSelectedIndex] = useState(null)
   const [result, setResult] = useState(null)
   const [loading, setLoading] = useState(false)
-  const [authOpen, setAuthOpen] = useState(false)
 
   const loadPreviousAnswer = useCallback(async () => {
     if (!user?.id) {
@@ -57,14 +55,21 @@ export default function DailyQuizModal({ open, onClose, onAnswered }) {
 
   if (!open) return null
 
-  const answered = isAuthenticated && result !== null
+  const answered = result !== null
   const isCorrect = result?.correct === true
 
   const handleSelect = async (index) => {
     if (answered || loading) return
 
     if (!isAuthenticated) {
-      setAuthOpen(true)
+      const correct = index === quiz.correctIndex
+      setSelectedIndex(index)
+      setResult({
+        selectedIndex: index,
+        correct,
+        pointsAwarded: 0,
+        guest: true,
+      })
       return
     }
 
@@ -82,6 +87,12 @@ export default function DailyQuizModal({ open, onClose, onAnswered }) {
       setLoading(false)
     }
   }
+
+  const feedbackMessage = isCorrect
+    ? isAuthenticated
+      ? t('quizFeedbackCorrect')
+      : t('quizGuestFeedbackCorrect')
+    : t('quizFeedbackIncorrect')
 
   return (
     <>
@@ -106,7 +117,7 @@ export default function DailyQuizModal({ open, onClose, onAnswered }) {
           </header>
 
           <div className="quiz-overlay__body">
-            {answered ? (
+            {isAuthenticated && answered ? (
               <p className="quiz-overlay__completed" role="status">
                 {t('quizAlreadyCompletedToday')}
               </p>
@@ -152,28 +163,20 @@ export default function DailyQuizModal({ open, onClose, onAnswered }) {
                   }`}
                   role="status"
                 >
-                  <p className="quiz-feedback__message">
-                    {isCorrect ? t('quizFeedbackCorrect') : t('quizFeedbackIncorrect')}
-                  </p>
+                  <p className="quiz-feedback__message">{feedbackMessage}</p>
                   <p className="quiz-feedback__explanation">{quiz.explanation}</p>
                 </div>
+                {!isAuthenticated ? (
+                  <p className="quiz-overlay__login-hint">{t('quizGuestLoginPrompt')}</p>
+                ) : null}
               </div>
             ) : (
               <p className="quiz-overlay__hint">{t('quizSelectHint')}</p>
             )}
-
-            {!isAuthenticated && !answered ? (
-              <p className="quiz-overlay__login-hint">{t('quizLoginForPoints')}</p>
-            ) : null}
           </div>
         </div>
       </div>
 
-      <AuthModal
-        open={authOpen}
-        onClose={() => setAuthOpen(false)}
-        initialMode="login"
-      />
     </>
   )
 }
