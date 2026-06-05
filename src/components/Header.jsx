@@ -1,17 +1,34 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { useLanguage } from '../i18n/useLanguage'
+import { fetchUserGamification } from '../services/dailyChallengeService'
 import LanguageToggle from './LanguageToggle'
 import InstallAppButton from './InstallAppButton'
 import AuthModal from './AuthModal'
 import HomeIcon from './HomeIcon'
+import UserChallengeStats from './dailyChallenge/UserChallengeStats'
 import './Header.css'
 
 export default function Header({ onOpenMyArea, onGoHome }) {
   const { t } = useLanguage()
-  const { isAuthenticated, displayName, signOut, isSupabaseReady, loading } = useAuth()
+  const { user, isAuthenticated, displayName, signOut, isSupabaseReady, loading } = useAuth()
   const [authOpen, setAuthOpen] = useState(false)
   const [authMode, setAuthMode] = useState('login')
+  const [gamificationStats, setGamificationStats] = useState(null)
+
+  useEffect(() => {
+    if (!isAuthenticated || !user?.id) {
+      setGamificationStats(null)
+      return undefined
+    }
+    let cancelled = false
+    fetchUserGamification(user.id).then((stats) => {
+      if (!cancelled) setGamificationStats(stats)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [isAuthenticated, user?.id])
 
   const openAuth = (mode) => {
     setAuthMode(mode)
@@ -33,7 +50,12 @@ export default function Header({ onOpenMyArea, onGoHome }) {
           <div className="header__auth">
             {isAuthenticated ? (
               <>
-                <span className="header__user">{t('authHello', { name: displayName })}</span>
+                <div className="header__profile">
+                  <span className="header__user">{t('authHello', { name: displayName })}</span>
+                  {gamificationStats ? (
+                    <UserChallengeStats stats={gamificationStats} compact />
+                  ) : null}
+                </div>
                 <button type="button" className="btn btn--ghost header__auth-btn" onClick={handleSignOut}>
                   {t('authLogout')}
                 </button>

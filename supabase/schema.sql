@@ -289,3 +289,44 @@ grant insert, delete on public.recipe_likes to authenticated;
 grant select on public.recipe_ratings to anon, authenticated;
 grant insert, update on public.recipe_ratings to authenticated;
 grant select, insert on public.recipe_shares to anon, authenticated;
+
+-- Daily challenge gamification — see also supabase/daily-challenge.sql for full setup
+create table if not exists public.user_gamification (
+  user_id uuid primary key references auth.users (id) on delete cascade,
+  total_points integer not null default 0 check (total_points >= 0),
+  challenges_completed integer not null default 0 check (challenges_completed >= 0),
+  photos_uploaded integer not null default 0 check (photos_uploaded >= 0),
+  likes_received integer not null default 0 check (likes_received >= 0),
+  unlocked_achievements text[] not null default '{}',
+  weekly_top_awards text[] not null default '{}',
+  five_like_awards uuid[] not null default '{}',
+  current_streak integer not null default 0 check (current_streak >= 0),
+  longest_streak integer not null default 0 check (longest_streak >= 0),
+  last_challenge_date date,
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.challenge_submissions (
+  id uuid primary key default gen_random_uuid(),
+  challenge_date date not null,
+  user_id uuid not null references auth.users (id) on delete cascade,
+  dish_name text not null check (char_length(trim(dish_name)) >= 2),
+  description text not null default '',
+  photo_url text,
+  created_at timestamptz not null default now(),
+  unique (challenge_date, user_id)
+);
+
+create table if not exists public.challenge_submission_likes (
+  user_id uuid not null references auth.users (id) on delete cascade,
+  submission_id uuid not null references public.challenge_submissions (id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (user_id, submission_id)
+);
+
+grant select on public.user_gamification to anon, authenticated;
+grant insert, update on public.user_gamification to authenticated;
+grant select on public.challenge_submissions to anon, authenticated;
+grant insert, update on public.challenge_submissions to authenticated;
+grant select on public.challenge_submission_likes to anon, authenticated;
+grant insert, delete on public.challenge_submission_likes to authenticated;

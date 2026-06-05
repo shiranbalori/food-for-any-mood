@@ -19,6 +19,13 @@ import FavoriteRecipes from './components/FavoriteRecipes'
 import WeeklyMealPlanner from './components/WeeklyMealPlanner'
 import MyAreaDrawer, { MY_AREA_PANELS, getMyAreaNavItem } from './components/MyAreaDrawer'
 import MyAreaPageSection from './components/MyAreaPageSection'
+import DailyChallengeTrigger from './components/dailyChallenge/DailyChallengeTrigger'
+import DailyChallengeModal from './components/dailyChallenge/DailyChallengeModal'
+import DailyChallengePage from './components/dailyChallenge/DailyChallengePage'
+import GamificationPage from './components/dailyChallenge/GamificationPage'
+import ChallengeSubmitModal from './components/dailyChallenge/ChallengeSubmitModal'
+import AuthModal from './components/AuthModal'
+import { userSubmittedToday } from './services/dailyChallengeService'
 import { useLanguage } from './i18n/useLanguage'
 import { getTheme } from './utils/themes'
 import { generateAppRecipe } from './services/recipeService'
@@ -54,7 +61,7 @@ const INITIAL_FORM = {
 
 export default function App() {
   const { t, language } = useLanguage()
-  const { user, isAuthenticated } = useAuth()
+  const { user, isAuthenticated, displayName } = useAuth()
   const [myRecipesCount, setMyRecipesCount] = useState(0)
   const [category, setCategory] = useState('dairy')
   const [recipeType, setRecipeType] = useState('meal')
@@ -82,6 +89,10 @@ export default function App() {
   const [stepsRegenerating, setStepsRegenerating] = useState(false)
   const [stepsRegenerateError, setStepsRegenerateError] = useState(null)
   const [stepsGenerationKey, setStepsGenerationKey] = useState(0)
+  const [challengeModalOpen, setChallengeModalOpen] = useState(false)
+  const [challengeSubmitOpen, setChallengeSubmitOpen] = useState(false)
+  const [challengeAuthOpen, setChallengeAuthOpen] = useState(false)
+  const [challengeSubmittedToday, setChallengeSubmittedToday] = useState(false)
 
   const refreshMyRecipesCount = useCallback(async () => {
     if (!isAuthenticated || !user?.id || !isUserRecipesAvailable()) {
@@ -99,6 +110,20 @@ export default function App() {
   useEffect(() => {
     refreshMyRecipesCount()
   }, [refreshMyRecipesCount])
+
+  useEffect(() => {
+    if (!isAuthenticated || !user?.id) {
+      setChallengeSubmittedToday(false)
+      return undefined
+    }
+    let cancelled = false
+    userSubmittedToday(user.id).then((submitted) => {
+      if (!cancelled) setChallengeSubmittedToday(submitted)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [isAuthenticated, user?.id])
 
   useEffect(() => {
     if (!myAreaOpen) return undefined
@@ -353,6 +378,23 @@ export default function App() {
     }
   }, [recipe, ideasLoading, category, form])
 
+  const handleChallengeGenerateRecipe = (ingredients, categoryHint) => {
+    setForm((prev) => ({
+      ...prev,
+      ingredients: ingredients.join(', '),
+    }))
+    if (categoryHint === 'dessert') {
+      setRecipeType('dessert')
+    } else if (categoryHint && categoryHint !== 'none' && ['dairy', 'meat', 'parve'].includes(categoryHint)) {
+      setCategory(categoryHint)
+    }
+    setChallengeModalOpen(false)
+    window.requestAnimationFrame(() => {
+      document.getElementById('ingredients')?.focus({ preventScroll: true })
+      document.getElementById('ingredients')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    })
+  }
+
   const goHome = () => {
     setMyAreaOpen(false)
     setActiveMyAreaPage(null)
@@ -401,6 +443,10 @@ export default function App() {
         return <MyRecipes onRecipesChanged={refreshMyRecipesCount} />
       case MY_AREA_PANELS.community:
         return <CommunityRecipes />
+      case MY_AREA_PANELS.dailyChallenge:
+        return <DailyChallengePage />
+      case MY_AREA_PANELS.gamification:
+        return <GamificationPage />
       case MY_AREA_PANELS.story:
         return <OurStory />
       default:
@@ -462,6 +508,8 @@ export default function App() {
           </MyAreaPageSection>
         ) : (
           <>
+        <DailyChallengeTrigger onClick={() => setChallengeModalOpen(true)} />
+
         <CategorySelector
           selected={category}
           onSelect={setCategory}
@@ -559,6 +607,40 @@ export default function App() {
         searchCommunityRecipes={searchCommunityRecipes}
         onSearchSelect={handleSearchSelect}
       />
+
+      <DailyChallengeModal
+        open={challengeModalOpen}
+        onClose={() => setChallengeModalOpen(false)}
+        userId={user?.id}
+        submittedToday={challengeSubmittedToday}
+        onOpenChallengePage={() => {
+          setChallengeModalOpen(false)
+          openMyAreaPanel(MY_AREA_PANELS.dailyChallenge)
+        }}
+        onGenerateRecipe={handleChallengeGenerateRecipe}
+        onOpenSubmit={
+          challengeSubmittedToday
+            ? undefined
+            : () => {
+                if (isAuthenticated) {
+                  setChallengeModalOpen(false)
+                  setChallengeSubmitOpen(true)
+                } else {
+                  setChallengeAuthOpen(true)
+                }
+              }
+        }
+      />
+      <ChallengeSubmitModal
+        open={challengeSubmitOpen}
+        onClose={() => setChallengeSubmitOpen(false)}
+        userId={user?.id}
+        authorName={displayName}
+        onSubmitted={() => {
+          setChallengeSubmittedToday(true)
+        }}
+      />
+      <AuthModal open={challengeAuthOpen} onClose={() => setChallengeAuthOpen(false)} initialMode="login" />
 
       <footer className="app__footer">
         <p>{t('footer')}</p>

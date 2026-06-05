@@ -8,6 +8,8 @@ export const MY_AREA_PANELS = {
   saved: 'saved',
   favorites: 'favorites',
   community: 'community',
+  dailyChallenge: 'dailyChallenge',
+  gamification: 'gamification',
   myRecipes: 'myRecipes',
   story: 'story',
 }
@@ -21,6 +23,8 @@ export const MY_AREA_PANEL_NAV = [
   { id: MY_AREA_PANELS.saved, icon: '📌', labelKey: 'myAreaNavSaved', badgeKey: 'saved' },
   { id: MY_AREA_PANELS.favorites, icon: '❤️', labelKey: 'myAreaNavFavorites', badgeKey: 'favorites' },
   { id: MY_AREA_PANELS.community, icon: '👥', labelKey: 'myAreaNavCommunity' },
+  { id: MY_AREA_PANELS.dailyChallenge, icon: '🎯', labelKey: 'myAreaNavDailyChallenge' },
+  { id: MY_AREA_PANELS.gamification, icon: '🏅', labelKey: 'myAreaNavGamification' },
   { id: MY_AREA_PANELS.myRecipes, icon: '📒', labelKey: 'myAreaNavMyRecipes', badgeKey: 'myRecipes' },
   { id: MY_AREA_PANELS.story, icon: '✨', labelKey: 'myAreaNavStory' },
 ]

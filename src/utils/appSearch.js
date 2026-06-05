@@ -6,6 +6,8 @@ const PANEL = {
   saved: 'saved',
   favorites: 'favorites',
   community: 'community',
+  dailyChallenge: 'dailyChallenge',
+  gamification: 'gamification',
   myRecipes: 'myRecipes',
   story: 'story',
 }
@@ -105,6 +107,20 @@ export function buildAppSections(t) {
       icon: '👥',
       title: t('myAreaNavCommunity'),
       haystack: normalizeSearchText(t('myAreaNavCommunity')),
+    },
+    {
+      id: 'section-dailyChallenge',
+      panelId: PANEL.dailyChallenge,
+      icon: '🎯',
+      title: t('myAreaNavDailyChallenge'),
+      haystack: normalizeSearchText(`${t('myAreaNavDailyChallenge')} ${t('challengeDailyTitle')}`),
+    },
+    {
+      id: 'section-gamification',
+      panelId: PANEL.gamification,
+      icon: '🏅',
+      title: t('myAreaNavGamification'),
+      haystack: normalizeSearchText(`${t('myAreaNavGamification')} ${t('challengeAchievementsTitle')}`),
     },
     {
       id: 'section-myRecipes',

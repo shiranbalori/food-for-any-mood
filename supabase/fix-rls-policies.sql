@@ -298,3 +298,17 @@ create policy "Anyone can record a share"
   with check (user_id is null or auth.uid() = user_id);
 
 grant select, insert on public.recipe_shares to anon, authenticated;
+
+-- ---------------------------------------------------------------------------
+-- Daily challenge gamification (run supabase/daily-challenge.sql for full setup)
+-- ---------------------------------------------------------------------------
+grant select on public.user_gamification to anon, authenticated;
+grant insert, update on public.user_gamification to authenticated;
+grant select on public.challenge_submissions to anon, authenticated;
+grant insert, update on public.challenge_submissions to authenticated;
+grant select on public.challenge_submission_likes to anon, authenticated;
+grant insert, delete on public.challenge_submission_likes to authenticated;
+
+alter table if exists public.user_gamification enable row level security;
+alter table if exists public.challenge_submissions enable row level security;
+alter table if exists public.challenge_submission_likes enable row level security;

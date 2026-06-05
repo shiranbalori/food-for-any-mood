@@ -27,6 +27,18 @@
   margin-inline: 0;
 }
 
+.header__profile {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.1rem;
+  min-width: 0;
+}
+
+html[dir='rtl'] .header__profile {
+  align-items: flex-end;
+}
+
 html[dir='rtl'] .header__auth {
   justify-content: flex-end;
 }
