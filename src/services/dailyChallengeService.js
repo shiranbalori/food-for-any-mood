@@ -48,6 +48,8 @@ function defaultGamification(userId) {
     unlockedAchievements: [],
     weeklyTopAwards: [],
     fiveLikeAwards: [],
+    quizzesAnswered: 0,
+    quizCorrectCount: 0,
   }
 }
 
@@ -254,9 +256,17 @@ function mapDbGamification(row) {
     unlockedAchievements: row.unlocked_achievements ?? [],
     weeklyTopAwards: row.weekly_top_awards ?? [],
     fiveLikeAwards: row.five_like_awards ?? [],
+    quizzesAnswered: row.quizzes_answered ?? 0,
+    quizCorrectCount: row.quiz_correct_count ?? 0,
   }
   stats.unlockedAchievements = syncAchievements(stats)
   return stats
+}
+
+export async function awardGamificationPoints(userId, delta, patch = {}) {
+  let stats = await loadGamificationStats(userId)
+  stats = applyPoints(stats, delta, patch)
+  return upsertGamification(stats)
 }
 
 export function getTodayChallenge() {
@@ -289,6 +299,8 @@ async function upsertGamification(stats) {
       unlocked_achievements: stats.unlockedAchievements,
       weekly_top_awards: stats.weeklyTopAwards,
       five_like_awards: stats.fiveLikeAwards,
+      quizzes_answered: stats.quizzesAnswered ?? 0,
+      quiz_correct_count: stats.quizCorrectCount ?? 0,
       updated_at: new Date().toISOString(),
     },
     { onConflict: 'user_id' },

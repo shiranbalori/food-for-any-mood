@@ -1,23 +1,23 @@
 import { useLanguage } from '../../i18n/useLanguage'
-import '../dailyQuiz/DailyQuiz.css'
+import './DailyQuiz.css'
 
 /**
  * @param {{ onClick: () => void }} props
  */
-export default function DailyChallengeTrigger({ onClick }) {
+export default function DailyQuizTrigger({ onClick }) {
   const { t } = useLanguage()
 
   return (
     <button
       type="button"
-      className="home-pill home-pill--challenge"
+      className="home-pill home-pill--quiz"
       onClick={onClick}
-      aria-label={t('challengeDailyTitle')}
+      aria-label={t('quizDailyTitle')}
     >
       <span className="home-pill__icon" aria-hidden="true">
-        🎯
+        🧠
       </span>
-      <span className="home-pill__label">{t('challengeTriggerLabel')}</span>
+      <span className="home-pill__label">{t('quizTriggerLabel')}</span>
     </button>
   )
 }

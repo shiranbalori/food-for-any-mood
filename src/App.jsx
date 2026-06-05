@@ -19,8 +19,9 @@ import FavoriteRecipes from './components/FavoriteRecipes'
 import WeeklyMealPlanner from './components/WeeklyMealPlanner'
 import MyAreaDrawer, { MY_AREA_PANELS, getMyAreaNavItem } from './components/MyAreaDrawer'
 import MyAreaPageSection from './components/MyAreaPageSection'
-import DailyChallengeTrigger from './components/dailyChallenge/DailyChallengeTrigger'
+import HomeDailyPills from './components/HomeDailyPills'
 import DailyChallengeModal from './components/dailyChallenge/DailyChallengeModal'
+import DailyQuizModal from './components/dailyQuiz/DailyQuizModal'
 import DailyChallengePage from './components/dailyChallenge/DailyChallengePage'
 import GamificationPage from './components/dailyChallenge/GamificationPage'
 import ChallengeSubmitModal from './components/dailyChallenge/ChallengeSubmitModal'
@@ -90,6 +91,8 @@ export default function App() {
   const [stepsRegenerateError, setStepsRegenerateError] = useState(null)
   const [stepsGenerationKey, setStepsGenerationKey] = useState(0)
   const [challengeModalOpen, setChallengeModalOpen] = useState(false)
+  const [quizModalOpen, setQuizModalOpen] = useState(false)
+  const [gamificationRefreshKey, setGamificationRefreshKey] = useState(0)
   const [challengeSubmitOpen, setChallengeSubmitOpen] = useState(false)
   const [challengeAuthOpen, setChallengeAuthOpen] = useState(false)
   const [challengeSubmittedToday, setChallengeSubmittedToday] = useState(false)
@@ -500,7 +503,11 @@ export default function App() {
       <div className="app__bg" />
 
       <main className={`app__main ${activeMyAreaPage ? 'app__main--my-area-page' : ''}`}>
-        <Header onOpenMyArea={() => setMyAreaOpen(true)} onGoHome={goHome} />
+        <Header
+          onOpenMyArea={() => setMyAreaOpen(true)}
+          onGoHome={goHome}
+          gamificationRefreshKey={gamificationRefreshKey}
+        />
 
         {activeMyAreaPage ? (
           <MyAreaPageSection titleKey={getMyAreaNavItem(activeMyAreaPage)?.labelKey}>
@@ -508,7 +515,10 @@ export default function App() {
           </MyAreaPageSection>
         ) : (
           <>
-        <DailyChallengeTrigger onClick={() => setChallengeModalOpen(true)} />
+        <HomeDailyPills
+          onOpenChallenge={() => setChallengeModalOpen(true)}
+          onOpenQuiz={() => setQuizModalOpen(true)}
+        />
 
         <CategorySelector
           selected={category}
@@ -608,6 +618,11 @@ export default function App() {
         onSearchSelect={handleSearchSelect}
       />
 
+      <DailyQuizModal
+        open={quizModalOpen}
+        onClose={() => setQuizModalOpen(false)}
+        onAnswered={() => setGamificationRefreshKey((key) => key + 1)}
+      />
       <DailyChallengeModal
         open={challengeModalOpen}
         onClose={() => setChallengeModalOpen(false)}

@@ -9,7 +9,7 @@ import HomeIcon from './HomeIcon'
 import UserChallengeStats from './dailyChallenge/UserChallengeStats'
 import './Header.css'
 
-export default function Header({ onOpenMyArea, onGoHome }) {
+export default function Header({ onOpenMyArea, onGoHome, gamificationRefreshKey = 0 }) {
   const { t } = useLanguage()
   const { user, isAuthenticated, displayName, signOut, isSupabaseReady, loading } = useAuth()
   const [authOpen, setAuthOpen] = useState(false)
@@ -28,7 +28,7 @@ export default function Header({ onOpenMyArea, onGoHome }) {
     return () => {
       cancelled = true
     }
-  }, [isAuthenticated, user?.id])
+  }, [isAuthenticated, user?.id, gamificationRefreshKey])
 
   const openAuth = (mode) => {
     setAuthMode(mode)

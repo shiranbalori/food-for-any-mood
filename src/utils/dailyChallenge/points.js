@@ -6,6 +6,7 @@ export const POINT_AWARDS = {
   STREAK_3: 2,
   STREAK_7: 5,
   STREAK_30: 20,
+  QUIZ_CORRECT: 2,
 }
 
 /**
