@@ -1,5 +1,7 @@
 import { useEffect } from 'react'
+import { useAuth } from '../context/AuthContext'
 import { useLanguage } from '../i18n/useLanguage'
+import LogOutIcon from './LogOutIcon'
 import MyAreaSearch from './MyAreaSearch'
 import './MyAreaDrawer.css'
 
@@ -44,6 +46,16 @@ export default function MyAreaDrawer({
   onSearchSelect,
 }) {
   const { t } = useLanguage()
+  const { isAuthenticated, signOut } = useAuth()
+
+  const handleSignOut = async () => {
+    try {
+      await signOut()
+      onClose()
+    } catch (error) {
+      console.error('[MyAreaDrawer] sign out failed:', error)
+    }
+  }
 
   useEffect(() => {
     if (!open) return undefined
@@ -139,6 +151,19 @@ export default function MyAreaDrawer({
             )
           })}
         </nav>
+
+        {isAuthenticated ? (
+          <footer className="my-area-drawer__footer">
+            <button
+              type="button"
+              className="my-area-drawer__logout"
+              onClick={handleSignOut}
+            >
+              <LogOutIcon size={15} className="my-area-drawer__logout-icon" />
+              <span>{t('authLogout')}</span>
+            </button>
+          </footer>
+        ) : null}
       </aside>
     </div>
   )

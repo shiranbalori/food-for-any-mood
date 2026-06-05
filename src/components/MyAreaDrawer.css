@@ -120,8 +120,57 @@ html[dir='rtl'] .my-area-drawer__panel {
   display: flex;
   flex-direction: column;
   gap: 0.65rem;
-  padding: 0.85rem 1rem max(1rem, env(safe-area-inset-bottom));
+  padding: 0.85rem 1rem 0.5rem;
+  flex: 1;
   flex-shrink: 0;
+}
+
+.my-area-drawer__footer {
+  position: relative;
+  z-index: 1;
+  margin-top: auto;
+  flex-shrink: 0;
+  display: flex;
+  justify-content: flex-start;
+  padding: 0.5rem 1rem max(0.85rem, env(safe-area-inset-bottom));
+}
+
+html[dir='rtl'] .my-area-drawer__footer {
+  justify-content: flex-end;
+}
+
+.my-area-drawer__logout {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.3rem 0.45rem;
+  margin: 0;
+  border: none;
+  border-radius: var(--radius-xs);
+  background: transparent;
+  color: #94a3b8;
+  font: inherit;
+  font-size: 0.74rem;
+  font-weight: 500;
+  line-height: 1.2;
+  cursor: pointer;
+  transition:
+    color 0.2s ease,
+    background 0.2s ease;
+}
+
+.my-area-drawer__logout:hover {
+  color: #64748b;
+  background: rgba(148, 163, 184, 0.1);
+}
+
+.my-area-drawer__logout:active {
+  background: rgba(148, 163, 184, 0.16);
+}
+
+.my-area-drawer__logout-icon {
+  flex-shrink: 0;
+  opacity: 0.85;
 }
 
 .my-area-drawer__tab {
@@ -244,7 +293,16 @@ html[dir='rtl'] .my-area-drawer__tab-main {
 
   .my-area-drawer__tabs {
     gap: 0.5rem;
-    padding: 0.7rem 0.85rem 0.4rem;
+    padding: 0.7rem 0.85rem 0.35rem;
+  }
+
+  .my-area-drawer__footer {
+    padding: 0.4rem 0.85rem max(0.75rem, env(safe-area-inset-bottom));
+  }
+
+  .my-area-drawer__logout {
+    font-size: 0.7rem;
+    padding: 0.28rem 0.4rem;
   }
 
   .my-area-drawer__tab {

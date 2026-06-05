@@ -11,7 +11,7 @@ import './Header.css'
 
 export default function Header({ onOpenMyArea, onGoHome, gamificationRefreshKey = 0 }) {
   const { t } = useLanguage()
-  const { user, isAuthenticated, displayName, signOut, isSupabaseReady, loading } = useAuth()
+  const { user, isAuthenticated, displayName, isSupabaseReady, loading } = useAuth()
   const [authOpen, setAuthOpen] = useState(false)
   const [authMode, setAuthMode] = useState('login')
   const [gamificationStats, setGamificationStats] = useState(null)
@@ -35,31 +35,18 @@ export default function Header({ onOpenMyArea, onGoHome, gamificationRefreshKey 
     setAuthOpen(true)
   }
 
-  const handleSignOut = async () => {
-    try {
-      await signOut()
-    } catch (error) {
-      console.error('[Header] sign out failed:', error)
-    }
-  }
-
   return (
     <header className="header">
       <div className="header__top">
         {!loading && isSupabaseReady && (
           <div className="header__auth">
             {isAuthenticated ? (
-              <>
-                <div className="header__profile">
-                  <span className="header__user">{t('authHello', { name: displayName })}</span>
-                  {gamificationStats ? (
-                    <UserChallengeStats stats={gamificationStats} compact />
-                  ) : null}
-                </div>
-                <button type="button" className="btn btn--ghost header__auth-btn" onClick={handleSignOut}>
-                  {t('authLogout')}
-                </button>
-              </>
+              <div className="header__profile">
+                <span className="header__user">{t('authHello', { name: displayName })}</span>
+                {gamificationStats ? (
+                  <UserChallengeStats stats={gamificationStats} compact />
+                ) : null}
+              </div>
             ) : (
               <>
                 <button type="button" className="btn btn--ghost header__auth-btn" onClick={() => openAuth('login')}>
