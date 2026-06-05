@@ -23,7 +23,6 @@ import HomeDailyPills from './components/HomeDailyPills'
 import DailyChallengeModal from './components/dailyChallenge/DailyChallengeModal'
 import DailyQuizModal from './components/dailyQuiz/DailyQuizModal'
 import DailyChallengePage from './components/dailyChallenge/DailyChallengePage'
-import GamificationPage from './components/dailyChallenge/GamificationPage'
 import ChallengeSubmitModal from './components/dailyChallenge/ChallengeSubmitModal'
 import AuthModal from './components/AuthModal'
 import { userSubmittedToday } from './services/dailyChallengeService'
@@ -50,6 +49,10 @@ import {
   removeRecipeFromMealPlan,
 } from './utils/mealPlannerStorage'
 import './App.css'
+
+const GLOBAL_PAGES = {
+  dailyChallenge: 'dailyChallenge',
+}
 
 const INITIAL_FORM = {
   ingredients: '',
@@ -90,6 +93,7 @@ export default function App() {
   const [stepsRegenerating, setStepsRegenerating] = useState(false)
   const [stepsRegenerateError, setStepsRegenerateError] = useState(null)
   const [stepsGenerationKey, setStepsGenerationKey] = useState(0)
+  const [activeGlobalPage, setActiveGlobalPage] = useState(null)
   const [challengeModalOpen, setChallengeModalOpen] = useState(false)
   const [quizModalOpen, setQuizModalOpen] = useState(false)
   const [gamificationRefreshKey, setGamificationRefreshKey] = useState(0)
@@ -401,6 +405,14 @@ export default function App() {
   const goHome = () => {
     setMyAreaOpen(false)
     setActiveMyAreaPage(null)
+    setActiveGlobalPage(null)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  const openChallengeFullPage = () => {
+    setMyAreaOpen(false)
+    setActiveMyAreaPage(null)
+    setActiveGlobalPage(GLOBAL_PAGES.dailyChallenge)
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
@@ -446,10 +458,6 @@ export default function App() {
         return <MyRecipes onRecipesChanged={refreshMyRecipesCount} />
       case MY_AREA_PANELS.community:
         return <CommunityRecipes />
-      case MY_AREA_PANELS.dailyChallenge:
-        return <DailyChallengePage />
-      case MY_AREA_PANELS.gamification:
-        return <GamificationPage />
       case MY_AREA_PANELS.story:
         return <OurStory />
       default:
@@ -502,7 +510,7 @@ export default function App() {
       <BackgroundDecor theme={theme} />
       <div className="app__bg" />
 
-      <main className={`app__main ${activeMyAreaPage ? 'app__main--my-area-page' : ''}`}>
+      <main className={`app__main ${activeMyAreaPage || activeGlobalPage ? 'app__main--my-area-page' : ''}`}>
         <Header
           onOpenMyArea={() => setMyAreaOpen(true)}
           onGoHome={goHome}
@@ -512,6 +520,10 @@ export default function App() {
         {activeMyAreaPage ? (
           <MyAreaPageSection titleKey={getMyAreaNavItem(activeMyAreaPage)?.labelKey}>
             {renderMyAreaPageContent()}
+          </MyAreaPageSection>
+        ) : activeGlobalPage === GLOBAL_PAGES.dailyChallenge ? (
+          <MyAreaPageSection titleKey="challengeDailyTitle">
+            <DailyChallengePage />
           </MyAreaPageSection>
         ) : (
           <>
@@ -597,7 +609,7 @@ export default function App() {
           />
         )}
 
-        {!activeMyAreaPage && <CommunityTop5 />}
+        {!activeMyAreaPage && !activeGlobalPage && <CommunityTop5 />}
           </>
         )}
 
@@ -630,7 +642,7 @@ export default function App() {
         submittedToday={challengeSubmittedToday}
         onOpenChallengePage={() => {
           setChallengeModalOpen(false)
-          openMyAreaPanel(MY_AREA_PANELS.dailyChallenge)
+          openChallengeFullPage()
         }}
         onGenerateRecipe={handleChallengeGenerateRecipe}
         onOpenSubmit={
