@@ -35,7 +35,13 @@ export default function DailyQuizModal({ open, onClose, onAnswered }) {
   }, [user?.id])
 
   useEffect(() => {
-    if (!open) return undefined
+    if (!open) {
+      setSelectedIndex(null)
+      setResult(null)
+      setLoading(false)
+      return undefined
+    }
+
     loadPreviousAnswer()
 
     const onKeyDown = (event) => {
@@ -51,7 +57,8 @@ export default function DailyQuizModal({ open, onClose, onAnswered }) {
 
   if (!open) return null
 
-  const answered = result !== null
+  const answered = isAuthenticated && result !== null
+  const isCorrect = result?.correct === true
 
   const handleSelect = async (index) => {
     if (answered || loading) return
@@ -62,24 +69,19 @@ export default function DailyQuizModal({ open, onClose, onAnswered }) {
     }
 
     setLoading(true)
-    setSelectedIndex(index)
     try {
-      const answer = await submitDailyQuizAnswer(user.id, index, quiz.correctIndex)
+      const answer = await submitDailyQuizAnswer(user.id, index, quiz.correctIndex, quiz.id)
+      setSelectedIndex(answer.selectedIndex)
       setResult(answer)
       onAnswered?.()
     } catch (error) {
       if (error?.message === 'ALREADY_ANSWERED') {
         await loadPreviousAnswer()
-      } else {
-        const correct = index === quiz.correctIndex
-        setResult({ selectedIndex: index, correct, pointsAwarded: 0 })
       }
     } finally {
       setLoading(false)
     }
   }
-
-  const isCorrect = result?.correct === true
 
   return (
     <>
@@ -104,6 +106,12 @@ export default function DailyQuizModal({ open, onClose, onAnswered }) {
           </header>
 
           <div className="quiz-overlay__body">
+            {answered ? (
+              <p className="quiz-overlay__completed" role="status">
+                {t('quizAlreadyCompletedToday')}
+              </p>
+            ) : null}
+
             <p className="quiz-overlay__question">{quiz.question}</p>
 
             <ol className="quiz-options">
@@ -123,6 +131,7 @@ export default function DailyQuizModal({ open, onClose, onAnswered }) {
                       }`}
                       onClick={() => handleSelect(index)}
                       disabled={answered || loading}
+                      aria-pressed={isSelected}
                     >
                       <span className="quiz-option__index">{index + 1}.</span>
                       <span>{option}</span>
@@ -133,16 +142,21 @@ export default function DailyQuizModal({ open, onClose, onAnswered }) {
             </ol>
 
             {answered ? (
-              <div
-                className={`quiz-feedback ${
-                  isCorrect ? 'quiz-feedback--correct' : 'quiz-feedback--incorrect'
-                }`}
-                role="status"
-              >
-                <p className="quiz-feedback__message">
-                  {isCorrect ? t('quizFeedbackCorrect') : t('quizFeedbackIncorrect')}
+              <div className="quiz-results">
+                <p className="quiz-results__correct-answer">
+                  {t('quizCorrectAnswer', { answer: quiz.options[quiz.correctIndex] })}
                 </p>
-                <p className="quiz-feedback__explanation">{quiz.explanation}</p>
+                <div
+                  className={`quiz-feedback ${
+                    isCorrect ? 'quiz-feedback--correct' : 'quiz-feedback--incorrect'
+                  }`}
+                  role="status"
+                >
+                  <p className="quiz-feedback__message">
+                    {isCorrect ? t('quizFeedbackCorrect') : t('quizFeedbackIncorrect')}
+                  </p>
+                  <p className="quiz-feedback__explanation">{quiz.explanation}</p>
+                </div>
               </div>
             ) : (
               <p className="quiz-overlay__hint">{t('quizSelectHint')}</p>
@@ -155,7 +169,11 @@ export default function DailyQuizModal({ open, onClose, onAnswered }) {
         </div>
       </div>
 
-      <AuthModal open={authOpen} onClose={() => setAuthOpen(false)} initialMode="login" />
+      <AuthModal
+        open={authOpen}
+        onClose={() => setAuthOpen(false)}
+        initialMode="login"
+      />
     </>
   )
 }

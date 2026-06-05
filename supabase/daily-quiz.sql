@@ -8,6 +8,7 @@ create table if not exists public.daily_quiz_answers (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users (id) on delete cascade,
   quiz_date date not null,
+  quiz_id text,
   selected_index smallint not null check (selected_index >= 0 and selected_index <= 3),
   is_correct boolean not null default false,
   points_awarded integer not null default 0 check (points_awarded >= 0),

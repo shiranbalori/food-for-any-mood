@@ -207,6 +207,24 @@
   color: var(--text-muted);
 }
 
+.quiz-overlay__completed {
+  margin: 0 0 0.75rem;
+  padding: 0.5rem 0.65rem;
+  border-radius: var(--radius-xs);
+  background: rgba(219, 234, 254, 0.65);
+  border: 1px solid rgba(59, 130, 246, 0.2);
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.quiz-results__correct-answer {
+  margin: 0 0 0.65rem;
+  font-size: 0.86rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
 .quiz-overlay__hint,
 .quiz-overlay__login-hint {
   margin: 0;
