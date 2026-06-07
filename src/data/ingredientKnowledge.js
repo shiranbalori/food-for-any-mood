@@ -11,6 +11,7 @@ export const INGREDIENT_SYNONYMS = {
   cream: ['שמנת', 'heavy cream', 'whipping cream', 'שמנת מתוקה'],
   milk: ['חלב'],
   butter: ['חמאה'],
+  salt: ['מלח', 'sea salt', 'מלח ים'],
   garlic: ['שום', 'שום טרי'],
   onion: ['בצל', 'red onion', 'בצל סגול'],
   tomato: ['עגבניה', 'tomatoes', 'עגבניות', 'cherry tomatoes'],

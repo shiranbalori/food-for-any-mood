@@ -457,11 +457,34 @@ function buildCategoryFallbackRecipe(userInput) {
     },
   )
   console.warn('[aiRecipeService] Using frontend mock fallback recipe')
-  return finalizeRecipeForUser(userInput, recipe, {
+  const { recipe: fallbackRecipe, passed, validation } = finalizeRecipeForUser(userInput, recipe, {
     fallbackUsed: true,
     skipReparse: true,
     recipeSource: 'frontend-mock',
-  }).recipe
+  })
+  if (!passed) {
+    console.warn('[aiRecipeService] Frontend mock fallback failed validation — not returning invalid recipe', {
+      failedChecks: Object.entries(validation?.checks ?? {})
+        .filter(([, ok]) => !ok)
+        .map(([name]) => name),
+    })
+    return null
+  }
+  return fallbackRecipe
+}
+
+/** Result returned when no valid recipe (AI, backend, or fallback) could be produced. */
+function buildFallbackUnavailableResult(language) {
+  return {
+    recipe: null,
+    recipePossible: false,
+    impossibleReason:
+      language === 'he'
+        ? 'לא הצלחנו ליצור מתכון אמין מהמרכיבים — נסו שוב בעוד רגע.'
+        : 'We could not build a reliable recipe from these ingredients — please try again shortly.',
+    missingIngredients: [],
+    fallbackReason: null,
+  }
 }
 
 /**
@@ -645,6 +668,9 @@ async function generateAIRecipeCore(userInput) {
         timer.mark('diversityFallback:mock', 'Success')
         const fallbackRecipe = fetchMockFallbackRecipe(normalized, timer)
         timer.printTable()
+        if (!fallbackRecipe) {
+          return buildFallbackUnavailableResult(normalized.language)
+        }
         return {
           recipe: fallbackRecipe,
           recipePossible: true,
@@ -693,6 +719,9 @@ async function generateAIRecipeCore(userInput) {
     const fallbackRecipe = fetchMockFallbackRecipe(normalized, timer)
     timer.mark('complete', 'Success', 'frontend mock after error')
     timer.printTable()
+    if (!fallbackRecipe) {
+      return buildFallbackUnavailableResult(normalized.language)
+    }
     return {
       recipe: fallbackRecipe,
       recipePossible: true,
@@ -726,6 +755,9 @@ export async function generateAIRecipe(userInput) {
     const recipe = fetchMockFallbackRecipe(normalized, outerTimer)
     outerTimer.mark('timeoutRecovery:mockFallback', 'Success')
     outerTimer.printTable()
+    if (!recipe) {
+      return buildFallbackUnavailableResult(normalized.language)
+    }
     return {
       recipe,
       fallbackReason: 'fallback',

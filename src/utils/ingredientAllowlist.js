@@ -12,6 +12,7 @@ export const SYSTEM_PANTRY_CANONICAL = new Set([
   'olive',
   'olive oil',
   'garlic',
+  'onion',
   'baking powder',
   'paprika',
   'cumin',
@@ -45,7 +46,22 @@ function userProvidedVanilla(userIngredients) {
 }
 
 export function getSystemPantryItems(userIngredients = []) {
-  const items = ['water', 'salt', 'black pepper', 'oil', 'olive oil', 'garlic', 'baking powder']
+  const items = [
+    'water',
+    'salt',
+    'מלח',
+    'black pepper',
+    'פלפל שחור',
+    'oil',
+    'olive oil',
+    'שמן זית',
+    'שמן',
+    'garlic',
+    'שום',
+    'onion',
+    'בצל',
+    'baking powder',
+  ]
   if (userProvidedVanilla(userIngredients)) {
     items.push('vanilla', 'vanilla extract')
   }

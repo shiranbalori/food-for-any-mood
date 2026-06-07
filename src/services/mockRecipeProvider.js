@@ -20,10 +20,16 @@ import {
   validateRecipeRelevance,
 } from '../utils/ingredientRelevance'
 import { applyRecipeIngredientParser } from '../utils/recipeIngredientParser'
-import { buildGroundedChefTitle } from '../utils/recipeGrounding'
+import { buildGroundedChefTitle, validateTitleGrounding } from '../utils/recipeGrounding'
+import { isLiteralIngredientTitle } from '../utils/recipeTitle'
 import { buildDessertDishTitle } from '../utils/dessertDishTitle'
 import { buildChefIntro } from '../utils/chefIntro'
 import { buildStepsFromUserIngredients } from '../utils/userIngredientSteps'
+import {
+  formatHebrewStepIngredientList,
+  formatEnglishStepIngredientList,
+  toStepIngredientReference,
+} from '../utils/recipeStepWording'
 import { buildOptionalUpgrades } from '../utils/optionalUpgrades'
 import { pickAlternateDessertVariant, pickAlternateMealVariant } from '../utils/recipeDiversity'
 import { calculateHealthScoreFromRecipe } from '../utils/nutritionScore'
@@ -667,6 +673,271 @@ function hasUnusualIngredientCombo(userIngredients) {
 }
 
 /**
+ * Allowlisted pantry staple lines keyed by role. Quantities start with an integer
+ * so each line satisfies the "ingredient has a quantity" check, and every canon is
+ * permitted by the pantry allowlist (salt, pepper, oil, garlic, onion).
+ */
+const STAPLE_LINES = {
+  he: {
+    'olive oil': '2 כפות שמן זית',
+    onion: '1 בצל',
+    garlic: '2 שיני שום',
+    salt: '1 כפית מלח',
+    'black pepper': '1 כפית פלפל שחור',
+  },
+  en: {
+    'olive oil': '2 tbsp olive oil',
+    onion: '1 onion',
+    garlic: '2 garlic cloves',
+    salt: '1 tsp salt',
+    'black pepper': '1 tsp black pepper',
+  },
+}
+
+/** Canons that count as "already present" so we don't duplicate a staple. */
+const STAPLE_DEDUP_CANONS = {
+  'olive oil': ['olive', 'oil'],
+  onion: ['onion'],
+  garlic: ['garlic'],
+  salt: ['salt'],
+  'black pepper': ['black pepper', 'pepper'],
+}
+
+/** Quantity/unit prefix used when a user ingredient line must be rebuilt. */
+const USER_QTY_PREFIX = {
+  he: { pasta: '400 גרם', cream: '200 מ"ל', mushroom: '250 גרם', cheese: '200 גרם', tomato: '3', egg: '4', potato: '3', chicken: '500 גרם', beef: '500 גרם', rice: '1 כוס', tuna: '1 קופסת', corn: '1 קופסת', onion: '1' },
+  en: { pasta: '400 g', cream: '200 ml', mushroom: '250 g', cheese: '200 g', tomato: '3', egg: '4', potato: '3', chicken: '500 g', beef: '500 g', rice: '1 cup', tuna: '1 can', corn: '1 can', onion: '1' },
+}
+
+/** Short, clean ingredient nouns for building grounded dish titles. */
+const TITLE_NOUN = {
+  he: { tomato: 'עגבניות', cheese: 'גבינה', egg: 'ביצים', pasta: 'פסטה', cream: 'שמנת', mushroom: 'פטריות', potato: 'תפוחי אדמה', chicken: 'עוף', beef: 'בקר', rice: 'אורז', tuna: 'טונה', corn: 'תירס', onion: 'בצל', spinach: 'תרד', broccoli: 'ברוקולי', carrot: 'גזר', zucchini: 'קישואים' },
+  en: { tomato: 'tomato', cheese: 'cheese', egg: 'eggs', pasta: 'pasta', cream: 'cream', mushroom: 'mushroom', potato: 'potato', chicken: 'chicken', beef: 'beef', rice: 'rice', tuna: 'tuna', corn: 'corn', onion: 'onion', spinach: 'spinach', broccoli: 'broccoli', carrot: 'carrot', zucchini: 'zucchini' },
+}
+
+const STAPLE_CANONS = ['salt', 'black pepper', 'pepper', 'oil', 'olive', 'olive oil', 'garlic', 'onion', 'water']
+
+function ensureLeadingQuantity(line) {
+  const text = String(line ?? '').trim()
+  if (!text) return text
+  if (/^\d+(?:\s+\d+\/\d+)?\s+\S/.test(text)) return text
+  return `1 ${text}`
+}
+
+function hasLeadingQuantity(line) {
+  return /^\d+(?:\s+\d+\/\d+)?\s+\S/.test(String(line ?? '').trim())
+}
+
+/** Detects a common, cookable dish concept from the user's canonical ingredients. */
+function detectFallbackConcept(canonSet) {
+  if (canonSet.has('pasta')) return 'pasta'
+  if (canonSet.has('tuna')) return 'tuna'
+  if (canonSet.has('egg')) return 'egg'
+  return 'generic'
+}
+
+/** Allowlisted supporting staples to add for each concept. */
+function conceptStapleRoles(concept) {
+  switch (concept) {
+    case 'pasta':
+      return ['olive oil', 'garlic', 'salt', 'black pepper']
+    case 'tuna':
+      return ['onion', 'olive oil', 'salt', 'black pepper']
+    default:
+      return ['olive oil', 'onion', 'garlic', 'salt', 'black pepper']
+  }
+}
+
+/** Builds quantified user ingredient lines, preserving good parser quantities. */
+function buildUserIngredientLines(filteredUserIngredients, displayNames, parsedLines, language) {
+  const prefixMap = USER_QTY_PREFIX[language] ?? USER_QTY_PREFIX.he
+  return (filteredUserIngredients ?? []).map((item, index) => {
+    const canon = canonicalIngredient(item)
+    const display = displayNames?.[index] ?? item
+    const parsed = (parsedLines ?? []).find(
+      (line) => hasLeadingQuantity(line) && canonicalIngredient(line) === canon,
+    )
+    if (parsed) return parsed
+    if (canon && prefixMap[canon]) return `${prefixMap[canon]} ${display}`
+    return ensureLeadingQuantity(display)
+  })
+}
+
+function noun(canon, canonToDisplay, language) {
+  return TITLE_NOUN[language]?.[canon] ?? canonToDisplay.get(canon) ?? canon
+}
+
+/**
+ * Canons whose single-word name falsely matches a compound ingredient term in the
+ * grounding scan (e.g. "עוף" → "ציר עוף", "בשר" → "בשר בקר", "גבינה" → "גבינה בולגרית"),
+ * so they're tried last when choosing a generic title.
+ */
+const RISKY_TITLE_CANONS = ['chicken', 'beef', 'lamb', 'turkey', 'fish', 'meat', 'cheese']
+
+/**
+ * Builds candidate dish-style titles, best first. The title validator rejects titles
+ * listing 2+ main-ingredient names, so every candidate names exactly ONE main plus a
+ * dish word; the caller picks the first candidate that also passes the grounding scan.
+ */
+function buildFallbackTitleCandidates(concept, canonSet, canonToDisplay, language) {
+  const he = language !== 'en'
+  const has = (c) => canonSet.has(c)
+  const n = (c) => noun(c, canonToDisplay, language)
+
+  if (concept === 'pasta') {
+    if (has('cream')) return he ? ['פסטה קרמית', 'פסטה'] : ['Creamy pasta', 'Pasta']
+    if (has('cheese')) return he ? ['פסטה אפויה', 'פסטה'] : ['Baked pasta', 'Pasta']
+    return he ? ['פסטה ברוטב שום', 'פסטה'] : ['Garlic pasta', 'Pasta']
+  }
+  if (concept === 'egg') {
+    if (has('tomato')) return he ? ['חביתת עגבניות', 'חביתת ביצים'] : ['Tomato omelet', 'Egg omelet']
+    if (has('potato')) return he ? ['חביתת תפוחי אדמה', 'חביתת ביצים'] : ['Potato frittata', 'Egg omelet']
+    return he ? ['חביתת ביצים'] : ['Egg omelet']
+  }
+  if (concept === 'tuna') {
+    return he ? ['סלט טונה'] : ['Tuna salad']
+  }
+
+  const mains = [...canonSet]
+    .filter((c) => !STAPLE_CANONS.includes(c))
+    .sort((a, b) => (RISKY_TITLE_CANONS.includes(a) ? 1 : 0) - (RISKY_TITLE_CANONS.includes(b) ? 1 : 0))
+  const dishWord = has('cheese') ? (he ? 'מאפה' : 'bake') : he ? 'תבשיל' : 'skillet'
+  const candidates = mains.map((c) => (he ? `${dishWord} ${n(c)}` : `${n(c)} ${dishWord}`))
+  candidates.push(he ? 'תבשיל ירקות' : 'Vegetable skillet')
+  return candidates
+}
+
+function titlePasses(title, ingredients, userIngredients, language) {
+  if (!title) return false
+  if (isLiteralIngredientTitle(title, ingredients, language)) return false
+  return validateTitleGrounding(title, ingredients, userIngredients, language).ok
+}
+
+function fmtPhrase(displays, language) {
+  const refs = (displays ?? []).map((name) => toStepIngredientReference(name, language))
+  return language === 'en' ? formatEnglishStepIngredientList(refs) : formatHebrewStepIngredientList(refs)
+}
+
+/**
+ * Concept-appropriate steps. Every step contains a strong cooking-action verb form
+ * that the validator's action list actually matches, references the user ingredients,
+ * and avoids embedded unit-quantities / awkward "ה.. ו.." list phrasing.
+ */
+function buildFallbackSteps(concept, { canonSet, allPhrase, otherPhrase, cookMinutes, language }) {
+  const he = language !== 'en'
+  const has = (c) => canonSet.has(c)
+
+  if (concept === 'pasta') {
+    if (he) {
+      const steps = ['מרתיחים סיר מים עם מלח ומבשלים את הפסטה עד שהיא כמעט רכה, ומסננים.']
+      steps.push('מחממים שמן זית במחבת, מוסיפים שום כתוש ומבשלים עד שעולה ניחוח.')
+      if (otherPhrase) steps.push(`מוסיפים את ${otherPhrase} ומבשלים על אש בינונית עד שהרוטב מסמיך.`)
+      steps.push('מתבלים במלח ובפלפל שחור, מערבבים את הפסטה ברוטב ומבשלים יחד כדקה.')
+      steps.push('מעבירים לצלחת ומגישים חם מיד.')
+      return steps
+    }
+    const steps = ['Boil a pot of salted water and cook the pasta until al dente, then drain.']
+    steps.push('Heat olive oil in a pan, add crushed garlic and sauté until fragrant.')
+    if (otherPhrase) steps.push(`Add ${otherPhrase} and simmer over medium heat until the sauce thickens.`)
+    steps.push('Season with salt and black pepper, toss the pasta in the sauce, and simmer for a minute.')
+    steps.push('Transfer to plates and serve warm.')
+    return steps
+  }
+
+  if (concept === 'egg') {
+    if (he) {
+      const steps = ['חותכים בצל ושום ומטגנים בשמן זית במחבת עד שמזהיבים.']
+      if (otherPhrase) steps.push(`מוסיפים את ${otherPhrase} ומבשלים עד שמתרככים מעט.`)
+      steps.push('מערבבים את הביצים בקערה, מתבלים במלח ובפלפל שחור ויוצקים למחבת.')
+      steps.push('מבשלים על אש נמוכה עד שהביצים מתייצבות.')
+      steps.push('מעבירים לצלחת ומגישים חם לצד סלט או לחם.')
+      return steps
+    }
+    const steps = ['Chop the onion and garlic and sauté in olive oil until golden.']
+    if (otherPhrase) steps.push(`Add ${otherPhrase} and simmer until slightly softened.`)
+    steps.push('Whisk the eggs with salt and black pepper and pour into the pan.')
+    steps.push('Cook over low heat until the eggs set, folding gently.')
+    steps.push('Slide onto a plate and serve warm with salad or bread.')
+    return steps
+  }
+
+  if (concept === 'tuna') {
+    if (he) {
+      const steps = ['פותחים את הטונה, מסננים מהנוזלים ומעבירים לקערה.']
+      steps.push(otherPhrase ? `חותכים בצל דק ומוסיפים לקערה יחד עם ${otherPhrase}.` : 'חותכים בצל דק ומוסיפים לקערה.')
+      steps.push('מתבלים במלח ובפלפל שחור, יוצקים מעט שמן זית ומערבבים היטב.')
+      steps.push('מקררים את הסלט כ-10 דקות ומגישים על פרוסת לחם טרי.')
+      return steps
+    }
+    const steps = ['Drain the tuna and transfer it to a large bowl.']
+    steps.push(otherPhrase ? `Finely chop the onion and add it with ${otherPhrase}.` : 'Finely chop the onion and add it to the bowl.')
+    steps.push('Season with salt and black pepper, drizzle with olive oil, and mix.')
+    steps.push('Chill the salad for 10 minutes and serve on slices of fresh bread.')
+    return steps
+  }
+
+  void has
+  if (he) {
+    return [
+      'חותכים בצל ושום, מטגנים בשמן זית על אש בינונית עד שמזהיבים.',
+      `מוסיפים את ${allPhrase} ומבשלים יחד על אש בינונית תוך ערבוב מדי פעם.`,
+      `מתבלים במלח ובפלפל שחור ומבשלים כ-${cookMinutes} דקות עד שהמרכיבים רכים ומשתלבים.`,
+      'טועמים, מתקנים תיבול לפי הצורך ומבשלים עוד דקה לחיבור הטעמים.',
+      'מעבירים לצלחת הגשה ומגישים חם לצד לחם טרי או סלט ירקות.',
+    ]
+  }
+  return [
+    'Chop the onion and garlic and sauté in olive oil over medium heat until golden and fragrant.',
+    `Add ${allPhrase} and cook together over medium heat, stirring occasionally.`,
+    `Season with salt and black pepper and simmer for about ${cookMinutes} minutes until the ingredients are tender.`,
+    'Taste, adjust the seasoning, and cook for one more minute so the flavors come together.',
+    'Transfer to a serving plate, warm through, and serve hot with fresh bread or a green salad.',
+  ]
+}
+
+/**
+ * Turns a bare savory fallback into a real, dish-appropriate recipe: infers a common
+ * dish concept from the ingredients, keeps every user ingredient (quantified), adds
+ * only allowlisted supporting staples, sets a grounded title, and writes practical
+ * concept-specific steps.
+ */
+function enrichSavoryFallbackRecipe(recipe, { displayNames, filteredUserIngredients, language, cookingTime }) {
+  const cookMinutes = Math.min(cookingTime ?? 30, Math.max(10, Math.round((cookingTime ?? 30) / 2)))
+  const canonByIndex = (filteredUserIngredients ?? []).map((item) => canonicalIngredient(item))
+  const userCanons = new Set(canonByIndex.filter(Boolean))
+  const canonToDisplay = new Map()
+  canonByIndex.forEach((canon, index) => {
+    if (canon && !canonToDisplay.has(canon)) canonToDisplay.set(canon, displayNames?.[index] ?? '')
+  })
+
+  const concept = detectFallbackConcept(userCanons)
+  const primaryCanon = { pasta: 'pasta', egg: 'egg', tuna: 'tuna' }[concept] ?? null
+
+  const userLines = buildUserIngredientLines(filteredUserIngredients, displayNames, recipe.ingredients, language)
+  const stapleLines = conceptStapleRoles(concept)
+    .filter((role) => !(STAPLE_DEDUP_CANONS[role] ?? [role]).some((canon) => userCanons.has(canon)))
+    .map((role) => (STAPLE_LINES[language] ?? STAPLE_LINES.he)[role])
+
+  const allDisplays = displayNames ?? []
+  const otherDisplays = (displayNames ?? []).filter((_, index) => canonByIndex[index] !== primaryCanon)
+  const allPhrase = fmtPhrase(allDisplays, language)
+  const otherPhrase = otherDisplays.length ? fmtPhrase(otherDisplays, language) : ''
+
+  const ingredients = [...userLines, ...stapleLines]
+  const candidates = buildFallbackTitleCandidates(concept, userCanons, canonToDisplay, language)
+  const name =
+    candidates.find((title) => titlePasses(title, ingredients, filteredUserIngredients ?? [], language)) ??
+    candidates[0]
+
+  return {
+    ...recipe,
+    name,
+    ingredients,
+    steps: buildFallbackSteps(concept, { canonSet: userCanons, allPhrase, otherPhrase, cookMinutes, language }),
+  }
+}
+
+/**
  * Ingredient-first fallback when template/Gemini output fails relevance checks.
  */
 export function buildIngredientFirstFallbackRecipe(
@@ -831,15 +1102,27 @@ export function buildIngredientFirstFallbackRecipe(
     cookTime: cookingTime,
   }
 
+  const finalizedRecipe = finalizeRecipe(recipe, ingredients, language, {
+    cookingTime,
+    style: 'quick',
+    servings,
+    recipeType: effectiveRecipeType,
+    category,
+    isGlutenFree,
+  })
+
+  const shouldEnrich =
+    effectiveRecipeType !== 'dessert' && filteredUserIngredients.length > 0
+
   return {
-    recipe: finalizeRecipe(recipe, ingredients, language, {
-      cookingTime,
-      style: 'quick',
-      servings,
-      recipeType: effectiveRecipeType,
-      category,
-      isGlutenFree,
-    }),
+    recipe: shouldEnrich
+      ? enrichSavoryFallbackRecipe(finalizedRecipe, {
+          displayNames,
+          filteredUserIngredients,
+          language,
+          cookingTime,
+        })
+      : finalizedRecipe,
     meta,
   }
 }

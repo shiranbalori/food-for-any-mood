@@ -1,34 +1,61 @@
 import { canonicalIngredient, ingredientsMatch } from '../data/ingredientKnowledge'
 
-const UPGRADE_CATALOG = [
-  { canon: 'butter', he: 'חמאה', en: 'butter', reasonHe: 'מוסיפה עשירות ומחברת את התערובת', reasonEn: 'Adds richness and helps bind the mixture' },
-  { canon: 'vanilla', he: 'וניל', en: 'vanilla', reasonHe: 'מעצימה את הניחוח והמתיקות', reasonEn: 'Enhances sweetness and aroma' },
-  { canon: 'oil', he: 'שמן', en: 'oil', reasonHe: 'מונע הידבקות ומשפר מרקם', reasonEn: 'Helps prevent sticking and improves texture' },
-  { canon: 'flour', he: 'קמח', en: 'flour', reasonHe: 'מוסיפה מבנה לאפייה', reasonEn: 'Adds structure for baking' },
-  { canon: 'baking powder', he: 'אבקת אפייה', en: 'baking powder', reasonHe: 'מסייעת לקינוחים להתרומם', reasonEn: 'Helps desserts rise and stay light' },
-  { canon: 'egg', he: 'ביצה', en: 'egg', reasonHe: 'מחברת מרכיבים ומשפרת מרקם', reasonEn: 'Binds ingredients and improves texture' },
-  { canon: 'milk', he: 'חלב', en: 'milk', reasonHe: 'מרככת ומעשירה את התערובת', reasonEn: 'Softens and enriches the mixture' },
+/**
+ * Savory finishing upgrades. `match` lists user-ingredient canons this pairs
+ * especially well with, so suggestions stay relevant to the actual dish.
+ */
+const SAVORY_UPGRADES = [
+  { canon: 'parsley', he: 'פטרוזיליה קצוצה', en: 'chopped parsley', reasonHe: 'מוסיפה רעננות וצבע למנה', reasonEn: 'Adds freshness and color', match: [] },
+  { canon: 'chili flakes', he: 'פתיתי צ׳ילי', en: 'chili flakes', reasonHe: 'מוסיפים חריפות עדינה', reasonEn: 'Add a gentle kick of heat', match: [] },
+  { canon: 'lemon', he: 'מיץ לימון', en: 'a squeeze of lemon', reasonHe: 'מאזן ומבהיר את הטעמים', reasonEn: 'Brightens and balances the flavors', match: [] },
+  { canon: 'parmesan', he: 'פרמזן מגורר', en: 'grated parmesan', reasonHe: 'מוסיף מליחות ועומק לרוטב ולפסטה', reasonEn: 'Adds salty depth to pasta and sauce', match: ['pasta', 'cream', 'cheese'] },
+  { canon: 'nutmeg', he: 'אגוז מוסקט', en: 'nutmeg', reasonHe: 'מעדן ומעשיר רטבי שמנת', reasonEn: 'Rounds out and enriches cream sauces', match: ['cream'] },
+  { canon: 'oregano', he: 'אורגנו', en: 'oregano', reasonHe: 'מדגיש את טעם העגבניות והגבינה', reasonEn: 'Highlights the tomato and cheese', match: ['tomato', 'cheese'] },
+  { canon: 'basil', he: 'בזיליקום טרי', en: 'fresh basil', reasonHe: 'משתלב מצוין עם עגבניות וגבינה', reasonEn: 'Pairs beautifully with tomato and cheese', match: ['tomato', 'cheese'] },
+  { canon: 'olives', he: 'זיתים', en: 'olives', reasonHe: 'מוסיפים מליחות ים-תיכונית', reasonEn: 'Add briny Mediterranean flavor', match: ['tomato', 'cheese'] },
+  { canon: 'green onion', he: 'בצל ירוק', en: 'green onion', reasonHe: 'מוסיף רעננות וטעם עדין', reasonEn: 'Adds a fresh, mild onion note', match: ['egg', 'cheese'] },
+  { canon: 'feta', he: 'גבינת פטה', en: 'feta cheese', reasonHe: 'מוסיפה מליחות וטעם עשיר', reasonEn: 'Adds a salty, tangy bite', match: ['tomato', 'cheese', 'egg'] },
+  { canon: 'mushrooms', he: 'פטריות', en: 'mushrooms', reasonHe: 'מוסיפות מרקם ועומק אומאמי', reasonEn: 'Add texture and umami depth', match: ['egg'] },
 ]
 
+/** Sweet finishing upgrades for desserts. */
+const DESSERT_UPGRADES = [
+  { canon: 'vanilla', he: 'תמצית וניל', en: 'vanilla extract', reasonHe: 'מעצימה ניחוח ומתיקות', reasonEn: 'Enhances aroma and sweetness', match: [] },
+  { canon: 'cinnamon', he: 'קינמון', en: 'cinnamon', reasonHe: 'מוסיף חמימות וניחוח', reasonEn: 'Adds warmth and aroma', match: [] },
+  { canon: 'chocolate', he: 'שבבי שוקולד', en: 'chocolate chips', reasonHe: 'מוסיפים עושר ומתיקות', reasonEn: 'Add richness and sweetness', match: [] },
+  { canon: 'honey', he: 'דבש', en: 'honey', reasonHe: 'ממתיק בעדינות טבעית', reasonEn: 'Sweetens with a natural touch', match: [] },
+  { canon: 'coconut', he: 'קוקוס', en: 'shredded coconut', reasonHe: 'מוסיף מרקם וטעם', reasonEn: 'Adds texture and flavor', match: [] },
+]
+
+function userHas(userIngredients, canon) {
+  return (userIngredients ?? []).some(
+    (user) => ingredientsMatch(user, canon) || canonicalIngredient(user) === canon,
+  )
+}
+
 /**
+ * Context-aware optional upgrades for fallback/mock recipes. Suggestions are
+ * chosen from a savory or dessert catalog (by recipe type) and ranked by how
+ * well they match the actual ingredients, so a savory egg/tomato/cheese dish
+ * gets herbs and toppings — never vanilla or random oil.
+ *
  * @param {string[]} userIngredients
  * @param {{ language?: string, recipeType?: string, limit?: number }} [options]
  */
 export function buildOptionalUpgrades(userIngredients, { language = 'he', recipeType = 'meal', limit = 3 } = {}) {
-  const upgrades = []
+  const catalog = recipeType === 'dessert' ? DESSERT_UPGRADES : SAVORY_UPGRADES
+  const userCanons = new Set((userIngredients ?? []).map((user) => canonicalIngredient(user)).filter(Boolean))
 
-  for (const item of UPGRADE_CATALOG) {
-    const alreadyHas = (userIngredients ?? []).some(
-      (user) => ingredientsMatch(user, item.canon) || canonicalIngredient(user) === item.canon,
-    )
-    if (alreadyHas) continue
-
-    upgrades.push({
+  return catalog
+    .filter((item) => !userHas(userIngredients, item.canon))
+    .map((item) => ({
+      item,
+      score: (item.match ?? []).filter((canon) => userCanons.has(canon)).length,
+    }))
+    .sort((a, b) => b.score - a.score)
+    .slice(0, limit)
+    .map(({ item }) => ({
       ingredient: language === 'he' ? item.he : item.en,
       reason: language === 'he' ? item.reasonHe : item.reasonEn,
-    })
-    if (upgrades.length >= limit) break
-  }
-
-  return upgrades
+    }))
 }
