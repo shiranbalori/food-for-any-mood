@@ -78,7 +78,12 @@ function textHits(text, keywords) {
   })
 }
 
+// NOTE: `carbsPerServing` is accepted only for call-site compatibility; sugar is
+// counted strictly from actual sweet ingredients. We do NOT infer sugar from
+// carbohydrates (the old `carbs * 0.35` heuristic), which wrongly penalized
+// starch-heavy savory dishes like rice or pasta as if they were sugary.
 export function estimateSugarPerServing(ingredients, servings, carbsPerServing = 0) {
+  void carbsPerServing
   const safeServings = Math.max(1, servings)
   let total = 0
 
@@ -93,11 +98,7 @@ export function estimateSugarPerServing(ingredients, servings, carbsPerServing =
     else if (textHits(text, ['chocolate', 'שוקולד'])) total += 10
   }
 
-  let estimated = total / safeServings
-  if (estimated <= 0 && carbsPerServing >= 40) {
-    estimated = carbsPerServing * 0.35
-  }
-  return Math.round(estimated * 10) / 10
+  return Math.round((total / safeServings) * 10) / 10
 }
 
 export function estimateFiberPerServing(ingredients, servings) {
@@ -246,20 +247,27 @@ function scoreProteinContribution(proteinPerServing) {
 }
 
 function scoreCarbsContribution(carbsPerServing, sugarPerServing, refinedCarbLevel) {
-  let contribution = 0
-  if (carbsPerServing <= 25) contribution = 4
-  else if (carbsPerServing <= 35) contribution = 0
-  else if (carbsPerServing <= 50) contribution = -8
-  else if (carbsPerServing <= 65) contribution = -16
-  else if (carbsPerServing <= 80) contribution = -22
-  else contribution = -30
+  // Band values are unchanged — this is the quantity penalty for total carbs.
+  let bandContribution = 0
+  if (carbsPerServing <= 25) bandContribution = 4
+  else if (carbsPerServing <= 35) bandContribution = 0
+  else if (carbsPerServing <= 50) bandContribution = -8
+  else if (carbsPerServing <= 65) bandContribution = -16
+  else if (carbsPerServing <= 80) bandContribution = -22
+  else bandContribution = -30
 
+  // The refined-carb penalty describes the SAME carbohydrates the band already
+  // penalized (e.g. rice / pasta). Stacking both double-counts one ingredient, so
+  // we apply only the single worse penalty instead of summing them.
+  const refinedPenalty =
+    refinedCarbLevel === 'high' ? -12 : refinedCarbLevel === 'moderate' ? -6 : 0
+  let contribution = refinedPenalty < 0 ? Math.min(bandContribution, refinedPenalty) : bandContribution
+
+  // Sugar is now derived only from real sweet ingredients (see estimateSugarPerServing),
+  // so this remains a distinct, legitimate signal rather than a carb-derived guess.
   if (sugarPerServing > 30) contribution -= 8
   else if (sugarPerServing > 20) contribution -= 4
   else if (sugarPerServing > 15) contribution -= 2
-
-  if (refinedCarbLevel === 'high') contribution -= 12
-  else if (refinedCarbLevel === 'moderate') contribution -= 6
 
   return contribution
 }

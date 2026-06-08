@@ -8,7 +8,8 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "test:quality": "npx vite-node scripts/test-recipe-quality.mjs"
+    "test:quality": "npx vite-node scripts/test-recipe-quality.mjs",
+    "test:nutrition": "npx vite-node scripts/test-nutrition-scoring.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.106.2",

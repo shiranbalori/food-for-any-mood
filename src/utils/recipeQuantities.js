@@ -172,6 +172,22 @@ const NUTRITION_PER_UNIT = {
   },
 }
 
+// Per-cup nutrition for grains/starches measured by the cup but eaten COOKED.
+// The `cup` table above holds dry/raw densities (e.g. 685 kcal for a cup of
+// uncooked rice). A recipe line like "2 cups rice" almost always refers to the
+// cooked dish, so these cooked figures are used instead — unless the line
+// explicitly says it is dry/raw/uncooked.
+const COOKED_GRAIN_PER_CUP = {
+  rice: { calories: 205, protein: 4.3, carbs: 45, fat: 0.4 },
+  pasta: { calories: 220, protein: 8, carbs: 43, fat: 1.3 },
+  noodles: { calories: 220, protein: 8, carbs: 43, fat: 1.3 },
+  couscous: { calories: 176, protein: 6, carbs: 36, fat: 0.3 },
+  bulgur: { calories: 151, protein: 5.6, carbs: 34, fat: 0.4 },
+  quinoa: { calories: 222, protein: 8, carbs: 39, fat: 3.6 },
+}
+
+const DRY_OR_RAW_PATTERN = /uncooked|dry|raw|לא מבושל|יבש/i
+
 function escapeRegExp(str) {
   return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
@@ -320,9 +336,18 @@ function buildReadableQuantifiedItem(raw, language, pantryNote = '') {
   }
 }
 
-function getNutritionForItem(canon, unit, amount) {
+function getNutritionForItem(canon, unit, amount, rawText = '') {
+  // Cup-measured grains/starches default to cooked densities unless the line
+  // explicitly marks them as dry/raw/uncooked.
+  const useCookedGrain =
+    unit === 'cup' &&
+    COOKED_GRAIN_PER_CUP[canon] &&
+    !DRY_OR_RAW_PATTERN.test(String(rawText))
+
   const unitTable = NUTRITION_PER_UNIT[unit] ?? NUTRITION_PER_UNIT.gram
-  const macros = unitTable[canon] ?? unitTable.default ?? { calories: 0, protein: 0, carbs: 0, fat: 0 }
+  const macros = useCookedGrain
+    ? COOKED_GRAIN_PER_CUP[canon]
+    : unitTable[canon] ?? unitTable.default ?? { calories: 0, protein: 0, carbs: 0, fat: 0 }
   return {
     calories: macros.calories * amount,
     protein: macros.protein * amount,
@@ -440,7 +465,7 @@ export function computeNutritionFromQuantities(quantifiedItems, servings = DEFAU
   const totals = { calories: 0, protein: 0, carbs: 0, fat: 0 }
 
   for (const item of quantifiedItems) {
-    const macros = getNutritionForItem(item.canon, item.unit, item.amount)
+    const macros = getNutritionForItem(item.canon, item.unit, item.amount, item.raw ?? item.display ?? '')
     totals.calories += macros.calories
     totals.protein += macros.protein
     totals.carbs += macros.carbs
