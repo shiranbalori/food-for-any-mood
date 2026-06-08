@@ -264,10 +264,19 @@ function scoreCarbsContribution(carbsPerServing, sugarPerServing, refinedCarbLev
   return contribution
 }
 
-function scoreFatContribution(fatPerServing) {
-  if (fatPerServing >= 38) return -18
-  if (fatPerServing >= 29) return -12
-  if (fatPerServing >= 21) return -6
+const HEALTHY_FAT_PATTERN =
+  /olive oil|avocado|tahini|nuts?|almond|walnut|seeds?|salmon|tuna|egg|שמן זית|אבוקדו|טחינה|אגוז|שקד|זרעים|סלמון|טונה|ביצ/i
+
+export function hasHealthyFatSource(ingredients) {
+  return (ingredients ?? []).some((item) => HEALTHY_FAT_PATTERN.test(String(item)))
+}
+
+function scoreFatContribution(fatPerServing, healthyFat = false) {
+  // Unsaturated / whole-food fats (olive oil, avocado, eggs, fish, nuts) are
+  // penalized more gently than processed/heavy fats.
+  if (fatPerServing >= 38) return healthyFat ? -12 : -18
+  if (fatPerServing >= 29) return healthyFat ? -8 : -12
+  if (fatPerServing >= 21) return healthyFat ? -3 : -6
   if (fatPerServing <= 12) return 2
   return 0
 }
@@ -283,7 +292,8 @@ function scoreFiberContribution(fiberPerServing) {
   if (fiberPerServing >= 6) return 10
   if (fiberPerServing >= 4) return 6
   if (fiberPerServing >= 2) return 2
-  return -8
+  if (fiberPerServing >= 1) return 0
+  return -4
 }
 
 const INDULGENT_DESSERT_KEYWORDS = [
@@ -386,12 +396,18 @@ export function calculateHealthScoreDetailed({
   const refinedCarbLevel = detectRefinedCarbLevel(ingredients)
   const richInVegFruit = isRichInVegetablesOrFruit(ingredients)
 
+  const healthyFat = hasHealthyFatSource(ingredients)
+  const hasProduce = richInVegFruit || hasAnyVegetable(ingredients) || hasLegumes(ingredients)
+
   const caloriesContribution = scoreCaloriesContribution(caloriesPer)
   const proteinContribution = scoreProteinContribution(proteinPer)
   const carbsContribution = scoreCarbsContribution(carbsPer, sugarPer, refinedCarbLevel)
-  const fatContribution = scoreFatContribution(fatPer)
+  const fatContribution = scoreFatContribution(fatPer, healthyFat)
   const vegetableContribution = scoreVegetableContribution(ingredients)
-  const fiberContribution = scoreFiberContribution(fiberPer)
+  // Whole vegetables/legumes supply fiber the keyword estimate misses, so don't
+  // also penalize a produce-containing dish for "low fiber".
+  const rawFiberContribution = scoreFiberContribution(fiberPer)
+  const fiberContribution = hasProduce && rawFiberContribution < 0 ? 0 : rawFiberContribution
 
   let rawScore =
     HEALTH_SCORE_BASE +
@@ -546,6 +562,28 @@ export function calculateHealthScoreFromRecipe({
     name,
     language,
   }).score
+}
+
+/**
+ * Single source of truth for a recipe's nutrition score. Both the recipe card
+ * (Health Score) and the nutrition coach (Nutrition Score) must call this with the
+ * same recipe so they never show contradicting scores or classifications.
+ *
+ * @returns {{ score: number, classification: object, explanation: string }}
+ */
+export function resolveRecipeNutritionScore(recipe = {}, language = 'he') {
+  const { score, classification, explanation } = calculateHealthScoreDetailed({
+    ingredients: recipe.ingredients ?? [],
+    calories: recipe.calories ?? recipe.nutrition?.calories ?? 0,
+    protein: recipe.protein ?? recipe.nutrition?.protein ?? 0,
+    carbs: recipe.carbs ?? recipe.nutrition?.carbs ?? 0,
+    fat: recipe.fat ?? recipe.nutrition?.fat ?? 0,
+    servings: recipe.servings ?? recipe.nutrition?.servings ?? 2,
+    recipeType: recipe.recipeType,
+    name: recipe.name,
+    language,
+  })
+  return { score, classification, explanation }
 }
 
 /** @deprecated Use calculateHealthScoreFromRecipe */

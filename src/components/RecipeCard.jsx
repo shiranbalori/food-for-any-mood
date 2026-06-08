@@ -5,19 +5,15 @@ import ShoppingListModal from './ShoppingListModal'
 import MealPlanPickerModal from './MealPlanPickerModal'
 import NutritionCoach from './NutritionCoach'
 import { useLanguage } from '../i18n/useLanguage'
-import { getNutritionScoreClassification, buildNutritionScoreExplanationFromRecipe } from '../utils/nutritionScore'
+import { resolveRecipeNutritionScore } from '../utils/nutritionScore'
 import { sanitizeIngredientList } from '../utils/ingredientFormatting'
 import './RecipeCard.css'
 
-function HealthBar({ score, recipe }) {
+function HealthBar({ recipe }) {
   const { t, language } = useLanguage()
+  const { score, classification, explanation } = resolveRecipeNutritionScore(recipe, language)
   const safeScore = Math.min(100, Math.max(0, score ?? 0))
-  const classification = getNutritionScoreClassification(safeScore)
   const color = classification.color
-  const explanation = buildNutritionScoreExplanationFromRecipe(
-    { ...recipe, healthScore: safeScore },
-    language,
-  )
 
   return (
     <div className="health-bar animate-in stagger-4">
@@ -200,7 +196,7 @@ export default function RecipeCard({
         spiceLevel={recipe.spiceLevel}
       />
 
-      <HealthBar score={recipe.healthScore} recipe={recipe} />
+      <HealthBar recipe={recipe} />
 
       <NutritionCoach recipe={recipe} />
 

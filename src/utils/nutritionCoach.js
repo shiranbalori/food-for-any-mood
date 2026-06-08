@@ -5,10 +5,9 @@
 import {
   analyzeDessertNutritionProfile,
   calculateHealthScoreFromRecipe,
-  buildNutritionScoreExplanation,
   detectUltraProcessedLevel,
   estimateSugarPerServing,
-  getNutritionScoreClassification,
+  resolveRecipeNutritionScore,
 } from './nutritionScore'
 import { buildRecipeSpecificTips } from './recipeHealthTips'
 
@@ -113,20 +112,13 @@ export function buildLocalNutritionAnalysis(recipe, language = 'he') {
   }
 
   const insights = buildInsights(recipe, { proteinPer, carbsPer, fatPer, caloriesPer })
-  const nutritionScore = calculateNutritionScore(recipe, macroLevels.fiber, {
-    proteinPer,
-    fatPer,
-    caloriesPer,
-  })
-  const nutritionScoreExplanation = buildNutritionScoreExplanation({
+  // Shared source of truth: the same score/classification/explanation the recipe
+  // card shows, so Health Score and Nutrition Score never contradict each other.
+  const {
     score: nutritionScore,
-    ingredients: recipe.ingredients ?? [],
-    calories: recipe.calories ?? recipe.nutrition?.calories ?? 0,
-    protein: recipe.protein ?? recipe.nutrition?.protein ?? 0,
-    carbs: recipe.carbs ?? recipe.nutrition?.carbs ?? 0,
-    servings,
-    language,
-  })
+    classification: nutritionClassificationBand,
+    explanation: nutritionScoreExplanation,
+  } = resolveRecipeNutritionScore(recipe, language)
 
   let tips = buildFallbackTips(recipe, macroLevels, insights, language)
   if (caloriesPer > 500) {
@@ -141,7 +133,7 @@ export function buildLocalNutritionAnalysis(recipe, language = 'he') {
     macroLevels,
     insights,
     nutritionScore,
-    nutritionClassification: getNutritionScoreClassification(nutritionScore).id,
+    nutritionClassification: nutritionClassificationBand.id,
     nutritionScoreExplanation,
     tips,
     source: 'fallback',

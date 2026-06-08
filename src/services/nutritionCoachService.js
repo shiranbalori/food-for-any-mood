@@ -1,5 +1,6 @@
 import { NUTRITION_ANALYSIS_URL } from '../config/api'
 import { buildLocalNutritionAnalysis, recipeToNutritionPayload } from '../utils/nutritionCoach'
+import { resolveRecipeNutritionScore } from '../utils/nutritionScore'
 
 const FETCH_OPTIONS = {
   mode: 'cors',
@@ -33,13 +34,15 @@ export async function fetchNutritionAnalysis(recipe, language = 'he') {
       return buildLocalNutritionAnalysis(recipe, language)
     }
 
+    // Keep the backend's macro levels / insights / tips, but force the score,
+    // classification, and explanation to the shared source of truth so the
+    // Nutrition Score always matches the recipe card's Health Score.
+    const { score, explanation } = resolveRecipeNutritionScore(recipe, language)
     return {
       macroLevels: data.macroLevels,
       insights: data.insights ?? {},
-      nutritionScore: data.nutritionScore ?? buildLocalNutritionAnalysis(recipe, language).nutritionScore,
-      nutritionScoreExplanation:
-        data.nutritionScoreExplanation
-        ?? buildLocalNutritionAnalysis(recipe, language).nutritionScoreExplanation,
+      nutritionScore: score,
+      nutritionScoreExplanation: explanation,
       tips: Array.isArray(data.tips) ? data.tips : [],
       source: data.source ?? 'fallback',
     }
