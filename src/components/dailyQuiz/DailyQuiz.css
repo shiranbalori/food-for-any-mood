@@ -235,3 +235,19 @@
 .quiz-overlay__login-hint {
   margin-top: 0.5rem;
 }
+
+.quiz-bonus-banner {
+  margin: 0.5rem 0 0;
+  padding: 0.5rem 0.75rem;
+  border-radius: 8px;
+  background: #d1fae5;
+  color: #065f46;
+  font-weight: 600;
+  font-size: 0.9rem;
+  text-align: center;
+}
+
+.quiz-bonus-banner--gold {
+  background: #fef9c3;
+  color: #713f12;
+}

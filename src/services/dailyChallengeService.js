@@ -50,6 +50,13 @@ function defaultGamification(userId) {
     fiveLikeAwards: [],
     quizzesAnswered: 0,
     quizCorrectCount: 0,
+    // quiz streak fields (additive — challenge fields above are unchanged)
+    quizCurrentStreak: 0,
+    quizLongestStreak: 0,
+    lastQuizDate: null,
+    quizStreakBonusCount: 0,
+    quizCorrectStreak: 0,
+    quizCorrectStreakBonusCount: 0,
   }
 }
 
@@ -258,6 +265,13 @@ function mapDbGamification(row) {
     fiveLikeAwards: row.five_like_awards ?? [],
     quizzesAnswered: row.quizzes_answered ?? 0,
     quizCorrectCount: row.quiz_correct_count ?? 0,
+    // quiz streak fields (additive — challenge columns above are unchanged)
+    quizCurrentStreak: row.quiz_current_streak ?? 0,
+    quizLongestStreak: row.quiz_longest_streak ?? 0,
+    lastQuizDate: row.last_quiz_date ?? null,
+    quizStreakBonusCount: row.quiz_streak_bonus_count ?? 0,
+    quizCorrectStreak: row.quiz_correct_streak ?? 0,
+    quizCorrectStreakBonusCount: row.quiz_correct_streak_bonus_count ?? 0,
   }
   stats.unlockedAchievements = syncAchievements(stats)
   return stats
@@ -301,6 +315,13 @@ async function upsertGamification(stats) {
       five_like_awards: stats.fiveLikeAwards,
       quizzes_answered: stats.quizzesAnswered ?? 0,
       quiz_correct_count: stats.quizCorrectCount ?? 0,
+      // quiz streak fields (additive — challenge columns above are unchanged)
+      quiz_current_streak: stats.quizCurrentStreak ?? 0,
+      quiz_longest_streak: stats.quizLongestStreak ?? 0,
+      last_quiz_date: stats.lastQuizDate ?? null,
+      quiz_streak_bonus_count: stats.quizStreakBonusCount ?? 0,
+      quiz_correct_streak: stats.quizCorrectStreak ?? 0,
+      quiz_correct_streak_bonus_count: stats.quizCorrectStreakBonusCount ?? 0,
       updated_at: new Date().toISOString(),
     },
     { onConflict: 'user_id' },

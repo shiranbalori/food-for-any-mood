@@ -94,6 +94,9 @@ export default function DailyQuizModal({ open, onClose, onAnswered }) {
       : t('quizGuestFeedbackCorrect')
     : t('quizFeedbackIncorrect')
 
+  const participationBonus = result?.participationStreakBonus ?? 0
+  const correctBonus = result?.correctStreakBonus ?? 0
+
   return (
     <>
       <div className="quiz-overlay" role="presentation">
@@ -166,6 +169,16 @@ export default function DailyQuizModal({ open, onClose, onAnswered }) {
                   <p className="quiz-feedback__message">{feedbackMessage}</p>
                   <p className="quiz-feedback__explanation">{quiz.explanation}</p>
                 </div>
+                {isAuthenticated && participationBonus > 0 && (
+                  <p className="quiz-bonus-banner" role="status">
+                    {t('quizBonusParticipationStreak')}
+                  </p>
+                )}
+                {isAuthenticated && correctBonus > 0 && (
+                  <p className="quiz-bonus-banner quiz-bonus-banner--gold" role="status">
+                    {t('quizBonusCorrectStreak')}
+                  </p>
+                )}
                 {!isAuthenticated ? (
                   <p className="quiz-overlay__login-hint">{t('quizGuestLoginPrompt')}</p>
                 ) : null}

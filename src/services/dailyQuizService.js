@@ -1,6 +1,10 @@
 import { isSupabaseConfigured, supabase } from '../lib/supabaseClient'
 import { getChallengeDateKey } from '../utils/dailyChallenge/generateDailyChallenge'
 import { POINT_AWARDS } from '../utils/dailyChallenge/points'
+import {
+  applyQuizParticipationStreak,
+  applyQuizCorrectStreak,
+} from '../utils/dailyChallenge/streaks'
 import { generateDailyQuiz } from '../utils/dailyQuiz/generateDailyQuiz'
 import { awardGamificationPoints, fetchUserGamification } from './dailyChallengeService'
 
@@ -125,10 +129,27 @@ export async function submitDailyQuizAnswer(userId, selectedIndex, correctIndex,
   await saveRemoteQuizAnswer(userId, quizDate, answer)
 
   const stats = await fetchUserGamification(userId)
-  await awardGamificationPoints(userId, pointsAwarded, {
-    quizzesAnswered: (stats.quizzesAnswered ?? 0) + 1,
-    quizCorrectCount: (stats.quizCorrectCount ?? 0) + (correct ? 1 : 0),
+
+  // Apply participation streak (any answer keeps the streak going)
+  const { stats: statsAfterParticipation, streakBonus: participationBonus } =
+    applyQuizParticipationStreak(stats, quizDate)
+
+  // Apply correct-answer streak (wrong answer resets it)
+  const { stats: statsAfterCorrect, streakBonus: correctBonus } =
+    applyQuizCorrectStreak(statsAfterParticipation, correct)
+
+  const totalBonus = participationBonus + correctBonus
+
+  await awardGamificationPoints(userId, pointsAwarded + totalBonus, {
+    quizzesAnswered: (statsAfterCorrect.quizzesAnswered ?? 0) + 1,
+    quizCorrectCount: (statsAfterCorrect.quizCorrectCount ?? 0) + (correct ? 1 : 0),
+    quizCurrentStreak: statsAfterCorrect.quizCurrentStreak,
+    quizLongestStreak: statsAfterCorrect.quizLongestStreak,
+    lastQuizDate: statsAfterCorrect.lastQuizDate,
+    quizStreakBonusCount: statsAfterCorrect.quizStreakBonusCount,
+    quizCorrectStreak: statsAfterCorrect.quizCorrectStreak,
+    quizCorrectStreakBonusCount: statsAfterCorrect.quizCorrectStreakBonusCount,
   })
 
-  return answer
+  return { ...answer, participationStreakBonus: participationBonus, correctStreakBonus: correctBonus }
 }
