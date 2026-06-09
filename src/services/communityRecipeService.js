@@ -168,12 +168,25 @@ export async function fetchCommunityRecipes(userId) {
     return MOCK_COMMUNITY_RECIPES.map(mapMockRecipe)
   }
 
-  const { data: recipes, error } = await supabase
+  // NOTE: image_url is selected separately below to handle projects where the column
+  // hasn't been migrated yet (add-missing-columns.sql). On failure the column is omitted.
+  let { data: recipes, error } = await supabase
     .from('community_recipes')
     .select(
       'id, user_id, title, description, ingredients, steps, kosher_category, recipe_type, image_url, is_gluten_free, view_count, created_at',
     )
     .order('created_at', { ascending: false })
+
+  // PostgreSQL error 42703 = column does not exist. Retry without image_url.
+  if (error && error.code === '42703') {
+    console.warn('[communityRecipeService] image_url column missing – retrying without it. Run supabase/add-missing-columns.sql to fix.')
+    ;({ data: recipes, error } = await supabase
+      .from('community_recipes')
+      .select(
+        'id, user_id, title, description, ingredients, steps, kosher_category, recipe_type, is_gluten_free, view_count, created_at',
+      )
+      .order('created_at', { ascending: false }))
+  }
 
   if (error) {
     console.error('[communityRecipeService] fetch failed:', error)
