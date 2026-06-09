@@ -393,6 +393,175 @@
   margin-bottom: 0.25rem;
 }
 
+/* ── Comment count badge in meta row ─────────────────────────────────────── */
+.community-card__comment-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  font-size: 0.8rem;
+  color: var(--text-muted, #666);
+}
+
+/* ── Comments section (inside expanded details) ──────────────────────────── */
+.community-card__comments {
+  margin-top: 1rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid var(--border, #e5e7eb);
+}
+
+.community-card__comments-title {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin: 0 0 0.6rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.community-card__comments-count-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.3rem;
+  padding: 0 0.3rem;
+  height: 1.3rem;
+  border-radius: 999px;
+  background: var(--theme-accent, #e5e7eb);
+  color: var(--text, #111);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.community-card__comments-status,
+.community-card__comments-empty {
+  font-size: 0.8rem;
+  color: var(--text-muted, #888);
+  margin: 0.25rem 0 0.5rem;
+}
+
+/* ── Comment list ─────────────────────────────────────────────────────────── */
+.community-card__comments-list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.community-card__comment {
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--border, #f0f0f0);
+}
+
+.community-card__comment:last-child {
+  border-bottom: none;
+}
+
+.community-card__comment-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.35rem 0.55rem;
+  margin-bottom: 0.2rem;
+}
+
+.community-card__comment-author {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.community-card__comment-date {
+  font-size: 0.72rem;
+  color: var(--text-muted, #999);
+}
+
+.community-card__comment-delete {
+  margin-inline-start: auto;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 0.7rem;
+  color: var(--text-muted, #bbb);
+  padding: 0;
+  opacity: 0;
+  transition: opacity 0.15s, color 0.15s;
+}
+
+.community-card__comment:hover .community-card__comment-delete,
+.community-card__comment-delete:focus {
+  opacity: 1;
+  color: #e55;
+}
+
+.community-card__comment-body {
+  margin: 0;
+  font-size: 0.85rem;
+  line-height: 1.45;
+  color: var(--text);
+  word-break: break-word;
+}
+
+/* ── Comment form ─────────────────────────────────────────────────────────── */
+.community-card__comment-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.community-card__comment-input {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid var(--border, #d1d5db);
+  border-radius: 8px;
+  padding: 0.5rem 0.65rem;
+  font-size: 0.85rem;
+  font-family: inherit;
+  resize: vertical;
+  background: var(--bg, #fff);
+  color: var(--text);
+  transition: border-color 0.15s;
+}
+
+.community-card__comment-input:focus {
+  outline: none;
+  border-color: var(--theme-accent, #6366f1);
+}
+
+.community-card__comment-input:disabled {
+  opacity: 0.6;
+}
+
+.community-card__comment-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.community-card__comment-char-count {
+  font-size: 0.72rem;
+  color: var(--text-muted, #aaa);
+}
+
+.community-card__comment-submit {
+  font-size: 0.82rem;
+  padding: 0.35rem 0.9rem;
+}
+
+.community-card__comment-login {
+  font-size: 0.82rem;
+  margin-top: 0.25rem;
+}
+
+/* ── Mobile tweaks ────────────────────────────────────────────────────────── */
+@media (max-width: 480px) {
+  .community-card__comment-delete {
+    opacity: 1;
+  }
+}
+
 @media (min-width: 640px) {
   .community-recipes__grid {
     grid-template-columns: repeat(2, 1fr);

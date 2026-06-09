@@ -53,13 +53,14 @@ function mapMockRecipe(recipe) {
   })
 }
 
-function mapDbRecipe(row, { profileMap, likeCountMap, shareCountMap, ratingsByRecipe, userLikeSet, userRatingMap }) {
+function mapDbRecipe(row, { profileMap, likeCountMap, shareCountMap, ratingsByRecipe, userLikeSet, userRatingMap, commentCountMap }) {
   const recipeRatings = ratingsByRecipe.get(row.id) ?? []
   const ratingsCount = recipeRatings.length
   const averageRatingValue = averageRating(recipeRatings)
   const savesCount = likeCountMap.get(row.id) ?? 0
   const viewsCount = row.view_count ?? 0
   const sharesCount = shareCountMap.get(row.id) ?? 0
+  const commentCount = commentCountMap?.get(row.id) ?? 0
 
   return enrichCommunityRecipe({
     id: row.id,
@@ -86,6 +87,7 @@ function mapDbRecipe(row, { profileMap, likeCountMap, shareCountMap, ratingsByRe
     userRating: userRatingMap.get(row.id) ?? null,
     isGlutenFree: Boolean(row.is_gluten_free),
     createdAt: row.created_at,
+    commentCount,
   })
 }
 
@@ -214,9 +216,10 @@ export async function fetchCommunityRecipes(userId) {
     userId
       ? supabase.from('recipe_ratings').select('recipe_id, rating').eq('user_id', userId)
       : Promise.resolve({ data: [], error: null }),
+    supabase.from('recipe_comments').select('recipe_id').in('recipe_id', recipeIds),
   ]
 
-  const [profilesRes, allLikesRes, allSharesRes, allRatingsRes, userLikesRes, userRatingsRes] =
+  const [profilesRes, allLikesRes, allSharesRes, allRatingsRes, userLikesRes, userRatingsRes, allCommentsRes] =
     await Promise.all(fetches)
 
   if (profilesRes.error) {
@@ -237,6 +240,9 @@ export async function fetchCommunityRecipes(userId) {
   if (userRatingsRes.error) {
     console.error('[communityRecipeService] user ratings fetch:', userRatingsRes.error)
   }
+  if (allCommentsRes.error) {
+    console.warn('[communityRecipeService] comments count fetch:', allCommentsRes.error)
+  }
 
   const profileMap = new Map(
     (profilesRes.data ?? []).map((profile) => [profile.id, profile.display_name]),
@@ -248,6 +254,7 @@ export async function fetchCommunityRecipes(userId) {
   const userRatingMap = new Map(
     (userRatingsRes.data ?? []).map((row) => [row.recipe_id, row.rating]),
   )
+  const commentCountMap = buildCountMap(allCommentsRes.data, 'recipe_id')
 
   return recipeList.map((row) =>
     mapDbRecipe(row, {
@@ -257,6 +264,7 @@ export async function fetchCommunityRecipes(userId) {
       ratingsByRecipe,
       userLikeSet,
       userRatingMap,
+      commentCountMap,
     }),
   )
 }
@@ -393,4 +401,81 @@ export async function incrementRecipeShare(userId, recipeId) {
   })
 
   if (error) console.error('[communityRecipeService] increment share:', error)
+}
+
+/**
+ * Fetch up to 50 comments for a single recipe, with author display names from profiles.
+ * Returns [] if the table doesn't exist or on any error (graceful degradation).
+ */
+export async function fetchRecipeComments(recipeId) {
+  if (!supabase) return []
+
+  const { data: comments, error: commentsError } = await supabase
+    .from('recipe_comments')
+    .select('id, user_id, body, created_at')
+    .eq('recipe_id', recipeId)
+    .order('created_at', { ascending: true })
+    .limit(50)
+
+  if (commentsError) {
+    console.warn('[communityRecipeService] fetchRecipeComments:', commentsError)
+    return []
+  }
+
+  const rows = comments ?? []
+  if (rows.length === 0) return []
+
+  const userIds = [...new Set(rows.map((c) => c.user_id).filter(Boolean))]
+  const { data: profiles } = await supabase
+    .from('profiles')
+    .select('id, display_name')
+    .in('id', userIds)
+
+  const profileMap = new Map((profiles ?? []).map((p) => [p.id, p.display_name]))
+
+  return rows.map((c) => ({
+    id: c.id,
+    userId: c.user_id,
+    authorName: profileMap.get(c.user_id) ?? '—',
+    body: c.body,
+    createdAt: c.created_at,
+  }))
+}
+
+/**
+ * Post a comment. Returns the new comment row { id, userId, authorName, body, createdAt }.
+ */
+export async function addRecipeComment(userId, recipeId, body, authorName) {
+  if (!supabase) throw new Error('SUPABASE_NOT_CONFIGURED')
+
+  const { data, error } = await supabase
+    .from('recipe_comments')
+    .insert({ user_id: userId, recipe_id: recipeId, body: body.trim() })
+    .select('id, created_at')
+    .single()
+
+  if (error) throw error
+
+  return {
+    id: data.id,
+    userId,
+    authorName: authorName ?? '—',
+    body: body.trim(),
+    createdAt: data.created_at,
+  }
+}
+
+/**
+ * Delete a comment. RLS enforces owner-only; the .eq('user_id') is a safety guard.
+ */
+export async function deleteRecipeComment(userId, commentId) {
+  if (!supabase) throw new Error('SUPABASE_NOT_CONFIGURED')
+
+  const { error } = await supabase
+    .from('recipe_comments')
+    .delete()
+    .eq('id', commentId)
+    .eq('user_id', userId)
+
+  if (error) throw error
 }

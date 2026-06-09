@@ -22,7 +22,7 @@ const CATEGORY_OPTIONS = [
 
 export default function CommunityRecipes() {
   const { t } = useLanguage()
-  const { user, isAuthenticated, isSupabaseReady, loading: authLoading } = useAuth()
+  const { user, isAuthenticated, isSupabaseReady, loading: authLoading, displayName } = useAuth()
   const [recipes, setRecipes] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -133,6 +133,7 @@ export default function CommunityRecipes() {
             isSupabaseReady={isSupabaseReady}
             onAuthRequired={() => openAuth('login')}
             onUpdated={loadRecipes}
+            currentUserDisplayName={displayName}
           />
         ))}
       </div>
