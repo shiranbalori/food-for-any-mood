@@ -3,11 +3,13 @@ import { getTheme } from '../utils/themes'
 import { useLanguage } from '../i18n/useLanguage'
 import { sanitizeIngredientList } from '../utils/ingredientFormatting'
 import {
+  deleteCommunityRecipe,
   incrementRecipeShare,
   incrementRecipeViews,
   rateCommunityRecipe,
   toggleRecipeLike,
 } from '../services/communityRecipeService'
+import { removeSavedCommunityRecipe, saveCommunityRecipe } from '../utils/storage'
 import './CommunityRecipes.css'
 
 function formatViews(count, language) {
@@ -73,9 +75,33 @@ export default function CommunityRecipeCard({
       const liked = await toggleRecipeLike(userId, recipe.id, localLiked)
       setLocalLiked(liked)
       setLocalSavesCount((count) => Math.max(0, count + (liked ? 1 : -1)))
+      // Mirror like state into localStorage so Saved Recipes page shows this recipe
+      if (liked) {
+        saveCommunityRecipe(recipe)
+      } else {
+        removeSavedCommunityRecipe(recipe.id)
+      }
       onUpdated?.()
     } catch (error) {
       console.error('[CommunityRecipeCard] save failed:', error)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const isOwner = isAuthenticated && userId && recipe.authorId === userId
+
+  const handleDelete = async () => {
+    if (!isOwner || !isSupabaseReady) return
+    if (!window.confirm(t('communityDeleteConfirm'))) return
+
+    setBusy(true)
+    try {
+      await deleteCommunityRecipe(userId, recipe.id)
+      removeSavedCommunityRecipe(recipe.id)
+      onUpdated?.()
+    } catch (error) {
+      console.error('[CommunityRecipeCard] delete failed:', error)
     } finally {
       setBusy(false)
     }
@@ -203,6 +229,17 @@ export default function CommunityRecipeCard({
         <button type="button" className="btn btn--ghost community-card__expand" onClick={handleExpand}>
           {expanded ? t('communityHideDetails') : t('communityViewDetails')}
         </button>
+        {isOwner && (
+          <button
+            type="button"
+            className="btn btn--ghost community-card__delete"
+            onClick={handleDelete}
+            disabled={busy}
+            aria-label={t('communityDeleteButton')}
+          >
+            🗑️ {t('communityDeleteButton')}
+          </button>
+        )}
       </div>
 
       <div className="community-card__stars">

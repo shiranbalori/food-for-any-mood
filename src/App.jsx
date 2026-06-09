@@ -37,6 +37,8 @@ import {
   getSavedRecipes,
   saveRecipe,
   removeRecipe,
+  getSavedCommunityRecipes,
+  removeSavedCommunityRecipe,
 } from './utils/storage'
 import {
   getFavoriteRecipes,
@@ -73,6 +75,7 @@ export default function App() {
   const [recipe, setRecipe] = useState(null)
   const [loading, setLoading] = useState(false)
   const [savedRecipes, setSavedRecipes] = useState(getSavedRecipes)
+  const [savedCommunityRecipes, setSavedCommunityRecipes] = useState(getSavedCommunityRecipes)
   const [favoriteRecipes, setFavoriteRecipes] = useState(getFavoriteRecipes)
   const [usedTemplateKeys, setUsedTemplateKeys] = useState([])
   const [regenerationHistory, setRegenerationHistory] = useState({
@@ -282,8 +285,11 @@ export default function App() {
   }
 
   const handleRemove = (id) => {
-    const updated = removeRecipe(id)
-    setSavedRecipes(updated)
+    if (savedCommunityRecipes.some((r) => r.id === id)) {
+      setSavedCommunityRecipes(removeSavedCommunityRecipe(id))
+    } else {
+      setSavedRecipes(removeRecipe(id))
+    }
   }
 
   const handleAddFavorite = () => {
@@ -449,7 +455,7 @@ export default function App() {
       case MY_AREA_PANELS.saved:
         return (
           <SavedRecipes
-            recipes={savedRecipes}
+            recipes={[...savedRecipes, ...savedCommunityRecipes]}
             onRemove={handleRemove}
             onSelect={handleSelectSaved}
           />
@@ -619,10 +625,10 @@ export default function App() {
         open={myAreaOpen}
         onClose={() => setMyAreaOpen(false)}
         onSelectPanel={openMyAreaPanel}
-        savedCount={savedRecipes.length}
+        savedCount={savedRecipes.length + savedCommunityRecipes.length}
         favoritesCount={favoriteRecipes.length}
         myRecipesCount={myRecipesCount}
-        searchSavedRecipes={savedRecipes}
+        searchSavedRecipes={[...savedRecipes, ...savedCommunityRecipes]}
         searchFavoriteRecipes={favoriteRecipes}
         searchMealPlan={mealPlan}
         searchPrivateRecipes={searchPrivateRecipes}

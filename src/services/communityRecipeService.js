@@ -317,6 +317,23 @@ export async function uploadCommunityRecipe(userId, payload) {
   return data
 }
 
+/**
+ * Delete a community recipe. Only the owner (user_id match) can delete.
+ * Cascades: recipe_likes, recipe_ratings, recipe_shares are removed by DB.
+ * user_recipes.shared_community_recipe_id is set to NULL by DB.
+ */
+export async function deleteCommunityRecipe(userId, recipeId) {
+  if (!supabase) throw new Error('SUPABASE_NOT_CONFIGURED')
+
+  const { error } = await supabase
+    .from('community_recipes')
+    .delete()
+    .eq('id', recipeId)
+    .eq('user_id', userId)
+
+  if (error) throw error
+}
+
 export async function toggleRecipeLike(userId, recipeId, currentlyLiked) {
   if (!supabase) throw new Error('SUPABASE_NOT_CONFIGURED')
 
