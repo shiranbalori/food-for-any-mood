@@ -418,7 +418,12 @@ export default function CommunityRecipeCard({
           onClick={openCommentsSection}
           aria-label={t('communityCommentsCount', { count: localCommentCount })}
         >
-          💬 {t('communityCommentsCount', { count: localCommentCount })}
+          <span className="community-card__comment-count-emoji" aria-hidden="true">
+            💬
+          </span>
+          <span className="community-card__comment-count-text">
+            {t('communityCommentsCount', { count: localCommentCount })}
+          </span>
         </button>
       </div>
 
