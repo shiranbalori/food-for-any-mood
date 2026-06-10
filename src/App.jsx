@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useLayoutEffect, useRef } from 'react'
+import { useState, useCallback, useEffect, useLayoutEffect } from 'react'
 import BackgroundDecor from './components/BackgroundDecor'
 import Header from './components/Header'
 import CategorySelector from './components/CategorySelector'
@@ -56,8 +56,8 @@ import {
 } from './utils/mealPlannerStorage'
 import {
   applyNavigationRoute,
+  getStartupNavigationRoute,
   parseNavigationHash,
-  readNavigationRoute,
   writeNavigationRoute,
 } from './utils/navigationRoute'
 import './App.css'
@@ -76,12 +76,6 @@ const INITIAL_FORM = {
 }
 
 export default function App() {
-  const initialNavRef = useRef(null)
-  if (initialNavRef.current === null) {
-    initialNavRef.current = readNavigationRoute()
-  }
-  const initialNav = initialNavRef.current
-
   const { t, language } = useLanguage()
   const { user, isAuthenticated, getPublicDisplayName } = useAuth()
   const publicDisplayName = usePublicDisplayName()
@@ -107,16 +101,16 @@ export default function App() {
   const [ideasLoading, setIdeasLoading] = useState(false)
   const [mealPlan, setMealPlan] = useState(getMealPlan)
   const [myAreaOpen, setMyAreaOpen] = useState(false)
-  const [activeMyAreaPage, setActiveMyAreaPage] = useState(initialNav.activeMyAreaPage)
-  const [openRecipeId, setOpenRecipeId] = useState(initialNav.openRecipeId)
+  const [activeMyAreaPage, setActiveMyAreaPage] = useState(null)
+  const [openRecipeId, setOpenRecipeId] = useState(null)
   const [searchCommunityRecipes, setSearchCommunityRecipes] = useState([])
   const [searchPrivateRecipes, setSearchPrivateRecipes] = useState([])
   const [stepsRegenerating, setStepsRegenerating] = useState(false)
   const [stepsRegenerateError, setStepsRegenerateError] = useState(null)
   const [stepsGenerationKey, setStepsGenerationKey] = useState(0)
-  const [activeGlobalPage, setActiveGlobalPage] = useState(initialNav.activeGlobalPage)
+  const [activeGlobalPage, setActiveGlobalPage] = useState(null)
   const [challengeModalOpen, setChallengeModalOpen] = useState(false)
-  const [quizModalOpen, setQuizModalOpen] = useState(initialNav.quizModalOpen)
+  const [quizModalOpen, setQuizModalOpen] = useState(false)
   const [gamificationRefreshKey, setGamificationRefreshKey] = useState(0)
   const [challengeSubmitOpen, setChallengeSubmitOpen] = useState(false)
   const [challengeAuthOpen, setChallengeAuthOpen] = useState(false)
@@ -154,7 +148,7 @@ export default function App() {
   }, [isAuthenticated, user?.id])
 
   useLayoutEffect(() => {
-    applyNavigationRoute(readNavigationRoute(), {
+    applyNavigationRoute(getStartupNavigationRoute(), {
       setMyAreaOpen,
       setActiveMyAreaPage,
       setActiveGlobalPage,

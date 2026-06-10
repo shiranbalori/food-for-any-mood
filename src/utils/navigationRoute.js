@@ -94,28 +94,30 @@ function buildUrlWithHash(hash) {
 }
 
 /**
- * Read route from URL hash, falling back to localStorage and restoring the URL.
+ * Read route from URL hash only (no localStorage restore).
  */
 export function readNavigationRoute() {
-  const fromHash = parseNavigationHash(window.location.hash)
-  if (hasNavTarget(fromHash)) {
-    return fromHash
-  }
+  return parseNavigationHash(window.location.hash)
+}
+
+/**
+ * Cold app startup: always Home. Clears stale hash/localStorage (e.g. #/my/community?open=...).
+ */
+export function getStartupNavigationRoute() {
+  const homeHash = '#/'
 
   try {
-    const stored = localStorage.getItem(NAV_STORAGE_KEY)
-    if (stored && stored !== '#/' && stored !== '#') {
-      const fromStorage = parseNavigationHash(stored)
-      if (hasNavTarget(fromStorage)) {
-        window.history.replaceState(null, '', buildUrlWithHash(stored))
-        return fromStorage
-      }
-    }
+    localStorage.setItem(NAV_STORAGE_KEY, homeHash)
   } catch {
     // ignore storage errors
   }
 
-  return fromHash
+  const currentHash = window.location.hash
+  if (currentHash && currentHash !== homeHash && currentHash !== '#') {
+    window.history.replaceState(null, '', buildUrlWithHash(homeHash))
+  }
+
+  return { ...EMPTY_NAV }
 }
 
 /**
