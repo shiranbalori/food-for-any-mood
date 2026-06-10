@@ -9,7 +9,7 @@ import LoadingAnimation from './components/LoadingAnimation'
 import RecipeCard from './components/RecipeCard'
 import SavedRecipes from './components/SavedRecipes'
 import CommunityRecipes from './components/CommunityRecipes'
-import CommunityTop5 from './components/CommunityTop5'
+import CommunityTop5 from './components/CommunityTop5.jsx?strip=v4'
 import MyRecipes from './components/MyRecipes'
 import OurStory from './components/OurStory'
 import { useAuth } from './context/AuthContext'
@@ -492,6 +492,15 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
+  const openCommunityRecipe = (recipeId) => {
+    setMyAreaOpen(false)
+    setActiveGlobalPage(null)
+    setQuizModalOpen(false)
+    setActiveMyAreaPage(MY_AREA_PANELS.community)
+    setOpenRecipeId(recipeId)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
   const renderMyAreaPageContent = () => {
     switch (activeMyAreaPage) {
       case MY_AREA_PANELS.weekly:
@@ -691,7 +700,13 @@ export default function App() {
           />
         )}
 
-        {!activeMyAreaPage && !activeGlobalPage && <CommunityTop5 />}
+        {!activeMyAreaPage && !activeGlobalPage && (
+          <CommunityTop5
+            onRecipeClick={openCommunityRecipe}
+            onSavedChanged={() => setSavedCommunityRecipes(getSavedCommunityRecipes())}
+            onFavoritesChanged={() => setFavoriteRecipes(getFavoriteRecipes())}
+          />
+        )}
           </>
         )}
 

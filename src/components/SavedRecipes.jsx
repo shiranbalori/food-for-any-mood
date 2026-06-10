@@ -60,14 +60,6 @@ export default function SavedRecipes({
                 <span className="saved-card__category">
                   {theme.emoji} {t(`categories.${categoryId}`)}
                 </span>
-                <button
-                  type="button"
-                  className="saved-card__remove"
-                  onClick={() => onRemove(recipe.id)}
-                  aria-label={t('removeRecipe')}
-                >
-                  ×
-                </button>
               </div>
               <h3>{displayName}</h3>
               {isCommunity && recipe.authorName && (
@@ -127,15 +119,31 @@ export default function SavedRecipes({
                       )}
                     </div>
                   )}
+                  <button
+                    type="button"
+                    className="btn btn--ghost saved-card__remove-btn"
+                    onClick={() => onRemove(recipe.id)}
+                  >
+                    {t('removeFromSaved')}
+                  </button>
                 </>
               ) : (
-                <button
-                  type="button"
-                  className="btn btn--ghost"
-                  onClick={() => onSelect(recipe)}
-                >
-                  {t('viewRecipe')}
-                </button>
+                <>
+                  <button
+                    type="button"
+                    className="btn btn--ghost"
+                    onClick={() => onSelect(recipe)}
+                  >
+                    {t('viewRecipe')}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn--ghost saved-card__remove-btn"
+                    onClick={() => onRemove(recipe.id)}
+                  >
+                    {t('removeFromSaved')}
+                  </button>
+                </>
               )}
             </div>
           )

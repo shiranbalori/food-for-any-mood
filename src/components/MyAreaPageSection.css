@@ -69,8 +69,19 @@
   margin-bottom: 1rem;
 }
 
+.my-area-page:has(.community-recipes) .my-area-page__header {
+  display: none;
+}
+
+.my-area-page:has(.community-recipes) .my-area-page__content {
+  padding-top: 0;
+}
+
 .my-area-page__content .community-recipes__grid {
   grid-template-columns: 1fr;
+  margin-inline-start: 0;
+  margin-inline-end: auto;
+  justify-items: start;
 }
 
 @media (min-width: 640px) {

@@ -10,6 +10,7 @@ import {
 import AuthModal from './AuthModal'
 import UploadCommunityRecipeForm from './UploadCommunityRecipeForm'
 import CommunityRecipeCard from './CommunityRecipeCard'
+import CommunityTop5 from './CommunityTop5.jsx?strip=v4'
 import './CommunityRecipes.css'
 
 const UPLOAD_SECTION_ID = 'community-upload-section'
@@ -57,6 +58,17 @@ export default function CommunityRecipes({
     loadRecipes()
   }, [authLoading, loadRecipes])
 
+  useEffect(() => {
+    if (!initialExpandedRecipeId || loading) return undefined
+    const timer = window.setTimeout(() => {
+      document.getElementById(`community-recipe-${initialExpandedRecipeId}`)?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'nearest',
+      })
+    }, 120)
+    return () => window.clearTimeout(timer)
+  }, [initialExpandedRecipeId, loading])
+
   const sortedRecipes = useMemo(
     () => sortCommunityRecipesByCategory(recipes, activeCategory),
     [recipes, activeCategory],
@@ -86,6 +98,16 @@ export default function CommunityRecipes({
     scrollToUploadSection()
   }
 
+  const handleOpenRecipe = (recipeId) => {
+    onExpandedRecipeChange?.(recipeId)
+    window.requestAnimationFrame(() => {
+      document.getElementById(`community-recipe-${recipeId}`)?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'nearest',
+      })
+    })
+  }
+
   return (
     <section className="community-recipes">
       <div className="community-recipes__header">
@@ -97,6 +119,32 @@ export default function CommunityRecipes({
           {t('communityUploadRecipe')}
         </button>
       </div>
+
+      {isAuthenticated && uploadExpanded && (
+        <div
+          ref={uploadSectionRef}
+          id={UPLOAD_SECTION_ID}
+          className="community-upload community-upload--expanded community-upload--inline"
+          aria-label={t('communityUploadRecipe')}
+        >
+          <UploadCommunityRecipeForm
+            userId={user.id}
+            onUploaded={() => {
+              loadRecipes()
+              setUploadExpanded(false)
+            }}
+          />
+        </div>
+      )}
+
+      {!loading && (
+        <CommunityTop5
+          recipes={recipes}
+          onRecipeClick={handleOpenRecipe}
+          onSavedChanged={onSavedChanged}
+          onFavoritesChanged={onFavoritesChanged}
+        />
+      )}
 
       <div className="community-recipes__categories" role="tablist" aria-label={t('communityCategoriesLabel')}>
         {CATEGORY_OPTIONS.map((option) => (
@@ -121,6 +169,10 @@ export default function CommunityRecipes({
 
       {loading && <p className="community-recipes__status">{t('communityLoading')}</p>}
       {error && <p className="community-recipes__error">{error}</p>}
+
+      {!loading && (
+        <h2 className="community-recipes__list-title community-section-bar">{t('myAreaNavCommunity')}</h2>
+      )}
 
       {!loading && sortedRecipes.length === 0 && (
         <div className="community-recipes__empty">
@@ -147,22 +199,6 @@ export default function CommunityRecipes({
           />
         ))}
       </div>
-
-      {isAuthenticated && (
-        <section
-          ref={uploadSectionRef}
-          id={UPLOAD_SECTION_ID}
-          className={`community-upload ${uploadExpanded ? 'community-upload--expanded' : ''}`}
-          aria-labelledby="community-upload-title"
-        >
-          <h2 id="community-upload-title" className="community-upload__title">
-            {t('communityUploadRecipe')}
-          </h2>
-          <div className="community-upload__body">
-            <UploadCommunityRecipeForm userId={user.id} onUploaded={loadRecipes} />
-          </div>
-        </section>
-      )}
 
       <AuthModal open={authOpen} onClose={() => setAuthOpen(false)} initialMode={authMode} />
     </section>

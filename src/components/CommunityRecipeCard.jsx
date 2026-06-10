@@ -362,12 +362,24 @@ export default function CommunityRecipeCard({
 
   return (
     <article
+      id={`community-recipe-${recipe.id}`}
       className="community-card"
       style={{
         '--theme-accent': theme.accent,
         '--theme-accent-light': theme.accentLight,
       }}
     >
+      {isOwner && (
+        <button
+          type="button"
+          className="community-card__delete-icon"
+          onClick={handleDelete}
+          disabled={busy}
+          aria-label={t('communityDeleteButton')}
+        >
+          🗑️
+        </button>
+      )}
       <div className="community-card__media">
         {recipe.imageUrl ? (
           <img
@@ -565,25 +577,6 @@ export default function CommunityRecipeCard({
         </div>
       )}
 
-      <div className="community-card__meta">
-        <span>{t('communityViews', { count: formatViews(recipe.viewsCount ?? recipe.views ?? 0, language) })}</span>
-        <span className="community-card__likes">❤️ {localLikeCount}</span>
-        <span className="community-card__saves">📌 {localSavesCount}</span>
-        <button
-          type="button"
-          className="community-card__comment-count"
-          onClick={openCommentsSection}
-          aria-label={t('communityCommentsCount', { count: localCommentCount })}
-        >
-          <span className="community-card__comment-count-emoji" aria-hidden="true">
-            💬
-          </span>
-          <span className="community-card__comment-count-text">
-            {t('communityCommentsCount', { count: localCommentCount })}
-          </span>
-        </button>
-      </div>
-
       <div className="community-card__actions">
         <button
           type="button"
@@ -627,6 +620,25 @@ export default function CommunityRecipeCard({
             🗑️ {t('communityDeleteButton')}
           </button>
         )}
+      </div>
+
+      <div className="community-card__meta">
+        <span>{t('communityViews', { count: formatViews(recipe.viewsCount ?? recipe.views ?? 0, language) })}</span>
+        <span className="community-card__likes">❤️ {localLikeCount}</span>
+        <span className="community-card__saves">📌 {localSavesCount}</span>
+        <button
+          type="button"
+          className="community-card__comment-count"
+          onClick={openCommentsSection}
+          aria-label={t('communityCommentsCount', { count: localCommentCount })}
+        >
+          <span className="community-card__comment-count-emoji" aria-hidden="true">
+            💬
+          </span>
+          <span className="community-card__comment-count-text">
+            {t('communityCommentsCount', { count: localCommentCount })}
+          </span>
+        </button>
       </div>
 
       <div className="community-card__stars">
