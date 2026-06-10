@@ -61,7 +61,10 @@ export function AuthProvider({ children }) {
       setUser(session?.user ?? null)
       if (session?.user) {
         fetchProfile(session.user.id).then((p) => {
-          if (active) setProfile(p)
+          if (active) {
+            setProfile(p)
+            setProfileRevision((value) => value + 1)
+          }
         })
       }
       setLoading(false)
@@ -72,7 +75,10 @@ export function AuthProvider({ children }) {
     } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null)
       if (session?.user) {
-        fetchProfile(session.user.id).then(setProfile)
+        fetchProfile(session.user.id).then((nextProfile) => {
+          setProfile(nextProfile)
+          setProfileRevision((value) => value + 1)
+        })
       } else {
         setProfile(null)
       }
@@ -140,6 +146,7 @@ export function AuthProvider({ children }) {
       user,
       profile,
       loading,
+      authLoading: loading,
       isAuthenticated: Boolean(user),
       isSupabaseReady: isSupabaseConfigured,
       signUp,

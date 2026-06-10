@@ -159,6 +159,6 @@ export default function AuthModal({ open, onClose, initialMode = 'login' }) {
         </p>
       </div>
     </div>,
-    document.body
+    document.body,
   )
 }

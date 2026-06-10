@@ -8,7 +8,6 @@ import {
 import { pickBestSubmission } from '../utils/dailyChallenge/weeklyWinner'
 import { applyStreakOnSubmission } from '../utils/dailyChallenge/streaks'
 import { POINT_AWARDS, pointsForSubmission } from '../utils/dailyChallenge/points'
-import { normalizeDisplayNameInput } from '../utils/displayName'
 
 export const CHALLENGE_IMAGE_BUCKET = 'challenge-submission-images'
 export const CHALLENGE_IMAGE_MAX_BYTES = 5 * 1024 * 1024
@@ -340,7 +339,7 @@ function mapSubmission(row, profileName, likeCount = 0, userLiked = false) {
     id: row.id,
     challengeDate: row.challenge_date,
     userId: row.user_id,
-    authorName: normalizeDisplayNameInput(profileName) || null,
+    authorName: profileName ?? '—',
     dishName: row.dish_name,
     description: row.description ?? '',
     photoUrl: row.photo_url ?? null,
@@ -657,7 +656,7 @@ export async function fetchChallengeLeaderboard(limit = 10) {
   return rows.map((row, index) => ({
     rank: index + 1,
     userId: row.user_id,
-    displayName: normalizeDisplayNameInput(profileMap.get(row.user_id)) || null,
+    displayName: profileMap.get(row.user_id) ?? '—',
     totalPoints: row.total_points ?? 0,
     challengesCompleted: row.challenges_completed ?? 0,
     currentStreak: row.current_streak ?? 0,

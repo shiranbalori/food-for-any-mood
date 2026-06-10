@@ -1,9 +1,7 @@
 /** @typedef {{ id: string, question: Record<string, string>, options: Record<string, string[]>, correctIndex: number, explanation: Record<string, string> }} DailyQuizQuestion */
 
-import { DAILY_QUIZ_QUESTIONS_EXTRA } from './dailyQuizQuestionsExtra.js'
-
 /** @type {DailyQuizQuestion[]} */
-const BASE_DAILY_QUIZ_QUESTIONS = [
+export const DAILY_QUIZ_QUESTIONS = [
   {
     id: 'basil-origin',
     question: {
@@ -325,5 +323,3 @@ const BASE_DAILY_QUIZ_QUESTIONS = [
     },
   },
 ]
-
-export const DAILY_QUIZ_QUESTIONS = [...BASE_DAILY_QUIZ_QUESTIONS, ...DAILY_QUIZ_QUESTIONS_EXTRA]

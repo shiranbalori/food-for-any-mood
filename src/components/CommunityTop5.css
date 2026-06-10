@@ -92,16 +92,16 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 1.2rem;
-  height: 1.2rem;
-  min-width: 1.2rem;
-  min-height: 1.2rem;
+  width: 1rem;
+  height: 1rem;
+  min-width: 1rem;
+  min-height: 1rem;
   padding: 0;
   border: 1px solid rgba(15, 23, 42, 0.14) !important;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.97) !important;
   box-shadow: 0 1px 3px rgba(15, 23, 42, 0.16);
-  font-size: 0.58rem;
+  font-size: 0.5rem;
   line-height: 1;
   cursor: pointer;
   touch-action: manipulation;
@@ -111,7 +111,7 @@
 .community-top5 .community-top5__action span {
   display: block;
   line-height: 1;
-  font-size: 0.72rem;
+  font-size: 0.58rem;
 }
 
 .community-top5 .community-top5__action--like:not(.community-top5__action--active) span {
@@ -324,14 +324,14 @@ html[dir='rtl'] .community-top5__author {
   }
 
   .community-top5 .community-top5__action {
-    width: 1.38rem;
-    height: 1.38rem;
-    min-width: 1.38rem;
-    min-height: 1.38rem;
+    width: 1.1rem;
+    height: 1.1rem;
+    min-width: 1.1rem;
+    min-height: 1.1rem;
   }
 
   .community-top5 .community-top5__action span {
-    font-size: 0.82rem;
+    font-size: 0.62rem;
   }
 }
 
@@ -375,15 +375,15 @@ html[dir='rtl'] .community-top5__author {
   }
 
   .community-top5 .community-top5__action {
-    width: 1.45rem;
-    height: 1.45rem;
-    min-width: 1.45rem;
-    min-height: 1.45rem;
-    font-size: 0.72rem;
+    width: 1.15rem;
+    height: 1.15rem;
+    min-width: 1.15rem;
+    min-height: 1.15rem;
+    font-size: 0.58rem;
   }
 
   .community-top5 .community-top5__action span {
-    font-size: 0.82rem;
+    font-size: 0.64rem;
   }
 
   .community-top5__author {

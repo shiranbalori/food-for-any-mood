@@ -65,7 +65,7 @@ export default function WeeklyChallengeWinner() {
         )}
         <div className="challenge-weekly-winner__body">
           <h4>{submission.dishName}</h4>
-          <p>{t('communityAuthor', { name: submission.authorName || t('defaultDisplayName') })}</p>
+          <p>{t('communityAuthor', { name: submission.authorName })}</p>
           <p>{t('challengeWeeklyWinnerLikes', { count: submission.likeCount ?? 0 })}</p>
         </div>
       </article>

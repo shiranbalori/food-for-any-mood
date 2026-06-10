@@ -11,6 +11,8 @@ import {
   incrementRecipeShare,
   incrementRecipeViews,
   rateCommunityRecipe,
+  updateCommunityRecipeRating,
+  clearCommunityRecipeRating,
   reportRecipeComment,
   toggleRecipeLike,
   updateRecipeComment,
@@ -19,6 +21,13 @@ import { removeSavedCommunityRecipe, saveCommunityRecipe, isCommunityRecipeSaved
 import { addFavoriteCommunityRecipe, removeFavoriteRecipe } from '../utils/favoritesStorage'
 import { resolveCommunityAuthorName } from '../utils/displayName'
 import './CommunityRecipes.css'
+
+function normalizeUserRating(value) {
+  if (value == null || value === '') return null
+  const parsed = Number(value)
+  if (!Number.isFinite(parsed) || parsed < 1 || parsed > 5) return null
+  return parsed
+}
 
 function formatRelativeDate(isoString, language) {
   if (!isoString) return ''
@@ -66,8 +75,7 @@ export default function CommunityRecipeCard({
   const [localSaved, setLocalSaved] = useState(() => isCommunityRecipeSaved(recipe.id))
   const [localRating, setLocalRating] = useState(recipe.averageRating ?? recipe.rating ?? 0)
   const [localRatingCount, setLocalRatingCount] = useState(recipe.totalRatings ?? recipe.ratingCount ?? 0)
-  const [localUserRating, setLocalUserRating] = useState(recipe.userRating)
-  const hasRated = localUserRating != null
+  const [localUserRating, setLocalUserRating] = useState(() => normalizeUserRating(recipe.userRating))
 
   // Comments state
   const [comments, setComments] = useState([])
@@ -82,6 +90,21 @@ export default function CommunityRecipeCard({
   const [reportedCommentIds, setReportedCommentIds] = useState(() => new Set())
   const commentInputRef = useRef(null)
   const commentsSectionRef = useRef(null)
+  const [mobileRecipeDetails, setMobileRecipeDetails] = useState(false)
+
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 767px)')
+    const syncLayout = () => setMobileRecipeDetails(mq.matches)
+    syncLayout()
+    mq.addEventListener('change', syncLayout)
+    return () => mq.removeEventListener('change', syncLayout)
+  }, [])
+
+  const commentPlaceholder = mobileRecipeDetails
+    ? language === 'he'
+      ? 'כתבו תגובה...'
+      : 'Add a comment...'
+    : t('communityCommentPlaceholder')
 
   useEffect(() => {
     setLocalLikeCount(recipe.likeCount ?? 0)
@@ -90,9 +113,12 @@ export default function CommunityRecipeCard({
     setLocalSaved(isCommunityRecipeSaved(recipe.id))
     setLocalRating(recipe.averageRating ?? recipe.rating ?? 0)
     setLocalRatingCount(recipe.totalRatings ?? recipe.ratingCount ?? 0)
-    setLocalUserRating(recipe.userRating)
     setLocalCommentCount(recipe.commentCount ?? 0)
   }, [recipe])
+
+  useEffect(() => {
+    setLocalUserRating(normalizeUserRating(recipe.userRating))
+  }, [recipe.id])
 
   useEffect(() => {
     setExpanded(initialExpanded)
@@ -174,6 +200,13 @@ export default function CommunityRecipeCard({
     }
 
     scrollToComments()
+  }
+
+  const handleCollapse = () => {
+    if (!expanded) return
+    setExpanded(false)
+    setCommentsOpen(false)
+    onOpenRecipeChange?.(null)
   }
 
   const handleAddComment = async (e) => {
@@ -324,15 +357,53 @@ export default function CommunityRecipeCard({
     }
   }
 
-  const handleRate = async (stars) => {
-    if (hasRated || !requireAuth() || !isSupabaseReady || recipe.id.startsWith('mock-')) return
+  const handleRate = async (starValue) => {
+    if (!requireAuth() || !isSupabaseReady || recipe.id.startsWith('mock-')) return
+
+    const stars = Number(starValue)
+    const currentRating = normalizeUserRating(localUserRating)
+    if (!Number.isFinite(stars) || stars < 1 || stars > 5) return
 
     setBusy(true)
     try {
-      await rateCommunityRecipe(userId, recipe.id, stars)
-      setLocalUserRating(stars)
-      setLocalRatingCount((count) => count + 1)
-      onUpdated?.()
+      if (currentRating === stars) {
+        await clearCommunityRecipeRating(userId, recipe.id)
+        const previousCount = localRatingCount
+        const previousAverage = localRating
+        const nextCount = Math.max(0, previousCount - 1)
+        const nextAverage =
+          nextCount > 0 ? (previousAverage * previousCount - currentRating) / nextCount : 0
+
+        setLocalUserRating(null)
+        setLocalRatingCount(nextCount)
+        setLocalRating(Math.round(nextAverage * 10) / 10)
+      } else if (currentRating == null) {
+        await rateCommunityRecipe(userId, recipe.id, stars)
+        const previousCount = localRatingCount
+        const previousAverage = localRating
+        const nextCount = previousCount + 1
+        const nextAverage =
+          previousCount > 0
+            ? (previousAverage * previousCount + stars) / nextCount
+            : stars
+
+        setLocalUserRating(stars)
+        setLocalRatingCount(nextCount)
+        setLocalRating(Math.round(nextAverage * 10) / 10)
+      } else {
+        await updateCommunityRecipeRating(userId, recipe.id, stars)
+        const previousCount = localRatingCount
+        const previousAverage = localRating
+        const nextAverage =
+          previousCount > 0
+            ? (previousAverage * previousCount - currentRating + stars) / previousCount
+            : stars
+
+        setLocalUserRating(stars)
+        setLocalRating(Math.round(nextAverage * 10) / 10)
+      }
+
+      await onUpdated?.()
     } catch (error) {
       if (error?.message === 'ALREADY_RATED') return
       console.error('[CommunityRecipeCard] rate failed:', error)
@@ -558,7 +629,7 @@ export default function CommunityRecipeCard({
                     className="community-card__comment-input"
                     value={commentText}
                     onChange={(e) => setCommentText(e.target.value.slice(0, 500))}
-                    placeholder={t('communityCommentPlaceholder')}
+                    placeholder={commentPlaceholder}
                     rows={2}
                     disabled={submitting}
                   />
@@ -608,7 +679,7 @@ export default function CommunityRecipeCard({
           onClick={handleSaveRecipe}
           disabled={busy}
         >
-          📌 {localSaved ? t('communitySaved') : t('communitySave')}
+          📌 {t('communitySave')}
         </button>
         <button
           type="button"
@@ -656,55 +727,65 @@ export default function CommunityRecipeCard({
       <div className="community-card__stars">
         <span className="community-card__stars-label">{t('communityRateLabel')}</span>
         <div className="community-card__stars-row" role="group" aria-label={t('communityRateLabel')}>
-          {[1, 2, 3, 4, 5].map((stars) => (
+          {[1, 2, 3, 4, 5].map((stars) => {
+            const selectedRating = normalizeUserRating(localUserRating) ?? 0
+            const isActive = selectedRating >= stars
+
+            return (
             <button
               key={stars}
               type="button"
-              className={`community-card__star ${
-                (localUserRating ?? 0) >= stars ? 'community-card__star--active' : ''
-              }`}
+              className={`community-card__star ${isActive ? 'community-card__star--active' : ''}`}
               onClick={() => handleRate(stars)}
-              disabled={busy || hasRated}
+              disabled={busy}
               aria-label={t('communityRateStars', { count: stars })}
+              aria-pressed={isActive}
             >
               ★
             </button>
-          ))}
+            )
+          })}
         </div>
-        {hasRated ? (
-          <p className="community-card__rated-note">{t('communityRatedOnce')}</p>
-        ) : null}
       </div>
 
       {expanded && (
-        <div className="community-card__details">
-          {recipe.isGlutenFree ? (
-            <span className="community-card__gf-badge community-card__gf-badge--details">
-              {t('glutenFreeBadge')}
-            </span>
-          ) : null}
-          {recipe.description && <p>{recipe.description}</p>}
-          {displayIngredients.length > 0 && (
-            <>
-              <h4>{t('ingredients')}</h4>
-              <ul>
-                {displayIngredients.map((item) => (
-                  <li key={item}>{item}</li>
-                ))}
-              </ul>
-            </>
-          )}
-          {recipe.steps?.length > 0 && (
-            <>
-              <h4>{t('cookingSteps')}</h4>
-              <ol>
-                {recipe.steps.map((step, index) => (
-                  <li key={`${index}-${step.slice(0, 20)}`}>{step}</li>
-                ))}
-              </ol>
-            </>
-          )}
-        </div>
+        <>
+          <div className="community-card__details">
+            {recipe.isGlutenFree ? (
+              <span className="community-card__gf-badge community-card__gf-badge--details">
+                {t('glutenFreeBadge')}
+              </span>
+            ) : null}
+            {recipe.description && <p>{recipe.description}</p>}
+            {displayIngredients.length > 0 && (
+              <>
+                <h4>{t('ingredients')}</h4>
+                <ul>
+                  {displayIngredients.map((item) => (
+                    <li key={item}>{item}</li>
+                  ))}
+                </ul>
+              </>
+            )}
+            {recipe.steps?.length > 0 && (
+              <>
+                <h4>{t('cookingSteps')}</h4>
+                <ol>
+                  {recipe.steps.map((step, index) => (
+                    <li key={`${index}-${step.slice(0, 20)}`}>{step}</li>
+                  ))}
+                </ol>
+              </>
+            )}
+          </div>
+          <button
+            type="button"
+            className="community-card__collapse-less"
+            onClick={handleCollapse}
+          >
+            {t('communityShowLess')}
+          </button>
+        </>
       )}
     </article>
   )

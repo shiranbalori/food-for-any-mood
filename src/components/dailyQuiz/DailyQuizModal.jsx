@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useAuth } from '../../context/AuthContext'
 import { useLanguage } from '../../i18n/useLanguage'
 import {
   fetchUserQuizAnswerToday,
-  resolveTodayQuiz,
+  getTodayQuiz,
   submitDailyQuizAnswer,
 } from '../../services/dailyQuizService'
 import './DailyQuiz.css'
@@ -11,7 +11,7 @@ import './DailyQuiz.css'
 export default function DailyQuizModal({ open, onClose, onAnswered }) {
   const { t, language } = useLanguage()
   const { user, isAuthenticated } = useAuth()
-  const [quiz, setQuiz] = useState(null)
+  const quiz = useMemo(() => getTodayQuiz(language), [language])
   const [selectedIndex, setSelectedIndex] = useState(null)
   const [result, setResult] = useState(null)
   const [loading, setLoading] = useState(false)
@@ -34,17 +34,11 @@ export default function DailyQuizModal({ open, onClose, onAnswered }) {
 
   useEffect(() => {
     if (!open) {
-      setQuiz(null)
       setSelectedIndex(null)
       setResult(null)
       setLoading(false)
       return undefined
     }
-
-    let cancelled = false
-    resolveTodayQuiz(language).then((nextQuiz) => {
-      if (!cancelled) setQuiz(nextQuiz)
-    })
 
     loadPreviousAnswer()
 
@@ -54,13 +48,12 @@ export default function DailyQuizModal({ open, onClose, onAnswered }) {
     document.addEventListener('keydown', onKeyDown)
     document.body.style.overflow = 'hidden'
     return () => {
-      cancelled = true
       document.removeEventListener('keydown', onKeyDown)
       document.body.style.overflow = ''
     }
-  }, [open, onClose, loadPreviousAnswer, language])
+  }, [open, onClose, loadPreviousAnswer])
 
-  if (!open || !quiz) return null
+  if (!open) return null
 
   const answered = result !== null
   const isCorrect = result?.correct === true

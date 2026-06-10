@@ -59,6 +59,13 @@ function mapMockRecipe(recipe) {
   })
 }
 
+function normalizeStoredRating(value) {
+  if (value == null || value === '') return null
+  const parsed = Number(value)
+  if (!Number.isFinite(parsed) || parsed < 1 || parsed > 5) return null
+  return parsed
+}
+
 function mapDbRecipe(row, { profileMap, likeCountMap, shareCountMap, ratingsByRecipe, userLikeSet, userRatingMap, commentCountMap }) {
   const recipeRatings = ratingsByRecipe.get(row.id) ?? []
   const ratingsCount = recipeRatings.length
@@ -90,7 +97,7 @@ function mapDbRecipe(row, { profileMap, likeCountMap, shareCountMap, ratingsByRe
     savesCount: 0,
     sharesCount,
     userLiked: userLikeSet.has(row.id),
-    userRating: userRatingMap.get(row.id) ?? null,
+    userRating: normalizeStoredRating(userRatingMap.get(row.id)),
     isGlutenFree: Boolean(row.is_gluten_free),
     createdAt: row.created_at,
     commentCount,
@@ -381,6 +388,30 @@ export async function rateCommunityRecipe(userId, recipeId, rating) {
   if (error?.code === '23505') {
     throw new Error('ALREADY_RATED')
   }
+  if (error) throw error
+}
+
+export async function updateCommunityRecipeRating(userId, recipeId, rating) {
+  if (!supabase) throw new Error('SUPABASE_NOT_CONFIGURED')
+
+  const { error } = await supabase
+    .from('recipe_ratings')
+    .update({ rating, updated_at: new Date().toISOString() })
+    .eq('user_id', userId)
+    .eq('recipe_id', recipeId)
+
+  if (error) throw error
+}
+
+export async function clearCommunityRecipeRating(userId, recipeId) {
+  if (!supabase) throw new Error('SUPABASE_NOT_CONFIGURED')
+
+  const { error } = await supabase
+    .from('recipe_ratings')
+    .delete()
+    .eq('user_id', userId)
+    .eq('recipe_id', recipeId)
+
   if (error) throw error
 }
 

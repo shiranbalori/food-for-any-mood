@@ -182,7 +182,7 @@ export default function PrivateRecipeFormModal({ open, onClose, userId, onSaved 
 
           <div className="upload-recipe-modal__field">
             <span>{t('servingsLabel')}</span>
-            <div className="upload-recipe-modal__chips upload-recipe-modal__chips--servings">
+            <div className="upload-recipe-modal__chips">
               {SERVING_OPTIONS.map((count) => (
                 <button
                   key={count}

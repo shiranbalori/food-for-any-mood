@@ -1,9 +1,6 @@
-import { useState, useEffect } from 'react'
-import { useAuth } from '../context/AuthContext'
+import { useState } from 'react'
 import { getTheme } from '../utils/themes'
 import { useLanguage } from '../i18n/useLanguage'
-import { usePublicDisplayName } from '../hooks/usePublicDisplayName'
-import { resolveCommunityAuthorName } from '../utils/displayName'
 import SpiceLevel from './SpiceLevel'
 import './SavedRecipes.css'
 
@@ -15,8 +12,6 @@ export default function SavedRecipes({
   onExpandedChange,
 }) {
   const { t } = useLanguage()
-  const { user } = useAuth()
-  const publicDisplayName = usePublicDisplayName()
   const [expandedId, setExpandedId] = useState(initialExpandedId)
 
   useEffect(() => {
@@ -34,7 +29,7 @@ export default function SavedRecipes({
       <section className="saved-recipes saved-recipes--empty">
         <h2 className="section-title">{t('savedRecipes')}</h2>
         <div className="saved-recipes__empty">
-          <span>📌</span>
+          <span>📖</span>
           <p>{t('savedEmpty')}</p>
         </div>
       </section>
@@ -65,19 +60,18 @@ export default function SavedRecipes({
                 <span className="saved-card__category">
                   {theme.emoji} {t(`categories.${categoryId}`)}
                 </span>
+                <button
+                  type="button"
+                  className="saved-card__remove"
+                  onClick={() => onRemove(recipe.id)}
+                  aria-label={t('removeRecipe')}
+                >
+                  ×
+                </button>
               </div>
               <h3>{displayName}</h3>
-              {isCommunity && (
-                <p className="saved-card__community-author">
-                  {t('communityAuthor', {
-                    name: resolveCommunityAuthorName(
-                      recipe,
-                      user?.id,
-                      publicDisplayName,
-                      t('defaultDisplayName'),
-                    ),
-                  })}
-                </p>
+              {isCommunity && recipe.authorName && (
+                <p className="saved-card__community-author">{t('communityAuthor', { name: recipe.authorName })}</p>
               )}
               {(isCommunity ? recipe.isGlutenFree : recipe.glutenFree) && (
                 <span className="saved-card__gf-badge">{t('glutenFreeBadge')}</span>
@@ -133,31 +127,15 @@ export default function SavedRecipes({
                       )}
                     </div>
                   )}
-                  <button
-                    type="button"
-                    className="btn btn--ghost saved-card__remove-btn"
-                    onClick={() => onRemove(recipe.id)}
-                  >
-                    {t('removeFromSaved')}
-                  </button>
                 </>
               ) : (
-                <>
-                  <button
-                    type="button"
-                    className="btn btn--ghost"
-                    onClick={() => onSelect(recipe)}
-                  >
-                    {t('viewRecipe')}
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn--ghost saved-card__remove-btn"
-                    onClick={() => onRemove(recipe.id)}
-                  >
-                    {t('removeFromSaved')}
-                  </button>
-                </>
+                <button
+                  type="button"
+                  className="btn btn--ghost"
+                  onClick={() => onSelect(recipe)}
+                >
+                  {t('viewRecipe')}
+                </button>
               )}
             </div>
           )

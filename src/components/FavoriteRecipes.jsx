@@ -1,8 +1,5 @@
-import { useAuth } from '../context/AuthContext'
 import { getTheme } from '../utils/themes'
 import { useLanguage } from '../i18n/useLanguage'
-import { usePublicDisplayName } from '../hooks/usePublicDisplayName'
-import { resolveCommunityAuthorName } from '../utils/displayName'
 import './FavoriteRecipes.css'
 
 function formatSavedDate(iso, language) {
@@ -20,8 +17,6 @@ function formatSavedDate(iso, language) {
 
 export default function FavoriteRecipes({ recipes, onRemove, onSelect }) {
   const { t, language } = useLanguage()
-  const { user } = useAuth()
-  const publicDisplayName = usePublicDisplayName()
 
   if (recipes.length === 0) {
     return (
@@ -44,8 +39,6 @@ export default function FavoriteRecipes({ recipes, onRemove, onSelect }) {
         {recipes.map((recipe) => {
           const theme = getTheme(recipe.category ?? 'parve')
           const categoryId = recipe.category ?? 'parve'
-          const isCommunity = recipe.isCommunity === true
-          const displayName = recipe.name ?? recipe.title ?? ''
           return (
             <article
               key={recipe.id}
@@ -63,41 +56,23 @@ export default function FavoriteRecipes({ recipes, onRemove, onSelect }) {
                   {formatSavedDate(recipe.savedAt, language)}
                 </time>
               </div>
-              <h3 className="favorite-card__title">{displayName}</h3>
-              {isCommunity ? (
-                <p className="favorite-card__author">
-                  {t('communityAuthor', {
-                    name: resolveCommunityAuthorName(
-                      recipe,
-                      user?.id,
-                      publicDisplayName,
-                      t('defaultDisplayName'),
-                    ),
-                  })}
-                </p>
-              ) : null}
+              <h3 className="favorite-card__title">{recipe.name}</h3>
               <div className="favorite-card__meta">
-                {!isCommunity && (
-                  <>
-                    <span>
-                      {recipe.cookTime != null || recipe.time != null
-                        ? t('cookTime', { count: recipe.cookTime ?? recipe.time })
-                        : '—'}
-                    </span>
-                    <span>{recipe.calories ?? '—'} kcal</span>
-                  </>
-                )}
+                <span>
+                  {recipe.cookTime != null || recipe.time != null
+                    ? t('cookTime', { count: recipe.cookTime ?? recipe.time })
+                    : '—'}
+                </span>
+                <span>{recipe.calories ?? '—'} kcal</span>
               </div>
               <div className="favorite-card__actions">
-                {!isCommunity ? (
-                  <button
-                    type="button"
-                    className="btn btn--ghost favorite-card__view"
-                    onClick={() => onSelect(recipe)}
-                  >
-                    {t('viewRecipe')}
-                  </button>
-                ) : null}
+                <button
+                  type="button"
+                  className="btn btn--ghost favorite-card__view"
+                  onClick={() => onSelect(recipe)}
+                >
+                  {t('viewRecipe')}
+                </button>
                 <button
                   type="button"
                   className="btn btn--ghost favorite-card__remove"

@@ -57,7 +57,7 @@ export default function ChallengeSubmissionCard({
       <div className="challenge-submission-card__body">
         <h4 className="challenge-submission-card__title">{submission.dishName}</h4>
         <p className="challenge-submission-card__author">
-          {t('communityAuthor', { name: submission.authorName || t('defaultDisplayName') })}
+          {t('communityAuthor', { name: submission.authorName })}
         </p>
         {submission.description ? (
           <p className="challenge-submission-card__desc">{submission.description}</p>

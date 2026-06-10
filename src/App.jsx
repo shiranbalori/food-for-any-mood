@@ -83,7 +83,7 @@ export default function App() {
   const initialNav = initialNavRef.current
 
   const { t, language } = useLanguage()
-  const { user, isAuthenticated, getPublicDisplayName, profileRevision } = useAuth()
+  const { user, isAuthenticated, getPublicDisplayName } = useAuth()
   const publicDisplayName = usePublicDisplayName()
   const [myRecipesCount, setMyRecipesCount] = useState(0)
   const [category, setCategory] = useState('dairy')
@@ -506,7 +506,7 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
-  const handleProfileUpdated = useCallback(() => {
+  const handleCommunityDataChanged = useCallback(() => {
     if (user?.id) {
       const name = getPublicDisplayName(language)
       refreshOwnCommunityAuthorInStorage(user.id, name)
@@ -552,8 +552,8 @@ export default function App() {
           <CommunityRecipes
             initialExpandedRecipeId={openRecipeId}
             onExpandedRecipeChange={setOpenRecipeId}
-            onSavedChanged={() => setSavedCommunityRecipes(getSavedCommunityRecipes())}
-            onFavoritesChanged={() => setFavoriteRecipes(getFavoriteRecipes())}
+            onSavedChanged={handleCommunityDataChanged}
+            onFavoritesChanged={handleCommunityDataChanged}
           />
         )
       case MY_AREA_PANELS.story:
@@ -619,7 +619,13 @@ export default function App() {
         />
 
         {activeMyAreaPage ? (
-          <MyAreaPageSection titleKey={getMyAreaNavItem(activeMyAreaPage)?.labelKey}>
+          <MyAreaPageSection
+            titleKey={
+              activeMyAreaPage === MY_AREA_PANELS.community
+                ? undefined
+                : getMyAreaNavItem(activeMyAreaPage)?.labelKey
+            }
+          >
             {renderMyAreaPageContent()}
           </MyAreaPageSection>
         ) : activeGlobalPage === GLOBAL_PAGES.dailyChallenge ? (
@@ -718,8 +724,8 @@ export default function App() {
         {!activeMyAreaPage && !activeGlobalPage && (
           <CommunityTop5
             onRecipeClick={openCommunityRecipe}
-            onSavedChanged={() => setSavedCommunityRecipes(getSavedCommunityRecipes())}
-            onFavoritesChanged={() => setFavoriteRecipes(getFavoriteRecipes())}
+            onSavedChanged={handleCommunityDataChanged}
+            onFavoritesChanged={handleCommunityDataChanged}
           />
         )}
           </>
@@ -727,7 +733,7 @@ export default function App() {
 
       </main>
 
-      <ProfileSetupModal onUpdated={handleProfileUpdated} />
+      <ProfileSetupModal onUpdated={handleCommunityDataChanged} />
 
       <MyAreaDrawer
         open={myAreaOpen}
@@ -742,7 +748,7 @@ export default function App() {
         searchPrivateRecipes={searchPrivateRecipes}
         searchCommunityRecipes={searchCommunityRecipes}
         onSearchSelect={handleSearchSelect}
-        onProfileUpdated={handleProfileUpdated}
+        onProfileUpdated={handleCommunityDataChanged}
       />
 
       <DailyQuizModal
