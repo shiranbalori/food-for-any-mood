@@ -480,3 +480,78 @@ export async function deleteRecipeComment(userId, commentId) {
 
   if (error) throw error
 }
+
+/**
+ * Edit a comment body. Owner-only via RLS.
+ * Returns { id, body, createdAt }.
+ */
+export async function updateRecipeComment(userId, commentId, body) {
+  if (!supabase) throw new Error('SUPABASE_NOT_CONFIGURED')
+
+  const trimmed = body.trim()
+  if (!trimmed || trimmed.length > 500) throw new Error('INVALID_BODY')
+
+  const { data, error } = await supabase
+    .from('recipe_comments')
+    .update({ body: trimmed })
+    .eq('id', commentId)
+    .eq('user_id', userId)
+    .select('id, body, created_at')
+    .single()
+
+  if (error) throw error
+
+  return {
+    id: data.id,
+    body: data.body,
+    createdAt: data.created_at,
+  }
+}
+
+/**
+ * Report a comment for moderation. Does not delete the comment.
+ * Duplicate reports from the same user are ignored.
+ */
+export async function reportRecipeComment(userId, commentId) {
+  if (!supabase) throw new Error('SUPABASE_NOT_CONFIGURED')
+
+  const { error } = await supabase.from('recipe_comment_reports').insert({
+    comment_id: commentId,
+    reporter_id: userId,
+  })
+
+  if (error && error.code !== '23505') throw error
+}
+
+/**
+ * Returns comment IDs on this recipe that the user has already reported.
+ */
+export async function fetchUserCommentReports(userId, recipeId) {
+  if (!supabase || !userId) return []
+
+  const { data: comments, error: commentsError } = await supabase
+    .from('recipe_comments')
+    .select('id')
+    .eq('recipe_id', recipeId)
+
+  if (commentsError) {
+    console.warn('[communityRecipeService] fetchUserCommentReports comments:', commentsError)
+    return []
+  }
+
+  const commentIds = (comments ?? []).map((row) => row.id)
+  if (commentIds.length === 0) return []
+
+  const { data, error } = await supabase
+    .from('recipe_comment_reports')
+    .select('comment_id')
+    .eq('reporter_id', userId)
+    .in('comment_id', commentIds)
+
+  if (error) {
+    console.warn('[communityRecipeService] fetchUserCommentReports:', error)
+    return []
+  }
+
+  return (data ?? []).map((row) => row.comment_id)
+}

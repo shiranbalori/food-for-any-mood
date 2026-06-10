@@ -526,22 +526,62 @@
   color: var(--text-muted, #999);
 }
 
-.community-card__comment-delete {
+.community-card__comment-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
   margin-inline-start: auto;
+}
+
+.community-card__comment-action {
   background: none;
   border: none;
   cursor: pointer;
-  font-size: 0.7rem;
-  color: var(--text-muted, #bbb);
+  font-size: 0.68rem;
+  font-family: inherit;
+  color: var(--text-muted, #999);
   padding: 0;
-  opacity: 0;
+  line-height: 1.2;
+  opacity: 0.75;
   transition: opacity 0.15s, color 0.15s;
 }
 
-.community-card__comment:hover .community-card__comment-delete,
-.community-card__comment-delete:focus {
+.community-card__comment:hover .community-card__comment-action,
+.community-card__comment-action:focus-visible {
   opacity: 1;
-  color: #e55;
+}
+
+.community-card__comment-action:hover:not(:disabled) {
+  color: var(--text, #444);
+}
+
+.community-card__comment-action:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.community-card__comment-action--danger:hover:not(:disabled) {
+  color: #c44;
+}
+
+.community-card__comment-action--primary {
+  font-weight: 600;
+}
+
+.community-card__comment-action--primary:hover:not(:disabled) {
+  color: var(--theme-accent, #6366f1);
+}
+
+.community-card__comment-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.community-card__comment-edit-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
 }
 
 .community-card__comment-body {
@@ -605,7 +645,7 @@
 
 /* ── Mobile tweaks ────────────────────────────────────────────────────────── */
 @media (max-width: 480px) {
-  .community-card__comment-delete {
+  .community-card__comment-action {
     opacity: 1;
   }
 }

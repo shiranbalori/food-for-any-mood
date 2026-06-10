@@ -7,10 +7,13 @@ import {
   deleteRecipeComment,
   deleteCommunityRecipe,
   fetchRecipeComments,
+  fetchUserCommentReports,
   incrementRecipeShare,
   incrementRecipeViews,
   rateCommunityRecipe,
+  reportRecipeComment,
   toggleRecipeLike,
+  updateRecipeComment,
 } from '../services/communityRecipeService'
 import { removeSavedCommunityRecipe, saveCommunityRecipe, isCommunityRecipeSaved } from '../utils/storage'
 import { addFavoriteCommunityRecipe, removeFavoriteRecipe } from '../utils/favoritesStorage'
@@ -72,6 +75,10 @@ export default function CommunityRecipeCard({
   const [localCommentCount, setLocalCommentCount] = useState(recipe.commentCount ?? 0)
   const [commentText, setCommentText] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const [editingCommentId, setEditingCommentId] = useState(null)
+  const [editText, setEditText] = useState('')
+  const [editSaving, setEditSaving] = useState(false)
+  const [reportedCommentIds, setReportedCommentIds] = useState(() => new Set())
   const commentInputRef = useRef(null)
   const commentsSectionRef = useRef(null)
 
@@ -108,13 +115,19 @@ export default function CommunityRecipeCard({
       if (loaded.length > 0) {
         setLocalCommentCount(loaded.length)
       }
+      if (userId && loaded.length > 0) {
+        const reportedIds = await fetchUserCommentReports(userId, recipe.id)
+        if (reportedIds.length > 0) {
+          setReportedCommentIds(new Set(reportedIds))
+        }
+      }
     } catch {
       // graceful — empty state shown
     } finally {
       setCommentsLoaded(true)
       setCommentsLoading(false)
     }
-  }, [canUseLiveComments, commentsLoaded, recipe.id])
+  }, [canUseLiveComments, commentsLoaded, recipe.id, userId])
 
   useEffect(() => {
     if ((expanded || commentsOpen) && canUseLiveComments && !commentsLoaded) {
@@ -175,12 +188,61 @@ export default function CommunityRecipeCard({
 
   const handleDeleteComment = async (commentId) => {
     if (!window.confirm(t('communityCommentDeleteConfirm'))) return
+    if (editingCommentId === commentId) {
+      setEditingCommentId(null)
+      setEditText('')
+    }
     try {
       await deleteRecipeComment(userId, commentId)
       setComments((prev) => prev.filter((c) => c.id !== commentId))
       setLocalCommentCount((n) => Math.max(0, n - 1))
     } catch (error) {
       console.error('[CommunityRecipeCard] deleteComment failed:', error)
+    }
+  }
+
+  const startEditComment = (comment) => {
+    setEditingCommentId(comment.id)
+    setEditText(comment.body)
+  }
+
+  const cancelEditComment = () => {
+    setEditingCommentId(null)
+    setEditText('')
+  }
+
+  const handleSaveEditComment = async (commentId) => {
+    const body = editText.trim()
+    if (!body || editSaving) return
+
+    setEditSaving(true)
+    try {
+      const updated = await updateRecipeComment(userId, commentId, body)
+      setComments((prev) =>
+        prev.map((comment) =>
+          comment.id === commentId ? { ...comment, body: updated.body } : comment,
+        ),
+      )
+      cancelEditComment()
+    } catch (error) {
+      console.error('[CommunityRecipeCard] editComment failed:', error)
+    } finally {
+      setEditSaving(false)
+    }
+  }
+
+  const handleReportComment = async (commentId) => {
+    if (!isAuthenticated) {
+      onAuthRequired()
+      return
+    }
+    if (reportedCommentIds.has(commentId)) return
+
+    try {
+      await reportRecipeComment(userId, commentId)
+      setReportedCommentIds((prev) => new Set(prev).add(commentId))
+    } catch (error) {
+      console.error('[CommunityRecipeCard] reportComment failed:', error)
     }
   }
 
@@ -376,27 +438,92 @@ export default function CommunityRecipeCard({
 
               {comments.length > 0 && (
                 <ul className="community-card__comments-list">
-                  {comments.map((c) => (
+                  {comments.map((c) => {
+                    const isOwnerComment = c.userId === userId
+                    const isEditing = editingCommentId === c.id
+                    const isReported = reportedCommentIds.has(c.id)
+
+                    return (
                     <li key={c.id} className="community-card__comment">
                       <div className="community-card__comment-header">
                         <span className="community-card__comment-author">{c.authorName}</span>
                         <span className="community-card__comment-date">
                           {formatRelativeDate(c.createdAt, language)}
                         </span>
-                        {c.userId === userId && (
-                          <button
-                            type="button"
-                            className="community-card__comment-delete"
-                            onClick={() => handleDeleteComment(c.id)}
-                            aria-label={t('communityCommentDelete')}
-                          >
-                            {t('communityCommentDelete')}
-                          </button>
-                        )}
+                        <div className="community-card__comment-actions">
+                          {isOwnerComment && !isEditing && (
+                            <>
+                              <button
+                                type="button"
+                                className="community-card__comment-action"
+                                onClick={() => startEditComment(c)}
+                              >
+                                {t('communityCommentEdit')}
+                              </button>
+                              <button
+                                type="button"
+                                className="community-card__comment-action community-card__comment-action--danger"
+                                onClick={() => handleDeleteComment(c.id)}
+                                aria-label={t('communityCommentDelete')}
+                              >
+                                {t('communityCommentDelete')}
+                              </button>
+                            </>
+                          )}
+                          {!isOwnerComment && (
+                            <button
+                              type="button"
+                              className="community-card__comment-action"
+                              onClick={() => handleReportComment(c.id)}
+                              disabled={isAuthenticated && isReported}
+                              aria-label={t('communityCommentReport')}
+                            >
+                              {isAuthenticated && isReported
+                                ? t('communityCommentReported')
+                                : t('communityCommentReport')}
+                            </button>
+                          )}
+                        </div>
                       </div>
-                      <p className="community-card__comment-body">{c.body}</p>
+                      {isEditing ? (
+                        <div className="community-card__comment-edit">
+                          <textarea
+                            className="community-card__comment-input"
+                            value={editText}
+                            onChange={(e) => setEditText(e.target.value.slice(0, 500))}
+                            rows={2}
+                            disabled={editSaving}
+                          />
+                          <div className="community-card__comment-footer">
+                            <span className="community-card__comment-char-count">
+                              {editText.length}/500
+                            </span>
+                            <div className="community-card__comment-edit-actions">
+                              <button
+                                type="button"
+                                className="community-card__comment-action"
+                                onClick={cancelEditComment}
+                                disabled={editSaving}
+                              >
+                                {t('communityCommentCancel')}
+                              </button>
+                              <button
+                                type="button"
+                                className="community-card__comment-action community-card__comment-action--primary"
+                                onClick={() => handleSaveEditComment(c.id)}
+                                disabled={editSaving || !editText.trim()}
+                              >
+                                {editSaving ? t('communityCommentSaving') : t('communityCommentSave')}
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <p className="community-card__comment-body">{c.body}</p>
+                      )}
                     </li>
-                  ))}
+                    )
+                  })}
                 </ul>
               )}
 
