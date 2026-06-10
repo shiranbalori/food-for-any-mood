@@ -1,24 +1,19 @@
-import { DAILY_QUIZ_QUESTIONS } from '../../data/dailyQuizQuestions'
 import { getChallengeDateKey } from '../dailyChallenge/generateDailyChallenge'
-
-function hashString(value) {
-  let hash = 2166136261
-  for (let index = 0; index < value.length; index += 1) {
-    hash ^= value.charCodeAt(index)
-    hash = Math.imul(hash, 16777619)
-  }
-  return hash >>> 0
-}
+import {
+  assignLocalDailyQuiz,
+  getQuizQuestionById,
+} from './quizRotation'
 
 /**
  * @param {string} language
  * @param {import('../../data/dailyQuizQuestions').DailyQuizQuestion} question
+ * @param {string} dateKey
  */
-export function localizeQuizQuestion(question, language = 'he') {
+export function localizeQuizQuestion(question, language = 'he', dateKey = getChallengeDateKey()) {
   const lang = language === 'en' ? 'en' : 'he'
   return {
     id: question.id,
-    quizDate: getChallengeDateKey(),
+    quizDate: dateKey,
     question: question.question[lang] ?? question.question.he,
     options: question.options[lang] ?? question.options.he,
     correctIndex: question.correctIndex,
@@ -27,14 +22,18 @@ export function localizeQuizQuestion(question, language = 'he') {
 }
 
 /**
+ * Build a localized quiz object from a scheduled quiz id.
+ * @param {string} quizId
  * @param {string} [dateKey]
  * @param {string} [language]
  */
+export function buildDailyQuizFromId(quizId, dateKey = getChallengeDateKey(), language = 'he') {
+  const question = getQuizQuestionById(quizId)
+  return localizeQuizQuestion(question, language, dateKey)
+}
+
+/** Local-only fallback when Supabase schedule is unavailable. */
 export function generateDailyQuiz(dateKey = getChallengeDateKey(), language = 'he') {
-  const index = hashString(`${dateKey}:daily-quiz`) % DAILY_QUIZ_QUESTIONS.length
-  const question = DAILY_QUIZ_QUESTIONS[index]
-  return {
-    ...localizeQuizQuestion(question, language),
-    quizDate: dateKey,
-  }
+  const quizId = assignLocalDailyQuiz(dateKey)
+  return buildDailyQuizFromId(quizId, dateKey, language)
 }

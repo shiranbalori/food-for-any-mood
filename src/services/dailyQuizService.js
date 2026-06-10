@@ -5,7 +5,15 @@ import {
   applyQuizParticipationStreak,
   applyQuizCorrectStreak,
 } from '../utils/dailyChallenge/streaks'
-import { generateDailyQuiz } from '../utils/dailyQuiz/generateDailyQuiz'
+import { buildDailyQuizFromId } from '../utils/dailyQuiz/generateDailyQuiz'
+import {
+  assignLocalDailyQuiz,
+  computeNextQuizAssignment,
+  getLocalQuizRotation,
+  getLocalQuizSchedule,
+  setLocalQuizRotation,
+  setLocalQuizSchedule,
+} from '../utils/dailyQuiz/quizRotation'
 import { awardGamificationPoints, fetchUserGamification } from './dailyChallengeService'
 
 const LS_QUIZ_ANSWERS = 'ffam_quiz_answers'
@@ -46,6 +54,115 @@ function saveLocalQuizAnswer(userId, quizDate, answer) {
   const userAnswers = { ...(all[userId] ?? {}), [quizDate]: answer }
   all[userId] = userAnswers
   writeJson(LS_QUIZ_ANSWERS, all)
+}
+
+async function fetchRemoteSchedule(quizDate) {
+  if (!isSupabaseConfigured || !supabase) return null
+
+  const { data, error } = await supabase
+    .from('daily_quiz_schedule')
+    .select('quiz_id, cycle_number')
+    .eq('quiz_date', quizDate)
+    .maybeSingle()
+
+  if (error) {
+    console.error('[dailyQuizService] schedule fetch:', error)
+    return null
+  }
+
+  return data
+}
+
+async function fetchRemoteRotation() {
+  if (!isSupabaseConfigured || !supabase) {
+    return getLocalQuizRotation()
+  }
+
+  const { data, error } = await supabase
+    .from('daily_quiz_rotation')
+    .select('cycle_number, used_quiz_ids')
+    .eq('id', 'global')
+    .maybeSingle()
+
+  if (error) {
+    console.error('[dailyQuizService] rotation fetch:', error)
+    return getLocalQuizRotation()
+  }
+
+  return {
+    cycleNumber: data?.cycle_number ?? 1,
+    usedQuizIds: data?.used_quiz_ids ?? [],
+  }
+}
+
+async function assignRemoteDailyQuiz(quizDate, assignment) {
+  if (!isSupabaseConfigured || !supabase) return null
+
+  const { data, error } = await supabase.rpc('assign_daily_quiz', {
+    p_quiz_date: quizDate,
+    p_quiz_id: assignment.quizId,
+    p_cycle_number: assignment.cycleNumber,
+    p_used_quiz_ids: assignment.usedQuizIds,
+  })
+
+  if (error) {
+    console.error('[dailyQuizService] assign_daily_quiz:', error)
+    return null
+  }
+
+  const row = Array.isArray(data) ? data[0] : data
+  return row?.quiz_id ?? null
+}
+
+function cacheScheduleLocally(quizDate, quizId, cycleNumber) {
+  setLocalQuizSchedule(quizDate, { quizId, cycleNumber })
+}
+
+async function resolveScheduledQuizId(quizDate) {
+  const cached = getLocalQuizSchedule(quizDate)
+  const remoteSchedule = await fetchRemoteSchedule(quizDate)
+
+  if (remoteSchedule?.quiz_id) {
+    cacheScheduleLocally(quizDate, remoteSchedule.quiz_id, remoteSchedule.cycle_number ?? 1)
+    return remoteSchedule.quiz_id
+  }
+
+  if (cached?.quizId) {
+    return cached.quizId
+  }
+
+  const rotation = await fetchRemoteRotation()
+  const assignment = computeNextQuizAssignment(
+    quizDate,
+    rotation.usedQuizIds,
+    rotation.cycleNumber,
+  )
+
+  const assignedId = await assignRemoteDailyQuiz(quizDate, assignment)
+
+  if (assignedId) {
+    cacheScheduleLocally(quizDate, assignedId, assignment.cycleNumber)
+    if (assignedId === assignment.quizId) {
+      setLocalQuizRotation({
+        cycleNumber: assignment.cycleNumber,
+        usedQuizIds: assignment.usedQuizIds,
+      })
+    } else {
+      const refreshed = await fetchRemoteSchedule(quizDate)
+      if (refreshed?.quiz_id) {
+        cacheScheduleLocally(quizDate, refreshed.quiz_id, refreshed.cycle_number ?? 1)
+      }
+    }
+    return assignedId
+  }
+
+  return assignLocalDailyQuiz(quizDate)
+}
+
+export async function resolveTodayQuiz(language = 'he') {
+  const quizDate = getChallengeDateKey()
+  const quizId = await resolveScheduledQuizId(quizDate)
+  return buildDailyQuizFromId(quizId, quizDate, language)
 }
 
 async function getRemoteQuizAnswer(userId, quizDate) {
@@ -89,10 +206,6 @@ async function saveRemoteQuizAnswer(userId, quizDate, answer) {
   }
 }
 
-export function getTodayQuiz(language = 'he') {
-  return generateDailyQuiz(getChallengeDateKey(), language)
-}
-
 export async function fetchUserQuizAnswerToday(userId) {
   if (!userId) return null
   const quizDate = getChallengeDateKey()
@@ -130,11 +243,9 @@ export async function submitDailyQuizAnswer(userId, selectedIndex, correctIndex,
 
   const stats = await fetchUserGamification(userId)
 
-  // Apply participation streak (any answer keeps the streak going)
   const { stats: statsAfterParticipation, streakBonus: participationBonus } =
     applyQuizParticipationStreak(stats, quizDate)
 
-  // Apply correct-answer streak (wrong answer resets it)
   const { stats: statsAfterCorrect, streakBonus: correctBonus } =
     applyQuizCorrectStreak(statsAfterParticipation, correct)
 
