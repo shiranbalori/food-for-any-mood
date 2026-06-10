@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useLayoutEffect, useRef } from 'react'
 import BackgroundDecor from './components/BackgroundDecor'
 import Header from './components/Header'
 import CategorySelector from './components/CategorySelector'
@@ -50,6 +50,12 @@ import {
   getMealPlan,
   removeRecipeFromMealPlan,
 } from './utils/mealPlannerStorage'
+import {
+  applyNavigationRoute,
+  parseNavigationHash,
+  readNavigationRoute,
+  writeNavigationRoute,
+} from './utils/navigationRoute'
 import './App.css'
 
 const GLOBAL_PAGES = {
@@ -66,6 +72,12 @@ const INITIAL_FORM = {
 }
 
 export default function App() {
+  const initialNavRef = useRef(null)
+  if (initialNavRef.current === null) {
+    initialNavRef.current = readNavigationRoute()
+  }
+  const initialNav = initialNavRef.current
+
   const { t, language } = useLanguage()
   const { user, isAuthenticated, displayName } = useAuth()
   const [myRecipesCount, setMyRecipesCount] = useState(0)
@@ -90,15 +102,16 @@ export default function App() {
   const [ideasLoading, setIdeasLoading] = useState(false)
   const [mealPlan, setMealPlan] = useState(getMealPlan)
   const [myAreaOpen, setMyAreaOpen] = useState(false)
-  const [activeMyAreaPage, setActiveMyAreaPage] = useState(null)
+  const [activeMyAreaPage, setActiveMyAreaPage] = useState(initialNav.activeMyAreaPage)
+  const [openRecipeId, setOpenRecipeId] = useState(initialNav.openRecipeId)
   const [searchCommunityRecipes, setSearchCommunityRecipes] = useState([])
   const [searchPrivateRecipes, setSearchPrivateRecipes] = useState([])
   const [stepsRegenerating, setStepsRegenerating] = useState(false)
   const [stepsRegenerateError, setStepsRegenerateError] = useState(null)
   const [stepsGenerationKey, setStepsGenerationKey] = useState(0)
-  const [activeGlobalPage, setActiveGlobalPage] = useState(null)
+  const [activeGlobalPage, setActiveGlobalPage] = useState(initialNav.activeGlobalPage)
   const [challengeModalOpen, setChallengeModalOpen] = useState(false)
-  const [quizModalOpen, setQuizModalOpen] = useState(false)
+  const [quizModalOpen, setQuizModalOpen] = useState(initialNav.quizModalOpen)
   const [gamificationRefreshKey, setGamificationRefreshKey] = useState(0)
   const [challengeSubmitOpen, setChallengeSubmitOpen] = useState(false)
   const [challengeAuthOpen, setChallengeAuthOpen] = useState(false)
@@ -134,6 +147,44 @@ export default function App() {
       cancelled = true
     }
   }, [isAuthenticated, user?.id])
+
+  useLayoutEffect(() => {
+    applyNavigationRoute(readNavigationRoute(), {
+      setMyAreaOpen,
+      setActiveMyAreaPage,
+      setActiveGlobalPage,
+      setQuizModalOpen,
+      setOpenRecipeId,
+    })
+  }, [])
+
+  useLayoutEffect(() => {
+    writeNavigationRoute({
+      activeMyAreaPage,
+      activeGlobalPage,
+      quizModalOpen,
+      openRecipeId,
+    })
+  }, [activeMyAreaPage, activeGlobalPage, quizModalOpen, openRecipeId])
+
+  useEffect(() => {
+    const applyHash = () => {
+      applyNavigationRoute(parseNavigationHash(window.location.hash), {
+        setMyAreaOpen,
+        setActiveMyAreaPage,
+        setActiveGlobalPage,
+        setQuizModalOpen,
+        setOpenRecipeId,
+      })
+    }
+
+    window.addEventListener('hashchange', applyHash)
+    window.addEventListener('popstate', applyHash)
+    return () => {
+      window.removeEventListener('hashchange', applyHash)
+      window.removeEventListener('popstate', applyHash)
+    }
+  }, [])
 
   useEffect(() => {
     if (!myAreaOpen) return undefined
@@ -412,12 +463,16 @@ export default function App() {
     setMyAreaOpen(false)
     setActiveMyAreaPage(null)
     setActiveGlobalPage(null)
+    setOpenRecipeId(null)
+    setQuizModalOpen(false)
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
   const openChallengeFullPage = () => {
     setMyAreaOpen(false)
     setActiveMyAreaPage(null)
+    setOpenRecipeId(null)
+    setQuizModalOpen(false)
     setActiveGlobalPage(GLOBAL_PAGES.dailyChallenge)
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
@@ -425,11 +480,15 @@ export default function App() {
   const closeMyArea = () => {
     setMyAreaOpen(false)
     setActiveMyAreaPage(null)
+    setOpenRecipeId(null)
   }
 
   const openMyAreaPanel = (panelId) => {
     setMyAreaOpen(false)
     setActiveMyAreaPage(panelId)
+    setOpenRecipeId(null)
+    setActiveGlobalPage(null)
+    setQuizModalOpen(false)
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
@@ -458,12 +517,19 @@ export default function App() {
             recipes={[...savedRecipes, ...savedCommunityRecipes]}
             onRemove={handleRemove}
             onSelect={handleSelectSaved}
+            initialExpandedId={openRecipeId}
+            onExpandedChange={setOpenRecipeId}
           />
         )
       case MY_AREA_PANELS.myRecipes:
         return <MyRecipes onRecipesChanged={refreshMyRecipesCount} />
       case MY_AREA_PANELS.community:
-        return <CommunityRecipes />
+        return (
+          <CommunityRecipes
+            initialExpandedRecipeId={openRecipeId}
+            onExpandedRecipeChange={setOpenRecipeId}
+          />
+        )
       case MY_AREA_PANELS.story:
         return <OurStory />
       default:
@@ -487,6 +553,9 @@ export default function App() {
   const handleSelectSaved = (saved) => {
     if (!saved?.id) return
     closeMyArea()
+    setOpenRecipeId(null)
+    setActiveGlobalPage(null)
+    setQuizModalOpen(false)
     setCategory(saved.category ?? 'dairy')
     setForm({
       ingredients: '',
@@ -535,7 +604,12 @@ export default function App() {
           <>
         <HomeDailyPills
           onOpenChallenge={() => setChallengeModalOpen(true)}
-          onOpenQuiz={() => setQuizModalOpen(true)}
+          onOpenQuiz={() => {
+            setActiveMyAreaPage(null)
+            setActiveGlobalPage(null)
+            setOpenRecipeId(null)
+            setQuizModalOpen(true)
+          }}
         />
 
         <CategorySelector

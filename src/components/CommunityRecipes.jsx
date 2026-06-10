@@ -20,7 +20,10 @@ const CATEGORY_OPTIONS = [
   { id: COMMUNITY_RECIPE_CATEGORIES.mostSaved, labelKey: 'communityCategoryMostSaved' },
 ]
 
-export default function CommunityRecipes() {
+export default function CommunityRecipes({
+  initialExpandedRecipeId = null,
+  onExpandedRecipeChange,
+}) {
   const { t } = useLanguage()
   const { user, isAuthenticated, isSupabaseReady, loading: authLoading, displayName } = useAuth()
   const [recipes, setRecipes] = useState([])
@@ -134,6 +137,8 @@ export default function CommunityRecipes() {
             onAuthRequired={() => openAuth('login')}
             onUpdated={loadRecipes}
             currentUserDisplayName={displayName}
+            initialExpanded={initialExpandedRecipeId === recipe.id}
+            onOpenRecipeChange={onExpandedRecipeChange}
           />
         ))}
       </div>

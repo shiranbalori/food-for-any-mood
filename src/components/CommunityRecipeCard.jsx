@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 import { getTheme } from '../utils/themes'
 import { useLanguage } from '../i18n/useLanguage'
 import { sanitizeIngredientList } from '../utils/ingredientFormatting'
@@ -46,9 +46,12 @@ export default function CommunityRecipeCard({
   onAuthRequired,
   onUpdated,
   currentUserDisplayName,
+  initialExpanded = false,
+  onOpenRecipeChange,
 }) {
   const { t, language } = useLanguage()
-  const [expanded, setExpanded] = useState(false)
+  const [expanded, setExpanded] = useState(initialExpanded)
+  const [commentsOpen, setCommentsOpen] = useState(false)
   const [busy, setBusy] = useState(false)
   const [localSavesCount, setLocalSavesCount] = useState(recipe.savesCount ?? recipe.likeCount ?? 0)
   const [localLiked, setLocalLiked] = useState(recipe.userLiked)
@@ -65,6 +68,7 @@ export default function CommunityRecipeCard({
   const [commentText, setCommentText] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const commentInputRef = useRef(null)
+  const commentsSectionRef = useRef(null)
 
   useEffect(() => {
     setLocalSavesCount(recipe.savesCount ?? recipe.likeCount ?? 0)
@@ -75,37 +79,79 @@ export default function CommunityRecipeCard({
     setLocalCommentCount(recipe.commentCount ?? 0)
   }, [recipe])
 
+  useEffect(() => {
+    setExpanded(initialExpanded)
+    if (initialExpanded) {
+      setCommentsOpen(true)
+    }
+  }, [initialExpanded, recipe.id])
+
   const theme = getTheme(recipe.category ?? 'parve')
   const categoryId = recipe.category ?? 'parve'
   const displayIngredients = sanitizeIngredientList(recipe.ingredients ?? [])
 
+  const canUseLiveComments = isSupabaseReady && !recipe.id.startsWith('mock-')
+
+  const loadComments = useCallback(async () => {
+    if (!canUseLiveComments || commentsLoaded) return
+    setCommentsLoading(true)
+    try {
+      const loaded = await fetchRecipeComments(recipe.id)
+      setComments(loaded)
+      if (loaded.length > 0) {
+        setLocalCommentCount(loaded.length)
+      }
+    } catch {
+      // graceful — empty state shown
+    } finally {
+      setCommentsLoaded(true)
+      setCommentsLoading(false)
+    }
+  }, [canUseLiveComments, commentsLoaded, recipe.id])
+
+  useEffect(() => {
+    if ((expanded || commentsOpen) && canUseLiveComments && !commentsLoaded) {
+      void loadComments()
+    }
+  }, [expanded, commentsOpen, canUseLiveComments, commentsLoaded, loadComments])
+
+  const scrollToComments = () => {
+    window.requestAnimationFrame(() => {
+      commentsSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+    })
+  }
+
+  const openCommentsSection = () => {
+    setCommentsOpen(true)
+    void loadComments()
+    scrollToComments()
+  }
+
   const handleExpand = async () => {
     const next = !expanded
     setExpanded(next)
-    if (next && isSupabaseReady && !recipe.id.startsWith('mock-')) {
-      await incrementRecipeViews(recipe.id)
-      onUpdated?.()
-      if (!commentsLoaded) {
-        setCommentsLoading(true)
-        try {
-          const loaded = await fetchRecipeComments(recipe.id)
-          setComments(loaded)
-          setLocalCommentCount(loaded.length)
-        } catch {
-          // graceful — empty state shown
-        } finally {
-          setCommentsLoaded(true)
-          setCommentsLoading(false)
-        }
-      }
+    onOpenRecipeChange?.(next ? recipe.id : null)
+    if (!next) {
+      setCommentsOpen(false)
+      return
     }
+
+    setCommentsOpen(true)
+
+    if (canUseLiveComments) {
+      void loadComments()
+      void incrementRecipeViews(recipe.id).then(() => {
+        onUpdated?.()
+      })
+    }
+
+    scrollToComments()
   }
 
   const handleAddComment = async (e) => {
     e.preventDefault()
     const body = commentText.trim()
-    if (!body || submitting) return
-    if (!requireAuth()) return
+    if (!body || !requireAuth() || !canUseLiveComments || submitting) return
 
     setSubmitting(true)
     try {
@@ -276,10 +322,104 @@ export default function CommunityRecipeCard({
 
       <p className="community-card__author">{t('communityAuthor', { name: recipe.authorName })}</p>
 
+      {(expanded || commentsOpen) && (
+        <div className="community-card__comments" ref={commentsSectionRef}>
+          <h4 className="community-card__comments-title">
+            {t('communityComments')}
+            {localCommentCount > 0 && (
+              <span className="community-card__comments-count-badge">
+                {localCommentCount}
+              </span>
+            )}
+          </h4>
+
+          {!canUseLiveComments ? (
+            <p className="community-card__comments-empty">{t('communityMockNotice')}</p>
+          ) : (
+            <>
+              {commentsLoading && (
+                <p className="community-card__comments-status">{t('communityCommentsLoading')}</p>
+              )}
+
+              {!commentsLoading && commentsLoaded && comments.length === 0 && (
+                <p className="community-card__comments-empty">{t('communityCommentsEmpty')}</p>
+              )}
+
+              {comments.length > 0 && (
+                <ul className="community-card__comments-list">
+                  {comments.map((c) => (
+                    <li key={c.id} className="community-card__comment">
+                      <div className="community-card__comment-header">
+                        <span className="community-card__comment-author">{c.authorName}</span>
+                        <span className="community-card__comment-date">
+                          {formatRelativeDate(c.createdAt, language)}
+                        </span>
+                        {c.userId === userId && (
+                          <button
+                            type="button"
+                            className="community-card__comment-delete"
+                            onClick={() => handleDeleteComment(c.id)}
+                            aria-label={t('communityCommentDelete')}
+                          >
+                            {t('communityCommentDelete')}
+                          </button>
+                        )}
+                      </div>
+                      <p className="community-card__comment-body">{c.body}</p>
+                    </li>
+                  ))}
+                </ul>
+              )}
+
+              {isAuthenticated ? (
+                <form className="community-card__comment-form" onSubmit={handleAddComment}>
+                  <textarea
+                    ref={commentInputRef}
+                    className="community-card__comment-input"
+                    value={commentText}
+                    onChange={(e) => setCommentText(e.target.value.slice(0, 500))}
+                    placeholder={t('communityCommentPlaceholder')}
+                    rows={2}
+                    disabled={submitting}
+                  />
+                  <div className="community-card__comment-footer">
+                    <span className="community-card__comment-char-count">
+                      {commentText.length}/500
+                    </span>
+                    <button
+                      type="submit"
+                      className="btn btn--primary community-card__comment-submit"
+                      disabled={submitting || !commentText.trim()}
+                    >
+                      {submitting ? t('communityCommentSubmitting') : t('communityCommentSubmit')}
+                    </button>
+                  </div>
+                </form>
+              ) : (
+                <button
+                  type="button"
+                  className="btn btn--ghost community-card__comment-login"
+                  onClick={onAuthRequired}
+                >
+                  {t('communityCommentLoginPrompt')}
+                </button>
+              )}
+            </>
+          )}
+        </div>
+      )}
+
       <div className="community-card__meta">
         <span>{t('communityViews', { count: formatViews(recipe.viewsCount ?? recipe.views ?? 0, language) })}</span>
         <span className="community-card__saves">❤️ {localSavesCount}</span>
-        <span className="community-card__comment-count">💬 {localCommentCount}</span>
+        <button
+          type="button"
+          className="community-card__comment-count"
+          onClick={openCommentsSection}
+          aria-label={t('communityCommentsCount', { count: localCommentCount })}
+        >
+          💬 {t('communityCommentsCount', { count: localCommentCount })}
+        </button>
       </div>
 
       <div className="community-card__actions">
@@ -365,88 +505,6 @@ export default function CommunityRecipeCard({
                 ))}
               </ol>
             </>
-          )}
-
-          {/* ── Comments section ── */}
-          {isSupabaseReady && !recipe.id.startsWith('mock-') && (
-            <div className="community-card__comments">
-              <h4 className="community-card__comments-title">
-                {t('communityComments')}
-                {localCommentCount > 0 && (
-                  <span className="community-card__comments-count-badge">
-                    {localCommentCount}
-                  </span>
-                )}
-              </h4>
-
-              {commentsLoading && (
-                <p className="community-card__comments-status">{t('communityCommentsLoading')}</p>
-              )}
-
-              {!commentsLoading && commentsLoaded && comments.length === 0 && (
-                <p className="community-card__comments-empty">{t('communityCommentsEmpty')}</p>
-              )}
-
-              {comments.length > 0 && (
-                <ul className="community-card__comments-list">
-                  {comments.map((c) => (
-                    <li key={c.id} className="community-card__comment">
-                      <div className="community-card__comment-header">
-                        <span className="community-card__comment-author">{c.authorName}</span>
-                        <span className="community-card__comment-date">
-                          {formatRelativeDate(c.createdAt, language)}
-                        </span>
-                        {c.userId === userId && (
-                          <button
-                            type="button"
-                            className="community-card__comment-delete"
-                            onClick={() => handleDeleteComment(c.id)}
-                            aria-label={t('communityCommentDelete')}
-                          >
-                            {t('communityCommentDelete')}
-                          </button>
-                        )}
-                      </div>
-                      <p className="community-card__comment-body">{c.body}</p>
-                    </li>
-                  ))}
-                </ul>
-              )}
-
-              {isAuthenticated ? (
-                <form className="community-card__comment-form" onSubmit={handleAddComment}>
-                  <textarea
-                    ref={commentInputRef}
-                    className="community-card__comment-input"
-                    value={commentText}
-                    onChange={(e) => setCommentText(e.target.value.slice(0, 500))}
-                    placeholder={t('communityCommentPlaceholder')}
-                    rows={2}
-                    disabled={submitting}
-                  />
-                  <div className="community-card__comment-footer">
-                    <span className="community-card__comment-char-count">
-                      {commentText.length}/500
-                    </span>
-                    <button
-                      type="submit"
-                      className="btn btn--primary community-card__comment-submit"
-                      disabled={submitting || !commentText.trim()}
-                    >
-                      {submitting ? t('communityCommentSubmitting') : t('communityCommentSubmit')}
-                    </button>
-                  </div>
-                </form>
-              ) : (
-                <button
-                  type="button"
-                  className="btn btn--ghost community-card__comment-login"
-                  onClick={onAuthRequired}
-                >
-                  {t('communityCommentLoginPrompt')}
-                </button>
-              )}
-            </div>
           )}
         </div>
       )}

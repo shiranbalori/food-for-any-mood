@@ -4,11 +4,25 @@ import { useLanguage } from '../i18n/useLanguage'
 import SpiceLevel from './SpiceLevel'
 import './SavedRecipes.css'
 
-export default function SavedRecipes({ recipes, onRemove, onSelect }) {
+export default function SavedRecipes({
+  recipes,
+  onRemove,
+  onSelect,
+  initialExpandedId = null,
+  onExpandedChange,
+}) {
   const { t } = useLanguage()
-  const [expandedId, setExpandedId] = useState(null)
+  const [expandedId, setExpandedId] = useState(initialExpandedId)
 
-  const toggleExpand = (id) => setExpandedId((prev) => (prev === id ? null : id))
+  useEffect(() => {
+    setExpandedId(initialExpandedId)
+  }, [initialExpandedId])
+
+  const toggleExpand = (id) => {
+    const next = expandedId === id ? null : id
+    setExpandedId(next)
+    onExpandedChange?.(next)
+  }
 
   if (recipes.length === 0) {
     return (

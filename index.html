@@ -13,6 +13,23 @@
     <script>
       ;(function () {
         try {
+          var stored = localStorage.getItem('ffam-nav-hash')
+          if (stored && stored !== '#/' && stored !== '#') {
+            var hash = window.location.hash
+            if (!hash || hash === '#' || hash === '#/') {
+              window.history.replaceState(
+                null,
+                '',
+                window.location.pathname + window.location.search + stored,
+              )
+            }
+          }
+        } catch (e) {}
+      })()
+    </script>
+    <script>
+      ;(function () {
+        try {
           var lang = localStorage.getItem('food-for-any-mood-lang')
           if (lang === 'en') {
             document.documentElement.lang = 'en'

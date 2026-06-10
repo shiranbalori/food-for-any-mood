@@ -50,6 +50,7 @@ function mapMockRecipe(recipe) {
     userRating: null,
     isGlutenFree: recipe.isGlutenFree ?? false,
     createdAt: recipe.createdAt ?? null,
+    commentCount: 0,
   })
 }
 
