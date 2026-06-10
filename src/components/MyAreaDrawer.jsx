@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext'
 import { useLanguage } from '../i18n/useLanguage'
 import LogOutIcon from './LogOutIcon'
 import MyAreaSearch from './MyAreaSearch'
+import ProfileDisplayName from './ProfileDisplayName'
 import './MyAreaDrawer.css'
 
 export const MY_AREA_PANELS = {
@@ -40,6 +41,7 @@ export default function MyAreaDrawer({
   searchPrivateRecipes = [],
   searchCommunityRecipes = [],
   onSearchSelect,
+  onProfileUpdated,
 }) {
   const { t } = useLanguage()
   const { isAuthenticated, signOut } = useAuth()
@@ -150,6 +152,7 @@ export default function MyAreaDrawer({
 
         {isAuthenticated ? (
           <footer className="my-area-drawer__footer">
+            <ProfileDisplayName onUpdated={onProfileUpdated} />
             <button
               type="button"
               className="my-area-drawer__logout"

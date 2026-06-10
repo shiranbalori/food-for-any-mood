@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useAuth } from '../../context/AuthContext'
+import { usePublicDisplayName } from '../../hooks/usePublicDisplayName'
 import { useLanguage } from '../../i18n/useLanguage'
 import {
   fetchAllChallengeSubmissions,
@@ -23,7 +24,8 @@ import './DailyChallenge.css'
 
 export default function DailyChallengePage() {
   const { t } = useLanguage()
-  const { user, isAuthenticated, displayName, loading: authLoading } = useAuth()
+  const { user, isAuthenticated, loading: authLoading } = useAuth()
+  const publicDisplayName = usePublicDisplayName()
   const challenge = useMemo(() => getTodayChallenge(), [])
   const [stats, setStats] = useState(null)
   const [todaySubmissions, setTodaySubmissions] = useState([])
@@ -160,7 +162,7 @@ export default function DailyChallengePage() {
         open={submitOpen}
         onClose={() => setSubmitOpen(false)}
         userId={user?.id}
-        authorName={displayName}
+        authorName={publicDisplayName}
         onSubmitted={refresh}
       />
       <AuthModal open={authOpen} onClose={() => setAuthOpen(false)} initialMode="login" />

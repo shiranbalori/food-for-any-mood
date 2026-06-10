@@ -1,6 +1,9 @@
 import { useState, useEffect } from 'react'
+import { useAuth } from '../context/AuthContext'
 import { getTheme } from '../utils/themes'
 import { useLanguage } from '../i18n/useLanguage'
+import { usePublicDisplayName } from '../hooks/usePublicDisplayName'
+import { resolveCommunityAuthorName } from '../utils/displayName'
 import SpiceLevel from './SpiceLevel'
 import './SavedRecipes.css'
 
@@ -12,6 +15,8 @@ export default function SavedRecipes({
   onExpandedChange,
 }) {
   const { t } = useLanguage()
+  const { user } = useAuth()
+  const publicDisplayName = usePublicDisplayName()
   const [expandedId, setExpandedId] = useState(initialExpandedId)
 
   useEffect(() => {
@@ -62,8 +67,17 @@ export default function SavedRecipes({
                 </span>
               </div>
               <h3>{displayName}</h3>
-              {isCommunity && recipe.authorName && (
-                <p className="saved-card__community-author">{t('communityAuthor', { name: recipe.authorName })}</p>
+              {isCommunity && (
+                <p className="saved-card__community-author">
+                  {t('communityAuthor', {
+                    name: resolveCommunityAuthorName(
+                      recipe,
+                      user?.id,
+                      publicDisplayName,
+                      t('defaultDisplayName'),
+                    ),
+                  })}
+                </p>
               )}
               {(isCommunity ? recipe.isGlutenFree : recipe.glutenFree) && (
                 <span className="saved-card__gf-badge">{t('glutenFreeBadge')}</span>

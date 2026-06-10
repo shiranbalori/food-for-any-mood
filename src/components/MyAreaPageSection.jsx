@@ -2,7 +2,12 @@ import { useLanguage } from '../i18n/useLanguage'
 import './MyAreaPageSection.css'
 
 /**
- * @param {{ title?: string, titleKey?: string, children: import('react').ReactNode, className?: string }} props
+ * @param {{
+ *   title?: string,
+ *   titleKey?: string,
+ *   children: import('react').ReactNode,
+ *   className?: string,
+ * }} props
  */
 export default function MyAreaPageSection({ title, titleKey, children, className = '' }) {
   const { t } = useLanguage()

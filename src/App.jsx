@@ -13,12 +13,14 @@ import CommunityTop5 from './components/CommunityTop5.jsx?strip=v4'
 import MyRecipes from './components/MyRecipes'
 import OurStory from './components/OurStory'
 import { useAuth } from './context/AuthContext'
+import { usePublicDisplayName } from './hooks/usePublicDisplayName'
 import { fetchUserRecipes, isUserRecipesAvailable } from './services/userRecipeService'
 import { fetchCommunityRecipes } from './services/communityRecipeService'
 import FavoriteRecipes from './components/FavoriteRecipes'
 import WeeklyMealPlanner from './components/WeeklyMealPlanner'
 import MyAreaDrawer, { MY_AREA_PANELS, getMyAreaNavItem } from './components/MyAreaDrawer'
 import MyAreaPageSection from './components/MyAreaPageSection'
+import ProfileSetupModal from './components/ProfileSetupModal'
 import HomeDailyPills from './components/HomeDailyPills'
 import DailyChallengeModal from './components/dailyChallenge/DailyChallengeModal'
 import DailyQuizModal from './components/dailyQuiz/DailyQuizModal'
@@ -39,11 +41,13 @@ import {
   removeRecipe,
   getSavedCommunityRecipes,
   removeSavedCommunityRecipe,
+  refreshOwnCommunityAuthorInStorage,
 } from './utils/storage'
 import {
   getFavoriteRecipes,
   addFavoriteRecipe,
   removeFavoriteRecipe,
+  refreshOwnCommunityAuthorInFavorites,
 } from './utils/favoritesStorage'
 import {
   clearMealPlan,
@@ -79,7 +83,8 @@ export default function App() {
   const initialNav = initialNavRef.current
 
   const { t, language } = useLanguage()
-  const { user, isAuthenticated, displayName } = useAuth()
+  const { user, isAuthenticated, getPublicDisplayName, profileRevision } = useAuth()
+  const publicDisplayName = usePublicDisplayName()
   const [myRecipesCount, setMyRecipesCount] = useState(0)
   const [category, setCategory] = useState('dairy')
   const [recipeType, setRecipeType] = useState('meal')
@@ -501,6 +506,16 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
+  const handleProfileUpdated = useCallback(() => {
+    if (user?.id) {
+      const name = getPublicDisplayName(language)
+      refreshOwnCommunityAuthorInStorage(user.id, name)
+      refreshOwnCommunityAuthorInFavorites(user.id, name)
+    }
+    setSavedCommunityRecipes(getSavedCommunityRecipes())
+    setFavoriteRecipes(getFavoriteRecipes())
+  }, [user?.id, getPublicDisplayName, language])
+
   const renderMyAreaPageContent = () => {
     switch (activeMyAreaPage) {
       case MY_AREA_PANELS.weekly:
@@ -712,6 +727,8 @@ export default function App() {
 
       </main>
 
+      <ProfileSetupModal onUpdated={handleProfileUpdated} />
+
       <MyAreaDrawer
         open={myAreaOpen}
         onClose={() => setMyAreaOpen(false)}
@@ -725,6 +742,7 @@ export default function App() {
         searchPrivateRecipes={searchPrivateRecipes}
         searchCommunityRecipes={searchCommunityRecipes}
         onSearchSelect={handleSearchSelect}
+        onProfileUpdated={handleProfileUpdated}
       />
 
       <DailyQuizModal
@@ -759,7 +777,7 @@ export default function App() {
         open={challengeSubmitOpen}
         onClose={() => setChallengeSubmitOpen(false)}
         userId={user?.id}
-        authorName={displayName}
+        authorName={publicDisplayName}
         onSubmitted={() => {
           setChallengeSubmittedToday(true)
         }}

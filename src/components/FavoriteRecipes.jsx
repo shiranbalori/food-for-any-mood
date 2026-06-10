@@ -1,5 +1,8 @@
+import { useAuth } from '../context/AuthContext'
 import { getTheme } from '../utils/themes'
 import { useLanguage } from '../i18n/useLanguage'
+import { usePublicDisplayName } from '../hooks/usePublicDisplayName'
+import { resolveCommunityAuthorName } from '../utils/displayName'
 import './FavoriteRecipes.css'
 
 function formatSavedDate(iso, language) {
@@ -17,6 +20,8 @@ function formatSavedDate(iso, language) {
 
 export default function FavoriteRecipes({ recipes, onRemove, onSelect }) {
   const { t, language } = useLanguage()
+  const { user } = useAuth()
+  const publicDisplayName = usePublicDisplayName()
 
   if (recipes.length === 0) {
     return (
@@ -59,8 +64,17 @@ export default function FavoriteRecipes({ recipes, onRemove, onSelect }) {
                 </time>
               </div>
               <h3 className="favorite-card__title">{displayName}</h3>
-              {isCommunity && recipe.authorName ? (
-                <p className="favorite-card__author">{t('communityAuthor', { name: recipe.authorName })}</p>
+              {isCommunity ? (
+                <p className="favorite-card__author">
+                  {t('communityAuthor', {
+                    name: resolveCommunityAuthorName(
+                      recipe,
+                      user?.id,
+                      publicDisplayName,
+                      t('defaultDisplayName'),
+                    ),
+                  })}
+                </p>
               ) : null}
               <div className="favorite-card__meta">
                 {!isCommunity && (

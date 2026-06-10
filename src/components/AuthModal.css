@@ -15,8 +15,9 @@
   position: absolute;
   inset: 0;
   border: none;
-  background: rgba(15, 23, 42, 0.45);
+  background: rgba(0, 0, 0, 0.4);
   backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
   cursor: pointer;
 }
 
@@ -27,9 +28,12 @@
   max-height: calc(100dvh - 5.5rem - 32px);
   margin: auto;
   overflow-y: auto;
-  background: var(--surface);
+  background: #ffffff;
+  opacity: 1;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
   border-radius: var(--radius);
-  border: 1px solid var(--glass-border);
+  border: 1px solid rgba(148, 163, 184, 0.22);
   box-shadow: 0 24px 60px rgba(15, 23, 42, 0.2);
   padding: 1.25rem 1.35rem 1.35rem;
   animation: mealPlanSlideUp 0.28s var(--ease-spring);
@@ -85,7 +89,8 @@
   border: 1.5px solid rgba(148, 163, 184, 0.25);
   border-radius: var(--radius-xs);
   font-size: 0.92rem;
-  background: var(--surface-solid);
+  background: #ffffff;
+  color: var(--text);
 }
 
 .auth-modal__field input:focus {

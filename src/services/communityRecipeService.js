@@ -1,6 +1,7 @@
 import { isSupabaseConfigured, supabase } from '../lib/supabaseClient'
 import { MOCK_COMMUNITY_RECIPES } from '../data/mockCommunityRecipes'
 import { enrichCommunityRecipe } from '../utils/communityRecipeRanking'
+import { normalizeDisplayNameInput } from '../utils/displayName'
 
 export const COMMUNITY_RECIPE_IMAGE_BUCKET = 'community-recipe-images'
 export const COMMUNITY_RECIPE_IMAGE_MAX_BYTES = 5 * 1024 * 1024
@@ -8,6 +9,10 @@ export const COMMUNITY_RECIPE_IMAGE_ACCEPT = 'image/jpeg,image/jpg,image/png,ima
 
 const ALLOWED_IMAGE_TYPES = new Set(['image/jpeg', 'image/jpg', 'image/png', 'image/webp'])
 const ALLOWED_IMAGE_EXTENSIONS = new Set(['jpg', 'jpeg', 'png', 'webp'])
+
+function publicNameFromProfile(profileMap, userId) {
+  return normalizeDisplayNameInput(profileMap.get(userId)) || null
+}
 
 function averageRating(ratings) {
   if (!ratings?.length) return 0
@@ -73,7 +78,7 @@ function mapDbRecipe(row, { profileMap, likeCountMap, shareCountMap, ratingsByRe
     recipeType: row.recipe_type ?? 'meal',
     imageUrl: row.image_url ?? null,
     authorId: row.user_id,
-    authorName: profileMap.get(row.user_id) ?? '—',
+    authorName: publicNameFromProfile(profileMap, row.user_id),
     averageRating: averageRatingValue,
     rating: averageRatingValue,
     ratingCount: ratingsCount,
@@ -437,7 +442,7 @@ export async function fetchRecipeComments(recipeId) {
   return rows.map((c) => ({
     id: c.id,
     userId: c.user_id,
-    authorName: profileMap.get(c.user_id) ?? '—',
+    authorName: publicNameFromProfile(profileMap, c.user_id),
     body: c.body,
     createdAt: c.created_at,
   }))
@@ -460,7 +465,7 @@ export async function addRecipeComment(userId, recipeId, body, authorName) {
   return {
     id: data.id,
     userId,
-    authorName: authorName ?? '—',
+    authorName: normalizeDisplayNameInput(authorName) || null,
     body: body.trim(),
     createdAt: data.created_at,
   }

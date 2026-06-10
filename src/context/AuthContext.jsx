@@ -1,5 +1,16 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import { isSupabaseConfigured, supabase } from '../lib/supabaseClient'
+import {
+  assertDisplayNameAvailableForSignup,
+  ProfileUpdateError,
+  updateUserDisplayName,
+} from '../services/profileService'
+import {
+  needsDisplayNameSetup,
+  normalizeDisplayNameInput,
+  resolvePublicDisplayName,
+  validateDisplayName,
+} from '../utils/displayName'
 
 const AuthContext = createContext(null)
 
@@ -24,6 +35,18 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
   const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [profileRevision, setProfileRevision] = useState(0)
+
+  const refreshProfile = useCallback(async (userId) => {
+    if (!userId) {
+      setProfile(null)
+      return null
+    }
+    const nextProfile = await fetchProfile(userId)
+    setProfile(nextProfile)
+    setProfileRevision((value) => value + 1)
+    return nextProfile
+  }, [])
 
   useEffect(() => {
     if (!isSupabaseConfigured || !supabase) {
@@ -64,11 +87,18 @@ export function AuthProvider({ children }) {
   const signUp = useCallback(async ({ email, password, displayName }) => {
     if (!supabase) throw new Error('SUPABASE_NOT_CONFIGURED')
 
+    const validation = validateDisplayName(displayName)
+    if (!validation.ok) {
+      throw new ProfileUpdateError(validation.code)
+    }
+
+    await assertDisplayNameAvailableForSignup(validation.value)
+
     const { data, error } = await supabase.auth.signUp({
       email: email.trim(),
       password,
       options: {
-        data: { display_name: displayName.trim() },
+        data: { display_name: validation.value },
       },
     })
 
@@ -94,6 +124,17 @@ export function AuthProvider({ children }) {
     if (error) throw error
   }, [])
 
+  const updateDisplayName = useCallback(
+    async (displayName) => {
+      if (!user?.id) throw new ProfileUpdateError('REQUIRED')
+      const updated = await updateUserDisplayName(user.id, displayName)
+      setProfile(updated)
+      setProfileRevision((value) => value + 1)
+      return updated
+    },
+    [user?.id],
+  )
+
   const value = useMemo(
     () => ({
       user,
@@ -104,9 +145,16 @@ export function AuthProvider({ children }) {
       signUp,
       signIn,
       signOut,
-      displayName: profile?.display_name ?? user?.email?.split('@')[0] ?? '',
+      updateDisplayName,
+      refreshProfile,
+      profileRevision,
+      needsDisplayNamePrompt: needsDisplayNameSetup(profile?.display_name),
+      displayName: resolvePublicDisplayName(profile?.display_name),
+      getPublicDisplayName: (language = 'he') =>
+        resolvePublicDisplayName(profile?.display_name, language),
+      rawDisplayName: normalizeDisplayNameInput(profile?.display_name),
     }),
-    [user, profile, loading, signUp, signIn, signOut],
+    [user, profile, loading, signUp, signIn, signOut, updateDisplayName, refreshProfile, profileRevision],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
@@ -119,3 +167,5 @@ export function useAuth() {
   }
   return context
 }
+
+export { ProfileUpdateError }

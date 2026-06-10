@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAuth } from '../context/AuthContext'
+import { usePublicDisplayName } from '../hooks/usePublicDisplayName'
 import { useLanguage } from '../i18n/useLanguage'
 import { fetchCommunityRecipes } from '../services/communityRecipeService'
 import { enrichCommunityRecipeSaveCount } from '../utils/storage'
@@ -29,7 +30,8 @@ export default function CommunityRecipes({
   onFavoritesChanged,
 }) {
   const { t } = useLanguage()
-  const { user, isAuthenticated, isSupabaseReady, loading: authLoading, displayName } = useAuth()
+  const { user, isAuthenticated, isSupabaseReady, loading: authLoading, profileRevision } = useAuth()
+  const publicDisplayName = usePublicDisplayName()
   const [recipes, setRecipes] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -56,7 +58,7 @@ export default function CommunityRecipes({
   useEffect(() => {
     if (authLoading) return
     loadRecipes()
-  }, [authLoading, loadRecipes])
+  }, [authLoading, loadRecipes, profileRevision])
 
   useEffect(() => {
     if (!initialExpandedRecipeId || loading) return undefined
@@ -191,7 +193,7 @@ export default function CommunityRecipes({
             isSupabaseReady={isSupabaseReady}
             onAuthRequired={() => openAuth('login')}
             onUpdated={loadRecipes}
-            currentUserDisplayName={displayName}
+            currentUserDisplayName={publicDisplayName}
             initialExpanded={initialExpandedRecipeId === recipe.id}
             onOpenRecipeChange={onExpandedRecipeChange}
             onSavedChanged={onSavedChanged}

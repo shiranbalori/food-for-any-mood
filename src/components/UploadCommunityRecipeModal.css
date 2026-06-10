@@ -151,6 +151,18 @@
   gap: 0.45rem;
 }
 
+.upload-recipe-modal__chips--servings {
+  flex-wrap: nowrap;
+  gap: 0.3rem;
+}
+
+.upload-recipe-modal__chips--servings .upload-recipe-modal__chip {
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 0.4rem 0.15rem;
+  text-align: center;
+}
+
 .upload-recipe-modal__chip {
   padding: 0.45rem 0.65rem;
   border-radius: var(--radius-xs);

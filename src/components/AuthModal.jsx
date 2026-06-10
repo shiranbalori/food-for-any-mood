@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { useAuth } from '../context/AuthContext'
+import { useAuth, ProfileUpdateError } from '../context/AuthContext'
 import { useLanguage } from '../i18n/useLanguage'
+import { ProfileServiceError } from '../services/profileService'
+import { getDisplayNameValidationMessage, validateDisplayName } from '../utils/displayName'
 import './AuthModal.css'
 
 export default function AuthModal({ open, onClose, initialMode = 'login' }) {
@@ -54,18 +56,26 @@ export default function AuthModal({ open, onClose, initialMode = 'login' }) {
       }
 
       if (mode === 'signup') {
-        if (!displayName.trim()) {
-          setError(t('authDisplayNameRequired'))
+        const validation = validateDisplayName(displayName)
+        if (!validation.ok) {
+          setError(getDisplayNameValidationMessage(validation.code, t))
           return
         }
-        await signUp({ email, password, displayName })
+        await signUp({ email, password, displayName: validation.value })
         setSuccessMessage(t('authSignupSuccess'))
       } else {
         await signIn({ email, password })
         onClose()
       }
     } catch (err) {
-      setError(err?.message ?? t('authErrorGeneric'))
+      console.error('[AuthModal] submit failed:', err)
+      if (err instanceof ProfileUpdateError) {
+        setError(getDisplayNameValidationMessage(err.code, t))
+      } else if (err instanceof ProfileServiceError) {
+        setError(err.message)
+      } else {
+        setError(err?.message ?? t('authErrorGeneric'))
+      }
     } finally {
       setLoading(false)
     }
@@ -90,7 +100,9 @@ export default function AuthModal({ open, onClose, initialMode = 'login' }) {
                 type="text"
                 value={displayName}
                 onChange={(e) => setDisplayName(e.target.value)}
-                autoComplete="name"
+                autoComplete="nickname"
+                minLength={3}
+                maxLength={30}
                 required
               />
             </label>

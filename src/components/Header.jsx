@@ -10,8 +10,9 @@ import UserChallengeStats from './dailyChallenge/UserChallengeStats'
 import './Header.css'
 
 export default function Header({ onOpenMyArea, onGoHome, gamificationRefreshKey = 0 }) {
-  const { t } = useLanguage()
-  const { user, isAuthenticated, displayName, isSupabaseReady, loading } = useAuth()
+  const { t, language } = useLanguage()
+  const { user, isAuthenticated, getPublicDisplayName, isSupabaseReady, loading } = useAuth()
+  const publicDisplayName = getPublicDisplayName(language)
   const [authOpen, setAuthOpen] = useState(false)
   const [authMode, setAuthMode] = useState('login')
   const [gamificationStats, setGamificationStats] = useState(null)
@@ -42,7 +43,7 @@ export default function Header({ onOpenMyArea, onGoHome, gamificationRefreshKey 
           <div className="header__auth">
             {isAuthenticated ? (
               <div className="header__profile">
-                <span className="header__user">{t('authHello', { name: displayName })}</span>
+                <span className="header__user">{t('authHello', { name: publicDisplayName })}</span>
                 {gamificationStats ? (
                   <UserChallengeStats stats={gamificationStats} compact />
                 ) : null}

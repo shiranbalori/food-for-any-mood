@@ -47,7 +47,7 @@ export default function BestChallengePhotos() {
               <img src={item.photoUrl} alt="" className="challenge-best-photos__image" loading="lazy" />
               <div className="challenge-best-photos__meta">
                 <strong>{item.dishName}</strong>
-                <span>{t('communityAuthor', { name: item.authorName })}</span>
+                <span>{t('communityAuthor', { name: item.authorName || t('defaultDisplayName') })}</span>
                 <span>{item.challengeDate}</span>
                 <span>❤️ {item.likeCount ?? 0}</span>
               </div>

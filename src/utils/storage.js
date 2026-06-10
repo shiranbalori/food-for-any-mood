@@ -151,6 +151,7 @@ export function saveCommunityRecipe(recipe) {
     isCommunity: true,
     title: recipe.title,
     category: recipe.category ?? 'parve',
+    authorId: recipe.authorId ?? null,
     authorName: recipe.authorName ?? null,
     description: recipe.description ?? '',
     isGlutenFree: recipe.isGlutenFree ?? false,
@@ -171,4 +172,11 @@ export function removeSavedCommunityRecipe(recipeId) {
     adjustCommunitySaveCount(recipeId, -1)
   }
   return next
+}
+
+export function refreshOwnCommunityAuthorInStorage(userId, authorName) {
+  const list = readCommunityList().map((entry) =>
+    entry.authorId === userId ? { ...entry, authorName } : entry,
+  )
+  return writeCommunityList(list)
 }

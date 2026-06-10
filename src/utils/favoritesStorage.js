@@ -76,6 +76,7 @@ export function addFavoriteCommunityRecipe(recipe) {
     name: recipe.title,
     title: recipe.title,
     category: recipe.category ?? 'parve',
+    authorId: recipe.authorId ?? null,
     authorName: recipe.authorName ?? null,
     description: recipe.description ?? '',
     isGlutenFree: recipe.isGlutenFree ?? false,
@@ -94,4 +95,12 @@ export function removeFavoriteRecipe(recipeId) {
   const updated = getFavoriteRecipes().filter((r) => r.id !== recipeId)
   const result = persistFavorites(updated)
   return result.ok ? result.recipes : getFavoriteRecipes()
+}
+
+export function refreshOwnCommunityAuthorInFavorites(userId, authorName) {
+  const list = getFavoriteRecipes().map((entry) =>
+    entry.authorId === userId ? { ...entry, authorName } : entry,
+  )
+  const result = persistFavorites(list)
+  return result.ok ? result.recipes : list
 }

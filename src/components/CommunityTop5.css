@@ -278,7 +278,7 @@ html[dir='rtl'] .community-top5__author {
     display: flex;
     flex-direction: column;
     align-items: stretch;
-    width: 62px;
+    width: auto;
     height: auto;
     overflow: visible;
     background: transparent;
@@ -291,10 +291,10 @@ html[dir='rtl'] .community-top5__author {
     position: static;
     flex: 0 0 auto;
     order: -1;
-    max-width: 62px;
-    margin: 0 0 0.1rem;
+    max-width: 82px;
+    margin: 0 0 0.13rem;
     padding: 0;
-    font-size: 0.42rem;
+    font-size: 0.56rem;
     line-height: 1.15;
     background: transparent;
   }
@@ -304,34 +304,34 @@ html[dir='rtl'] .community-top5__author {
   }
 
   .community-top5__body {
-    flex: 0 0 62px;
-    width: 62px;
-    height: 62px;
+    flex: 0 0 82px;
+    width: 82px;
+    height: 82px;
     border: 1px solid var(--glass-border, rgba(148, 163, 184, 0.28));
-    border-radius: 8px;
+    border-radius: 10px;
     background: var(--surface, #fff);
     box-shadow: 0 1px 4px rgba(15, 23, 42, 0.04);
     overflow: hidden;
   }
 
   .community-top5__name {
-    font-size: 0.42rem;
-    padding: 0.08rem 0.18rem 0.1rem;
+    font-size: 0.56rem;
+    padding: 0.11rem 0.24rem 0.13rem;
   }
 
   .community-top5__placeholder span {
-    font-size: 0.82rem;
+    font-size: 1.08rem;
   }
 
   .community-top5 .community-top5__action {
-    width: 1.05rem;
-    height: 1.05rem;
-    min-width: 1.05rem;
-    min-height: 1.05rem;
+    width: 1.38rem;
+    height: 1.38rem;
+    min-width: 1.38rem;
+    min-height: 1.38rem;
   }
 
   .community-top5 .community-top5__action span {
-    font-size: 0.62rem;
+    font-size: 0.82rem;
   }
 }
 

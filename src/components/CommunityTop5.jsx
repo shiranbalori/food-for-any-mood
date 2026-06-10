@@ -38,7 +38,7 @@ export default function CommunityTop5({
   onFavoritesChanged,
 }) {
   const { t } = useLanguage()
-  const { user, isAuthenticated, isSupabaseReady, authLoading } = useAuth()
+  const { user, isAuthenticated, isSupabaseReady, authLoading, profileRevision } = useAuth()
   const [fetchedRecipes, setFetchedRecipes] = useState([])
   const [loading, setLoading] = useState(!recipesProp)
   const [authOpen, setAuthOpen] = useState(false)
@@ -75,7 +75,7 @@ export default function CommunityTop5({
     return () => {
       cancelled = true
     }
-  }, [authLoading, recipesProp, user?.id])
+  }, [authLoading, recipesProp, user?.id, profileRevision])
 
   const sourceRecipes = recipesProp ?? fetchedRecipes
 
@@ -198,7 +198,7 @@ export default function CommunityTop5({
                   '--theme-accent-light': theme.accentLight,
                 }}
               >
-                <span className="community-top5__author">{recipe.authorName ?? '—'}</span>
+                <span className="community-top5__author">{recipe.authorName || t('defaultDisplayName')}</span>
                 <div className="community-top5__body">
                   <div
                     className="community-top5__actions"

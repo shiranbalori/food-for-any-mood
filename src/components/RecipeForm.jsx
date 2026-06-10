@@ -89,7 +89,7 @@ export default function RecipeForm({ form, onChange, onSubmit, disabled, theme }
 
       <div className="recipe-form__field">
         <label>{t('servingsLabel')}</label>
-        <div className="mood-grid">
+        <div className="servings-row">
           {SERVING_OPTIONS.map((count) => (
             <button
               key={count}

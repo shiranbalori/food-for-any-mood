@@ -49,7 +49,7 @@ export default function ChallengeLeaderboard() {
               <li key={entry.userId} className="challenge-leaderboard__item">
                 <span className="challenge-leaderboard__rank">{entry.rank}</span>
                 <div className="challenge-leaderboard__info">
-                  <strong>{entry.displayName}</strong>
+                  <strong>{entry.displayName || t('defaultDisplayName')}</strong>
                   <span>
                     {level.icon} {t(level.labelKey)}
                   </span>

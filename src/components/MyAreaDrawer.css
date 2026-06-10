@@ -131,7 +131,9 @@ html[dir='rtl'] .my-area-drawer__panel {
   margin-top: auto;
   flex-shrink: 0;
   display: flex;
-  justify-content: flex-start;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.5rem;
   padding: 0.5rem 1rem max(0.85rem, env(safe-area-inset-bottom));
 }
 

@@ -116,6 +116,21 @@
   font-size: 1rem;
 }
 
+.servings-row {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 0.35rem;
+  width: 100%;
+}
+
+.servings-row .mood-chip {
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 0.55rem 0.2rem;
+  font-size: 0.82rem;
+  min-height: 44px;
+}
+
 .recipe-form .btn--primary {
   margin-top: 0.65rem;
   width: 100%;
@@ -129,11 +144,31 @@
   .mood-chip {
     min-height: 48px;
   }
+
+  .servings-row {
+    gap: 0.28rem;
+  }
+
+  .servings-row .mood-chip {
+    padding: 0.5rem 0.12rem;
+    font-size: 0.76rem;
+    min-height: 42px;
+  }
 }
 
 @media (max-width: 360px) {
   .mood-grid {
     grid-template-columns: 1fr;
+  }
+
+  .servings-row {
+    gap: 0.22rem;
+  }
+
+  .servings-row .mood-chip {
+    padding: 0.45rem 0.08rem;
+    font-size: 0.72rem;
+    min-height: 40px;
   }
 }
 

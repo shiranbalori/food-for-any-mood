@@ -17,6 +17,7 @@ import {
 } from '../services/communityRecipeService'
 import { removeSavedCommunityRecipe, saveCommunityRecipe, isCommunityRecipeSaved } from '../utils/storage'
 import { addFavoriteCommunityRecipe, removeFavoriteRecipe } from '../utils/favoritesStorage'
+import { resolveCommunityAuthorName } from '../utils/displayName'
 import './CommunityRecipes.css'
 
 function formatRelativeDate(isoString, language) {
@@ -102,6 +103,13 @@ export default function CommunityRecipeCard({
 
   const theme = getTheme(recipe.category ?? 'parve')
   const categoryId = recipe.category ?? 'parve'
+  const fallbackAuthor = t('defaultDisplayName')
+  const authorLabel = resolveCommunityAuthorName(
+    recipe,
+    userId,
+    currentUserDisplayName,
+    fallbackAuthor,
+  )
   const displayIngredients = sanitizeIngredientList(recipe.ingredients ?? [])
 
   const canUseLiveComments = isSupabaseReady && !recipe.id.startsWith('mock-')
@@ -423,7 +431,7 @@ export default function CommunityRecipeCard({
 
       <h3 className="community-card__title">{recipe.title}</h3>
 
-      <p className="community-card__author">{t('communityAuthor', { name: recipe.authorName })}</p>
+      <p className="community-card__author">{t('communityAuthor', { name: authorLabel })}</p>
 
       {(expanded || commentsOpen) && (
         <div className="community-card__comments" ref={commentsSectionRef}>
@@ -458,7 +466,11 @@ export default function CommunityRecipeCard({
                     return (
                     <li key={c.id} className="community-card__comment">
                       <div className="community-card__comment-header">
-                        <span className="community-card__comment-author">{c.authorName}</span>
+                        <span className="community-card__comment-author">
+                          {c.userId === userId
+                            ? (currentUserDisplayName || fallbackAuthor)
+                            : (c.authorName || fallbackAuthor)}
+                        </span>
                         <span className="community-card__comment-date">
                           {formatRelativeDate(c.createdAt, language)}
                         </span>
