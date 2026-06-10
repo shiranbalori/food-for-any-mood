@@ -476,6 +476,18 @@ html[dir='rtl'] .recipe-card__section ol li:hover {
   font-weight: 600;
 }
 
+.recipe-card__upgrade-error {
+  margin: 0;
+  font-size: 0.82rem;
+  color: #dc2626;
+  text-align: center;
+  font-weight: 600;
+}
+
+.recipe-card__upgrade-btn {
+  width: 100%;
+}
+
 .recipe-card__ideas {
   margin-top: 1.25rem;
   padding-top: 1.25rem;

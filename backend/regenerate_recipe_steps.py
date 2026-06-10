@@ -71,6 +71,10 @@ def build_regenerate_steps_prompt(
 החזר JSON בלבד: {{"steps": ["...", "..."]}}"""
 
 
+from hebrew_display_text import normalize_hebrew_display_text
+
+
 def finalize_regenerated_steps(steps: list[str], *, language: str = "he") -> list[str]:
     cleaned = light_sanitize_recipe_steps([str(s).strip() for s in steps if str(s).strip()], language)
-    return sanitize_home_cooking_steps(cleaned, language)
+    sanitized = sanitize_home_cooking_steps(cleaned, language)
+    return [normalize_hebrew_display_text(step, language) for step in sanitized]

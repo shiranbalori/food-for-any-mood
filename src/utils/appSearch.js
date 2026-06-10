@@ -7,6 +7,7 @@ const PANEL = {
   favorites: 'favorites',
   community: 'community',
   myRecipes: 'myRecipes',
+  themedMeals: 'themedMeals',
   story: 'story',
 }
 
@@ -112,6 +113,13 @@ export function buildAppSections(t) {
       icon: '📒',
       title: t('myAreaNavMyRecipes'),
       haystack: normalizeSearchText(t('myAreaNavMyRecipes')),
+    },
+    {
+      id: 'section-themedMeals',
+      panelId: PANEL.themedMeals,
+      icon: '🍽️',
+      title: t('myAreaNavThemedMeals'),
+      haystack: normalizeSearchText(`${t('myAreaNavThemedMeals')} ${t('themedMealsIntro')}`),
     },
     {
       id: 'section-story',

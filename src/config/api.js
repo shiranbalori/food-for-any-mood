@@ -20,3 +20,6 @@ export const GENERATE_RECIPE_URL = `${API_BASE_URL}/generate-recipe`
 export const ANALYZE_INGREDIENTS_IMAGE_URL = `${API_BASE_URL}/analyze-ingredients-image`
 export const MORE_RECIPE_IDEAS_URL = `${API_BASE_URL}/more-recipe-ideas`
 export const NUTRITION_ANALYSIS_URL = `${API_BASE_URL}/nutrition-analysis`
+export const GENERATE_THEMED_MEAL_URL = `${API_BASE_URL}/generate-themed-meal`
+export const UPGRADE_THEMED_MEAL_URL = `${API_BASE_URL}/upgrade-themed-meal`
+export const UPGRADE_RECIPE_URL = `${API_BASE_URL}/upgrade-recipe`

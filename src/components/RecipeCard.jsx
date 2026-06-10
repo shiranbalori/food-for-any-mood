@@ -4,6 +4,7 @@ import SpiceLevel from './SpiceLevel'
 import ShoppingListModal from './ShoppingListModal'
 import MealPlanPickerModal from './MealPlanPickerModal'
 import NutritionCoach from './NutritionCoach'
+import RecipeUpgradeCard from './RecipeUpgradeCard'
 import { useLanguage } from '../i18n/useLanguage'
 import { resolveRecipeNutritionScore } from '../utils/nutritionScore'
 import { sanitizeIngredientList } from '../utils/ingredientFormatting'
@@ -81,6 +82,11 @@ export default function RecipeCard({
   stepsRegenerating = false,
   stepsRegenerateError = null,
   stepsGenerationKey = 0,
+  onUpgradeRecipe,
+  upgradeLoading = false,
+  upgradeError = null,
+  upgradedRecipe = null,
+  upgradeRecipeContext = null,
   recipeIdeas,
   ideasLoading,
   onLoadMoreIdeas,
@@ -282,6 +288,23 @@ export default function RecipeCard({
             {t('saveError')}
           </p>
         )}
+        {onUpgradeRecipe && (
+          <>
+            <button
+              type="button"
+              className="btn btn--secondary recipe-card__upgrade-btn"
+              onClick={onUpgradeRecipe}
+              disabled={upgradeLoading}
+            >
+              {upgradeLoading ? t('upgradeRecipeLoading') : t('upgradeRecipeBtn')}
+            </button>
+            {upgradeError && (
+              <p className="recipe-card__upgrade-error" role="alert">
+                {upgradeError}
+              </p>
+            )}
+          </>
+        )}
         <button
           type="button"
           className={`btn btn--secondary ${isSaved ? 'btn--saved' : ''}`}
@@ -302,6 +325,10 @@ export default function RecipeCard({
           {t('generateAnother')}
         </button>
       </div>
+
+      {upgradedRecipe && (
+        <RecipeUpgradeCard upgrade={upgradedRecipe} recipeContext={upgradeRecipeContext} />
+      )}
 
       <div className="recipe-card__ideas animate-in stagger-5">
         {recipeIdeas == null && (

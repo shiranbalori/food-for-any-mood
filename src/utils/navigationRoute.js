@@ -5,6 +5,7 @@ export const NAV_MY_AREA_PANELS = new Set([
   'favorites',
   'community',
   'myRecipes',
+  'themedMeals',
   'story',
 ])
 

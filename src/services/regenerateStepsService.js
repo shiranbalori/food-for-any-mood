@@ -1,7 +1,7 @@
 import { API_BASE_URL } from '../config/api'
 import { buildAlternateStepsFromUserIngredients } from '../utils/alternateUserIngredientSteps'
 import { lightSanitizeRecipeSteps } from '../utils/ingredientFormatting'
-import { naturalizeRecipeSteps } from '../utils/recipeStepWording'
+import { normalizeHebrewDisplayText } from '../utils/hebrewDisplayText'
 
 const REGENERATE_STEPS_URL = `${API_BASE_URL}/regenerate-steps`
 
@@ -82,7 +82,9 @@ export async function regenerateRecipeSteps({
     })
 
     if (response.ok && data?.ok !== false && Array.isArray(data?.steps) && data.steps.length >= 4) {
-      const steps = data.steps.map((s) => String(s).trim()).filter(Boolean)
+      const steps = data.steps
+        .map((s) => normalizeHebrewDisplayText(String(s).trim(), language))
+        .filter(Boolean)
       if (stepsAreDifferent(currentSteps, steps)) {
         console.log('[regenerateSteps] using API steps', { count: steps.length })
         return { steps, source: 'gemini' }
@@ -101,6 +103,7 @@ export async function regenerateRecipeSteps({
   })
   local = lightSanitizeRecipeSteps(local)
   local = naturalizeRecipeSteps(local, list, language)
+  local = local.map((step) => normalizeHebrewDisplayText(step, language))
 
   if (!stepsAreDifferent(currentSteps, local)) {
     local = buildAlternateStepsFromUserIngredients(list, {
@@ -110,6 +113,7 @@ export async function regenerateRecipeSteps({
       variationIndex: variationIndex + 1,
     })
     local = naturalizeRecipeSteps(lightSanitizeRecipeSteps(local), list, language)
+    local = local.map((step) => normalizeHebrewDisplayText(step, language))
   }
 
   if (local.length < 4) {

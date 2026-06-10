@@ -7,10 +7,12 @@ import MusicPlatformSelector from './components/MusicPlatformSelector'
 import RecipeForm from './components/RecipeForm'
 import LoadingAnimation from './components/LoadingAnimation'
 import RecipeCard from './components/RecipeCard'
+import RecipeUpgradeCard from './components/RecipeUpgradeCard'
 import SavedRecipes from './components/SavedRecipes'
 import CommunityRecipes from './components/CommunityRecipes'
 import CommunityTop5 from './components/CommunityTop5.jsx?strip=v4'
 import MyRecipes from './components/MyRecipes'
+import ThemedMeals from './components/ThemedMeals'
 import OurStory from './components/OurStory'
 import { useAuth } from './context/AuthContext'
 import { usePublicDisplayName } from './hooks/usePublicDisplayName'
@@ -31,6 +33,7 @@ import { useLanguage } from './i18n/useLanguage'
 import { getTheme } from './utils/themes'
 import { generateAppRecipe } from './services/recipeService'
 import { regenerateRecipeSteps } from './services/regenerateStepsService'
+import { upgradeRecipe } from './services/recipeUpgradeService'
 import { fetchMoreRecipeIdeas } from './services/recipeIdeasService'
 import { detectCookingMethod, detectDessertCategory } from './utils/recipeDiversity'
 // Recipe source: FastAPI backend (default) — see .env.example
@@ -107,6 +110,9 @@ export default function App() {
   const [stepsRegenerating, setStepsRegenerating] = useState(false)
   const [stepsRegenerateError, setStepsRegenerateError] = useState(null)
   const [stepsGenerationKey, setStepsGenerationKey] = useState(0)
+  const [upgradedRecipe, setUpgradedRecipe] = useState(null)
+  const [upgradeLoading, setUpgradeLoading] = useState(false)
+  const [upgradeError, setUpgradeError] = useState(null)
   const [activeGlobalPage, setActiveGlobalPage] = useState(null)
   const [challengeModalOpen, setChallengeModalOpen] = useState(false)
   const [quizModalOpen, setQuizModalOpen] = useState(false)
@@ -240,6 +246,8 @@ export default function App() {
       setImpossibleRecipe(null)
       setStepsRegenerateError(null)
       setStepsGenerationKey(0)
+      setUpgradedRecipe(null)
+      setUpgradeError(null)
       setSaveError(false)
       setBackendNotice(null)
 
@@ -367,6 +375,37 @@ export default function App() {
   const handleClearMealPlan = () => {
     setMealPlan(clearMealPlan())
   }
+
+  const handleUpgradeRecipe = useCallback(async () => {
+    if (!recipe || upgradeLoading) return
+
+    setUpgradeLoading(true)
+    setUpgradeError(null)
+
+    try {
+      const effectiveCategory =
+        category === 'any' && recipe.resolvedCategory ? recipe.resolvedCategory : category
+
+      const { upgrade } = await upgradeRecipe({
+        name: recipe.name,
+        description: recipe.description ?? '',
+        ingredients: recipe.ingredients ?? [],
+        steps: recipe.steps ?? [],
+        category: effectiveCategory,
+        recipeType,
+        mood: form.mood,
+        cookingTime: form.time,
+        isGlutenFree: form.glutenFree,
+        language,
+      })
+      setUpgradedRecipe(upgrade)
+    } catch (error) {
+      console.error('[App] Recipe upgrade failed:', error)
+      setUpgradeError(t('upgradeRecipeError'))
+    } finally {
+      setUpgradeLoading(false)
+    }
+  }, [recipe, upgradeLoading, category, recipeType, form, language, t])
 
   const handleRegenerate = () => {
     setRecipeIdeas(null)
@@ -540,6 +579,8 @@ export default function App() {
         )
       case MY_AREA_PANELS.myRecipes:
         return <MyRecipes onRecipesChanged={refreshMyRecipesCount} />
+      case MY_AREA_PANELS.themedMeals:
+        return <ThemedMeals />
       case MY_AREA_PANELS.community:
         return (
           <CommunityRecipes
@@ -586,6 +627,8 @@ export default function App() {
     setUsedTemplateKeys(saved.templateKey ? [saved.templateKey] : [])
     setRecipe(saved)
     setRecipeIdeas(null)
+    setUpgradedRecipe(null)
+    setUpgradeError(null)
     setSaveError(false)
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
@@ -707,6 +750,17 @@ export default function App() {
             stepsRegenerating={stepsRegenerating}
             stepsRegenerateError={stepsRegenerateError}
             stepsGenerationKey={stepsGenerationKey}
+            onUpgradeRecipe={handleUpgradeRecipe}
+            upgradeLoading={upgradeLoading}
+            upgradeError={upgradeError}
+            upgradedRecipe={upgradedRecipe}
+            upgradeRecipeContext={{
+              name: recipe.name,
+              category:
+                category === 'any' && recipe.resolvedCategory ? recipe.resolvedCategory : category,
+              recipeType,
+              isGlutenFree: form.glutenFree,
+            }}
             recipeIdeas={recipeIdeas}
             ideasLoading={ideasLoading}
             onLoadMoreIdeas={handleLoadMoreIdeas}

@@ -12,6 +12,7 @@ export const MY_AREA_PANELS = {
   favorites: 'favorites',
   community: 'community',
   myRecipes: 'myRecipes',
+  themedMeals: 'themedMeals',
   story: 'story',
 }
 
@@ -25,6 +26,7 @@ export const MY_AREA_PANEL_NAV = [
   { id: MY_AREA_PANELS.favorites, icon: '❤️', labelKey: 'myAreaNavFavorites', badgeKey: 'favorites' },
   { id: MY_AREA_PANELS.community, icon: '👥', labelKey: 'myAreaNavCommunity' },
   { id: MY_AREA_PANELS.myRecipes, icon: '📒', labelKey: 'myAreaNavMyRecipes', badgeKey: 'myRecipes' },
+  { id: MY_AREA_PANELS.themedMeals, icon: '🍽️', labelKey: 'myAreaNavThemedMeals' },
   { id: MY_AREA_PANELS.story, icon: '✨', labelKey: 'myAreaNavStory' },
 ]
 

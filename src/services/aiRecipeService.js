@@ -25,6 +25,7 @@ import {
 import { assessCategoryFit } from '../utils/recipeCategoryFit'
 import { validateRecipeDiversity } from '../utils/recipeDiversity'
 import { createRecipeGenerationTimer } from '../utils/recipeGenerationTiming'
+import { normalizeHebrewRecipeContent } from '../utils/hebrewDisplayText'
 
 const RECIPE_GENERATION_TIMEOUT_MS = 15000
 
@@ -417,8 +418,8 @@ function finalizeRecipeForUser(userInput, recipe, meta = {}) {
   })
   const categoryNote = (categoryFit.categoryNote || typed.categoryNote || '').trim()
 
-  return {
-    recipe: {
+  const finalizedRecipe = normalizeHebrewRecipeContent(
+    {
       ...typed,
       category: userInput.category,
       resolvedCategory,
@@ -426,6 +427,11 @@ function finalizeRecipeForUser(userInput, recipe, meta = {}) {
       categoryNote: categoryNote || undefined,
       optionalUpgrades: preferenceBased ? [] : (typed.optionalUpgrades ?? []),
     },
+    userInput.language ?? 'he',
+  )
+
+  return {
+    recipe: finalizedRecipe,
     passed,
     validation,
     categoryPassed,
@@ -537,8 +543,23 @@ function processGeneratedRecipe(userInput, recipe, { source = 'unknown', timer =
 function fetchMockFallbackRecipe(userInput, timer = null) {
   timer?.mark('fetchMockFallbackRecipe:start')
   const recipe = buildCategoryFallbackRecipe(userInput)
-  timer?.mark('fetchMockFallbackRecipe:complete', 'Success')
+  timer?.mark('fetchMockFallbackRecipe:complete', recipe ? 'Success' : 'Failed')
   return recipe
+}
+
+function tryPreferenceBasedFallback(userInput, timer = null) {
+  if (!isPreferenceBasedGeneration(userInput)) return null
+  return fetchMockFallbackRecipe(userInput, timer)
+}
+
+function buildPreferenceBasedSuccessResult(recipe, timer = null) {
+  timer?.mark('preferenceBasedFallback:complete', 'Success')
+  timer?.printTable()
+  return {
+    recipe,
+    recipePossible: true,
+    fallbackReason: 'fallback',
+  }
 }
 
 async function generateAIRecipeCore(userInput) {
@@ -577,6 +598,10 @@ async function generateAIRecipeCore(userInput) {
   try {
     const backendResult = await fetchRecipeFromBackend(payload, timer)
     if (backendResult.recipePossible === false) {
+      const preferenceFallback = tryPreferenceBasedFallback(normalized, timer)
+      if (preferenceFallback) {
+        return buildPreferenceBasedSuccessResult(preferenceFallback, timer)
+      }
       timer.printTable()
       return {
         recipe: null,
@@ -609,6 +634,10 @@ async function generateAIRecipeCore(userInput) {
     }
 
     if (!processed.ok || !processed.recipe) {
+      const preferenceFallback = tryPreferenceBasedFallback(normalized, timer)
+      if (preferenceFallback) {
+        return buildPreferenceBasedSuccessResult(preferenceFallback, timer)
+      }
       timer.mark('processGeneratedRecipe:reject', 'Failed')
       timer.printTable()
       const { reason, missingIngredients } = buildValidationFailureMessage(
@@ -641,6 +670,10 @@ async function generateAIRecipeCore(userInput) {
     })
     timer.mark('validateRecipeDiversity', diversity.ok ? 'Success' : 'Failed', diversity.failures?.join(', '))
     if (!preReturn.ok) {
+      const preferenceFallback = tryPreferenceBasedFallback(normalized, timer)
+      if (preferenceFallback) {
+        return buildPreferenceBasedSuccessResult(preferenceFallback, timer)
+      }
       console.warn('[aiRecipeService] Recipe failed pre-return validation:', preReturn.failures)
       timer.mark('preReturnValidation:reject', 'Failed')
       timer.printTable()

@@ -410,8 +410,22 @@ function validateRecipeQualityCore(userIngredients, recipe, language = 'he', opt
     groundingOk &&
     stepsQualityOk
 
+  let finalOk = ok
+  if (!finalOk && userIngredients.length === 0) {
+    const structuralOk =
+      (recipe.ingredients?.length ?? 0) >= 3 &&
+      (recipe.steps?.length ?? 0) >= 4 &&
+      invalidOk &&
+      languageOk &&
+      Boolean(String(recipe.name ?? '').trim())
+    if (structuralOk) {
+      finalOk = true
+      checks.preferenceBasedRelaxed = true
+    }
+  }
+
   return {
-    ok,
+    ok: finalOk,
     checks,
     ingredientRelevanceScore,
     matchRatio: relevance.matchRatio,

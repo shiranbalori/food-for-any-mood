@@ -1,0 +1,44 @@
+.recipe-upgrade {
+  margin-top: 1.25rem;
+  padding: 1.1rem 1.15rem;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.48);
+  border: 1px solid rgba(99, 102, 241, 0.22);
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.08);
+}
+
+.recipe-upgrade__header {
+  margin-bottom: 0.75rem;
+}
+
+.recipe-upgrade__badge {
+  margin: 0 0 0.35rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: rgba(79, 70, 229, 0.95);
+}
+
+.recipe-upgrade__header h3 {
+  margin: 0;
+  font-size: 1.25rem;
+}
+
+.recipe-upgrade__section {
+  margin-top: 0.85rem;
+}
+
+.recipe-upgrade__section h4 {
+  margin: 0 0 0.35rem;
+  font-size: 0.98rem;
+}
+
+.recipe-upgrade__section p {
+  margin: 0;
+  line-height: 1.55;
+}
+
+.recipe-upgrade__section ul {
+  margin: 0;
+  padding-inline-start: 1.2rem;
+  line-height: 1.55;
+}

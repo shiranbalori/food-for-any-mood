@@ -42,6 +42,19 @@ from recipe_ideas import (
     MoreRecipeIdeasResponse,
     generate_recipe_ideas_with_fallback,
 )
+from themed_meals import (
+    GenerateThemedMealRequest,
+    GenerateThemedMealResponse,
+    UpgradeThemedMealRequest,
+    UpgradeThemedMealResponse,
+    generate_themed_meal_with_fallback,
+    upgrade_themed_meal_with_fallback,
+)
+from recipe_upgrade import (
+    UpgradeRecipeRequest,
+    UpgradeRecipeResponse,
+    upgrade_recipe_with_fallback,
+)
 from analyze_ingredients_image import (
     AnalyzeIngredientsImageResponse,
     analyze_uploaded_image,
@@ -50,6 +63,7 @@ from recipe_ingredient_parser import (
     apply_recipe_ingredient_parser,
     is_recipe_acceptable,
 )
+from hebrew_display_text import normalize_hebrew_recipe_content
 from recipe_pre_return_validation import (
     assess_ingredient_feasibility,
     build_validation_failure_message,
@@ -1024,20 +1038,33 @@ def _post_process_recipe(
     )
     category_note = (category_fit.get("category_note") or "").strip() or None
 
+    language = payload.language or "he"
+    normalized = normalize_hebrew_recipe_content(
+        {
+            "name": tagged["name"],
+            "description": description,
+            "ingredients": tagged["ingredients"],
+            "steps": tagged["steps"],
+            "categoryNote": category_note,
+            "optionalUpgrades": [] if preference_based else (recipe.optionalUpgrades or []),
+        },
+        language,
+    )
+
     return GeneratedRecipe(
-        name=tagged["name"],
-        description=description,
-        ingredients=tagged["ingredients"],
-        steps=tagged["steps"],
+        name=normalized["name"],
+        description=normalized["description"],
+        ingredients=normalized["ingredients"],
+        steps=normalized["steps"],
         matchPercentage=tagged["matchPercentage"],
         spiceLevel=recipe.spiceLevel,
         nutrition=Nutrition(**tagged["nutrition"]),
         healthScore=tagged.get("healthScore", recipe.healthScore),
         tags=tagged["tags"],
         playlist=recipe.playlist,
-        optionalUpgrades=[] if preference_based else (recipe.optionalUpgrades or []),
+        optionalUpgrades=normalized.get("optionalUpgrades", []),
         generatedFromPreferences=processed.get("generatedFromPreferences", preference_based),
-        categoryNote=category_note,
+        categoryNote=normalized.get("categoryNote") or None,
     )
 
 
@@ -1456,17 +1483,22 @@ async def generate_recipe(payload: GenerateRecipeRequest):
     )
 
     if recipe is None:
-        return GenerateRecipeResponse(
-            recipe=None,
-            recipePossible=False,
-            impossibleReason=(
-                "לא הצלחנו ליצור מתכון מהמרכיבים שסיפקתם."
-                if payload.language == "he"
-                else "We could not create a recipe from the ingredients you provided."
-            ),
-            source="none",
-            geminiError=gemini_error,
-        )
+        if not parse_user_ingredients(payload.ingredients):
+            print("[FOOD FOR ANY MOOD] No recipe generated for preference-based request — using category fallback")
+            recipe = _category_fallback_recipe(payload)
+            source = "mock"
+        else:
+            return GenerateRecipeResponse(
+                recipe=None,
+                recipePossible=False,
+                impossibleReason=(
+                    "לא הצלחנו ליצור מתכון מהמרכיבים שסיפקתם."
+                    if payload.language == "he"
+                    else "We could not create a recipe from the ingredients you provided."
+                ),
+                source="none",
+                geminiError=gemini_error,
+            )
 
     pre_return = validate_recipe_before_return(
         _recipe_to_validation_dict(recipe),
@@ -1475,21 +1507,37 @@ async def generate_recipe(payload: GenerateRecipeRequest):
     )
     timer.mark("validateRecipeBeforeReturn", "Success" if pre_return["ok"] else "Failed", ",".join(pre_return["failures"]))
     if not pre_return["ok"]:
-        reason, missing = build_validation_failure_message(
-            pre_return,
-            None,
-            language=payload.language or "he",
-        )
-        print("[FOOD FOR ANY MOOD] Recipe failed pre-return validation:", pre_return["failures"])
-        timer.print_table()
-        return GenerateRecipeResponse(
-            recipe=None,
-            recipePossible=False,
-            impossibleReason=reason,
-            missingIngredients=missing,
-            source="none",
-            geminiError=gemini_error,
-        )
+        preference_based = not parse_user_ingredients(payload.ingredients)
+        if preference_based:
+            print("[FOOD FOR ANY MOOD] Pre-return failed for preference-based request — using category fallback")
+            recipe = _category_fallback_recipe(payload)
+            source = "mock"
+            pre_return = validate_recipe_before_return(
+                _recipe_to_validation_dict(recipe),
+                payload.ingredients,
+                language=payload.language or "he",
+            )
+            timer.mark(
+                "validateRecipeBeforeReturn:fallback",
+                "Success" if pre_return["ok"] else "Failed",
+                ",".join(pre_return["failures"]),
+            )
+        if not pre_return["ok"] and not preference_based:
+            reason, missing = build_validation_failure_message(
+                pre_return,
+                None,
+                language=payload.language or "he",
+            )
+            print("[FOOD FOR ANY MOOD] Recipe failed pre-return validation:", pre_return["failures"])
+            timer.print_table()
+            return GenerateRecipeResponse(
+                recipe=None,
+                recipePossible=False,
+                impossibleReason=reason,
+                missingIngredients=missing,
+                source="none",
+                geminiError=gemini_error,
+            )
 
     if source == "gemini":
         print(f"[FOOD FOR ANY MOOD] Returning Gemini recipe: {recipe.name}")
@@ -1643,6 +1691,34 @@ async def nutrition_analysis(payload: NutritionAnalysisRequest):
     """Analyze recipe nutrition macros, insights, and health tips."""
     print("[FOOD FOR ANY MOOD] Nutrition analysis endpoint called")
     return await analyze_nutrition_with_fallback(gemini_client, GEMINI_MODEL, payload)
+
+
+@app.post("/generate-themed-meal", response_model=GenerateThemedMealResponse)
+async def generate_themed_meal(payload: GenerateThemedMealRequest):
+    """Generate a full themed meal menu for My Area."""
+    print("[FOOD FOR ANY MOOD] Generate themed meal endpoint called")
+    return generate_themed_meal_with_fallback(gemini_client, GEMINI_MODEL, payload)
+
+
+@app.post("/upgrade-themed-meal", response_model=UpgradeThemedMealResponse)
+async def upgrade_themed_meal(payload: UpgradeThemedMealRequest):
+    """Upgrade a full themed meal menu."""
+    print("[FOOD FOR ANY MOOD] Upgrade themed meal endpoint called")
+    return upgrade_themed_meal_with_fallback(gemini_client, GEMINI_MODEL, payload)
+
+
+@app.post("/upgrade-recipe", response_model=UpgradeRecipeResponse)
+async def upgrade_recipe(payload: UpgradeRecipeRequest):
+    """Upgrade an existing generated recipe on the Home page."""
+    print("[FOOD FOR ANY MOOD] Upgrade recipe endpoint called")
+    print("[FOOD FOR ANY MOOD] Upgrade recipe incoming payload:", payload.model_dump())
+    try:
+        result = upgrade_recipe_with_fallback(gemini_client, GEMINI_MODEL, payload)
+        print("[FOOD FOR ANY MOOD] Upgrade recipe outgoing response:", result.model_dump())
+        return result
+    except Exception as exc:
+        print(f"[FOOD FOR ANY MOOD] Upgrade recipe endpoint error: {exc}")
+        return upgrade_recipe_with_fallback(None, GEMINI_MODEL, payload)
 
 
 def _print_registered_routes() -> None:
