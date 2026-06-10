@@ -69,6 +69,7 @@ export default function CommunityRecipeCard({
   const [expanded, setExpanded] = useState(initialExpanded)
   const [commentsOpen, setCommentsOpen] = useState(false)
   const [busy, setBusy] = useState(false)
+  const [ratingBusy, setRatingBusy] = useState(false)
   const [localLikeCount, setLocalLikeCount] = useState(recipe.likeCount ?? 0)
   const [localLiked, setLocalLiked] = useState(recipe.userLiked)
   const [localSavesCount, setLocalSavesCount] = useState(recipe.savesCount ?? 0)
@@ -76,6 +77,7 @@ export default function CommunityRecipeCard({
   const [localRating, setLocalRating] = useState(recipe.averageRating ?? recipe.rating ?? 0)
   const [localRatingCount, setLocalRatingCount] = useState(recipe.totalRatings ?? recipe.ratingCount ?? 0)
   const [localUserRating, setLocalUserRating] = useState(() => normalizeUserRating(recipe.userRating))
+  const localUserRatingRef = useRef(normalizeUserRating(recipe.userRating))
 
   // Comments state
   const [comments, setComments] = useState([])
@@ -107,6 +109,11 @@ export default function CommunityRecipeCard({
     : t('communityCommentPlaceholder')
 
   useEffect(() => {
+    localUserRatingRef.current = localUserRating
+  }, [localUserRating])
+
+  useEffect(() => {
+    if (ratingBusy) return
     setLocalLikeCount(recipe.likeCount ?? 0)
     setLocalLiked(recipe.userLiked)
     setLocalSavesCount(recipe.savesCount ?? 0)
@@ -114,10 +121,12 @@ export default function CommunityRecipeCard({
     setLocalRating(recipe.averageRating ?? recipe.rating ?? 0)
     setLocalRatingCount(recipe.totalRatings ?? recipe.ratingCount ?? 0)
     setLocalCommentCount(recipe.commentCount ?? 0)
-  }, [recipe])
+  }, [recipe, ratingBusy])
 
   useEffect(() => {
-    setLocalUserRating(normalizeUserRating(recipe.userRating))
+    const syncedRating = normalizeUserRating(recipe.userRating)
+    setLocalUserRating(syncedRating)
+    localUserRatingRef.current = syncedRating
   }, [recipe.id])
 
   useEffect(() => {
@@ -358,57 +367,77 @@ export default function CommunityRecipeCard({
   }
 
   const handleRate = async (starValue) => {
-    if (!requireAuth() || !isSupabaseReady || recipe.id.startsWith('mock-')) return
+    if (!requireAuth() || !userId || !isSupabaseReady || recipe.id.startsWith('mock-')) return
 
     const stars = Number(starValue)
-    const currentRating = normalizeUserRating(localUserRating)
     if (!Number.isFinite(stars) || stars < 1 || stars > 5) return
 
-    setBusy(true)
+    const currentRating = normalizeUserRating(localUserRatingRef.current)
+    const previousUserRating = currentRating
+    const previousCount = localRatingCount
+    const previousAverage = localRating
+
+    let nextUserRating = currentRating
+    let nextCount = previousCount
+    let nextAverage = previousAverage
+
+    if (currentRating === stars) {
+      nextUserRating = null
+      nextCount = Math.max(0, previousCount - 1)
+      nextAverage =
+        nextCount > 0 ? (previousAverage * previousCount - currentRating) / nextCount : 0
+      nextAverage = Math.round(nextAverage * 10) / 10
+    } else if (currentRating == null) {
+      nextUserRating = stars
+      nextCount = previousCount + 1
+      nextAverage =
+        previousCount > 0
+          ? (previousAverage * previousCount + stars) / nextCount
+          : stars
+      nextAverage = Math.round(nextAverage * 10) / 10
+    } else {
+      nextUserRating = stars
+      nextAverage =
+        previousCount > 0
+          ? (previousAverage * previousCount - currentRating + stars) / previousCount
+          : stars
+      nextAverage = Math.round(nextAverage * 10) / 10
+    }
+
+    setLocalUserRating(nextUserRating)
+    setLocalRatingCount(nextCount)
+    setLocalRating(nextAverage)
+    localUserRatingRef.current = nextUserRating
+
+    setRatingBusy(true)
     try {
       if (currentRating === stars) {
         await clearCommunityRecipeRating(userId, recipe.id)
-        const previousCount = localRatingCount
-        const previousAverage = localRating
-        const nextCount = Math.max(0, previousCount - 1)
-        const nextAverage =
-          nextCount > 0 ? (previousAverage * previousCount - currentRating) / nextCount : 0
-
-        setLocalUserRating(null)
-        setLocalRatingCount(nextCount)
-        setLocalRating(Math.round(nextAverage * 10) / 10)
       } else if (currentRating == null) {
-        await rateCommunityRecipe(userId, recipe.id, stars)
-        const previousCount = localRatingCount
-        const previousAverage = localRating
-        const nextCount = previousCount + 1
-        const nextAverage =
-          previousCount > 0
-            ? (previousAverage * previousCount + stars) / nextCount
-            : stars
-
-        setLocalUserRating(stars)
-        setLocalRatingCount(nextCount)
-        setLocalRating(Math.round(nextAverage * 10) / 10)
+        try {
+          await rateCommunityRecipe(userId, recipe.id, stars)
+        } catch (error) {
+          if (error?.message === 'ALREADY_RATED') {
+            await updateCommunityRecipeRating(userId, recipe.id, stars)
+            setLocalRatingCount(previousCount)
+            setLocalRating(previousAverage)
+            localUserRatingRef.current = stars
+            setLocalUserRating(stars)
+          } else {
+            throw error
+          }
+        }
       } else {
         await updateCommunityRecipeRating(userId, recipe.id, stars)
-        const previousCount = localRatingCount
-        const previousAverage = localRating
-        const nextAverage =
-          previousCount > 0
-            ? (previousAverage * previousCount - currentRating + stars) / previousCount
-            : stars
-
-        setLocalUserRating(stars)
-        setLocalRating(Math.round(nextAverage * 10) / 10)
       }
-
-      await onUpdated?.()
     } catch (error) {
-      if (error?.message === 'ALREADY_RATED') return
+      setLocalUserRating(previousUserRating)
+      setLocalRatingCount(previousCount)
+      setLocalRating(previousAverage)
+      localUserRatingRef.current = previousUserRating
       console.error('[CommunityRecipeCard] rate failed:', error)
     } finally {
-      setBusy(false)
+      setRatingBusy(false)
     }
   }
 
@@ -737,7 +766,7 @@ export default function CommunityRecipeCard({
               type="button"
               className={`community-card__star ${isActive ? 'community-card__star--active' : ''}`}
               onClick={() => handleRate(stars)}
-              disabled={busy}
+              disabled={ratingBusy}
               aria-label={t('communityRateStars', { count: stars })}
               aria-pressed={isActive}
             >
