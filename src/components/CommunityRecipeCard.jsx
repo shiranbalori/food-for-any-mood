@@ -12,7 +12,8 @@ import {
   rateCommunityRecipe,
   toggleRecipeLike,
 } from '../services/communityRecipeService'
-import { removeSavedCommunityRecipe, saveCommunityRecipe } from '../utils/storage'
+import { removeSavedCommunityRecipe, saveCommunityRecipe, isCommunityRecipeSaved } from '../utils/storage'
+import { addFavoriteCommunityRecipe, removeFavoriteRecipe } from '../utils/favoritesStorage'
 import './CommunityRecipes.css'
 
 function formatRelativeDate(isoString, language) {
@@ -48,13 +49,17 @@ export default function CommunityRecipeCard({
   currentUserDisplayName,
   initialExpanded = false,
   onOpenRecipeChange,
+  onSavedChanged,
+  onFavoritesChanged,
 }) {
   const { t, language } = useLanguage()
   const [expanded, setExpanded] = useState(initialExpanded)
   const [commentsOpen, setCommentsOpen] = useState(false)
   const [busy, setBusy] = useState(false)
-  const [localSavesCount, setLocalSavesCount] = useState(recipe.savesCount ?? recipe.likeCount ?? 0)
+  const [localLikeCount, setLocalLikeCount] = useState(recipe.likeCount ?? 0)
   const [localLiked, setLocalLiked] = useState(recipe.userLiked)
+  const [localSavesCount, setLocalSavesCount] = useState(recipe.savesCount ?? 0)
+  const [localSaved, setLocalSaved] = useState(() => isCommunityRecipeSaved(recipe.id))
   const [localRating, setLocalRating] = useState(recipe.averageRating ?? recipe.rating ?? 0)
   const [localRatingCount, setLocalRatingCount] = useState(recipe.totalRatings ?? recipe.ratingCount ?? 0)
   const [localUserRating, setLocalUserRating] = useState(recipe.userRating)
@@ -71,8 +76,10 @@ export default function CommunityRecipeCard({
   const commentsSectionRef = useRef(null)
 
   useEffect(() => {
-    setLocalSavesCount(recipe.savesCount ?? recipe.likeCount ?? 0)
+    setLocalLikeCount(recipe.likeCount ?? 0)
     setLocalLiked(recipe.userLiked)
+    setLocalSavesCount(recipe.savesCount ?? 0)
+    setLocalSaved(isCommunityRecipeSaved(recipe.id))
     setLocalRating(recipe.averageRating ?? recipe.rating ?? 0)
     setLocalRatingCount(recipe.totalRatings ?? recipe.ratingCount ?? 0)
     setLocalUserRating(recipe.userRating)
@@ -185,21 +192,43 @@ export default function CommunityRecipeCard({
     return true
   }
 
-  const handleSave = async () => {
+  const handleLike = async () => {
     if (!requireAuth() || !isSupabaseReady || recipe.id.startsWith('mock-')) return
 
     setBusy(true)
     try {
       const liked = await toggleRecipeLike(userId, recipe.id, localLiked)
       setLocalLiked(liked)
-      setLocalSavesCount((count) => Math.max(0, count + (liked ? 1 : -1)))
-      // Mirror like state into localStorage so Saved Recipes page shows this recipe
+      setLocalLikeCount((count) => Math.max(0, count + (liked ? 1 : -1)))
       if (liked) {
-        saveCommunityRecipe(recipe)
+        addFavoriteCommunityRecipe(recipe)
       } else {
-        removeSavedCommunityRecipe(recipe.id)
+        removeFavoriteRecipe(recipe.id)
       }
+      onFavoritesChanged?.()
       onUpdated?.()
+    } catch (error) {
+      console.error('[CommunityRecipeCard] like failed:', error)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const handleSaveRecipe = () => {
+    if (!requireAuth() || recipe.id.startsWith('mock-')) return
+
+    setBusy(true)
+    try {
+      if (localSaved) {
+        removeSavedCommunityRecipe(recipe.id)
+        setLocalSaved(false)
+        setLocalSavesCount((count) => Math.max(0, count - 1))
+      } else {
+        saveCommunityRecipe(recipe)
+        setLocalSaved(true)
+        setLocalSavesCount((count) => count + 1)
+      }
+      onSavedChanged?.()
     } catch (error) {
       console.error('[CommunityRecipeCard] save failed:', error)
     } finally {
@@ -306,16 +335,16 @@ export default function CommunityRecipeCard({
             <span className="community-card__gf-badge">{t('glutenFreeBadge')}</span>
           ) : null}
         </div>
+        {(localRating > 0 && localRatingCount > 0) ? (
         <div className="community-card__rating" aria-label={t('communityRateLabel')}>
           <span className="community-card__rating-value">
-            ⭐ {localRating > 0 ? localRating.toFixed(1) : '—'}
+            ⭐ {localRating.toFixed(1)}
           </span>
-          {localRatingCount > 0 ? (
-            <span className="community-card__rating-count">
-              {t('communityRatingsCount', { count: localRatingCount })}
-            </span>
-          ) : null}
+          <span className="community-card__rating-count">
+            {t('communityRatingsCount', { count: localRatingCount })}
+          </span>
         </div>
+        ) : null}
       </div>
 
       <h3 className="community-card__title">{recipe.title}</h3>
@@ -411,7 +440,8 @@ export default function CommunityRecipeCard({
 
       <div className="community-card__meta">
         <span>{t('communityViews', { count: formatViews(recipe.viewsCount ?? recipe.views ?? 0, language) })}</span>
-        <span className="community-card__saves">❤️ {localSavesCount}</span>
+        <span className="community-card__likes">❤️ {localLikeCount}</span>
+        <span className="community-card__saves">📌 {localSavesCount}</span>
         <button
           type="button"
           className="community-card__comment-count"
@@ -431,10 +461,22 @@ export default function CommunityRecipeCard({
         <button
           type="button"
           className={`community-card__like ${localLiked ? 'community-card__like--active' : ''}`}
-          onClick={handleSave}
+          onClick={handleLike}
+          disabled={busy}
+          aria-pressed={localLiked}
+        >
+          <span className="community-card__like-label">{t('communityLike')}</span>
+          <span className="community-card__like-icon" aria-hidden="true">
+            {localLiked ? '❤️' : '♡'}
+          </span>
+        </button>
+        <button
+          type="button"
+          className={`community-card__save ${localSaved ? 'community-card__save--active' : ''}`}
+          onClick={handleSaveRecipe}
           disabled={busy}
         >
-          {localLiked ? '❤️' : '🤍'} {t('communitySave')}
+          📌 {localSaved ? t('communitySaved') : t('communitySave')}
         </button>
         <button
           type="button"

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { getTheme } from '../utils/themes'
 import { useLanguage } from '../i18n/useLanguage'
 import SpiceLevel from './SpiceLevel'
@@ -29,7 +29,7 @@ export default function SavedRecipes({
       <section className="saved-recipes saved-recipes--empty">
         <h2 className="section-title">{t('savedRecipes')}</h2>
         <div className="saved-recipes__empty">
-          <span>📖</span>
+          <span>📌</span>
           <p>{t('savedEmpty')}</p>
         </div>
       </section>

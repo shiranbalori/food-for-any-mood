@@ -39,6 +39,8 @@ export default function FavoriteRecipes({ recipes, onRemove, onSelect }) {
         {recipes.map((recipe) => {
           const theme = getTheme(recipe.category ?? 'parve')
           const categoryId = recipe.category ?? 'parve'
+          const isCommunity = recipe.isCommunity === true
+          const displayName = recipe.name ?? recipe.title ?? ''
           return (
             <article
               key={recipe.id}
@@ -56,23 +58,32 @@ export default function FavoriteRecipes({ recipes, onRemove, onSelect }) {
                   {formatSavedDate(recipe.savedAt, language)}
                 </time>
               </div>
-              <h3 className="favorite-card__title">{recipe.name}</h3>
+              <h3 className="favorite-card__title">{displayName}</h3>
+              {isCommunity && recipe.authorName ? (
+                <p className="favorite-card__author">{t('communityAuthor', { name: recipe.authorName })}</p>
+              ) : null}
               <div className="favorite-card__meta">
-                <span>
-                  {recipe.cookTime != null || recipe.time != null
-                    ? t('cookTime', { count: recipe.cookTime ?? recipe.time })
-                    : '—'}
-                </span>
-                <span>{recipe.calories ?? '—'} kcal</span>
+                {!isCommunity && (
+                  <>
+                    <span>
+                      {recipe.cookTime != null || recipe.time != null
+                        ? t('cookTime', { count: recipe.cookTime ?? recipe.time })
+                        : '—'}
+                    </span>
+                    <span>{recipe.calories ?? '—'} kcal</span>
+                  </>
+                )}
               </div>
               <div className="favorite-card__actions">
-                <button
-                  type="button"
-                  className="btn btn--ghost favorite-card__view"
-                  onClick={() => onSelect(recipe)}
-                >
-                  {t('viewRecipe')}
-                </button>
+                {!isCommunity ? (
+                  <button
+                    type="button"
+                    className="btn btn--ghost favorite-card__view"
+                    onClick={() => onSelect(recipe)}
+                  >
+                    {t('viewRecipe')}
+                  </button>
+                ) : null}
                 <button
                   type="button"
                   className="btn btn--ghost favorite-card__remove"

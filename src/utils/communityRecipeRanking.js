@@ -12,16 +12,18 @@ export const COMMUNITY_RECIPE_CATEGORIES = {
  */
 export function enrichCommunityRecipe(recipe) {
   const viewsCount = recipe.viewsCount ?? recipe.views ?? 0
-  const savesCount = recipe.savesCount ?? recipe.likeCount ?? 0
+  const likeCount = recipe.likeCount ?? 0
+  const savesCount = recipe.savesCount ?? 0
   const ratingsCount = recipe.ratingsCount ?? recipe.ratingCount ?? 0
   const sharesCount = recipe.sharesCount ?? 0
   const averageRating = recipe.averageRating ?? recipe.rating ?? 0
   const popularityScore =
-    viewsCount * 1 + savesCount * 5 + ratingsCount * 3 + sharesCount * 10
+    viewsCount * 1 + likeCount * 5 + ratingsCount * 3 + sharesCount * 10
 
   return {
     ...recipe,
     viewsCount,
+    likeCount,
     savesCount,
     ratingsCount,
     sharesCount,
@@ -51,7 +53,7 @@ export function sortCommunityRecipesByCategory(recipes, category) {
         return b.totalRatings - a.totalRatings
       })
     case COMMUNITY_RECIPE_CATEGORIES.mostSaved:
-      return list.sort((a, b) => b.savesCount - a.savesCount)
+      return list.sort((a, b) => b.likeCount - a.likeCount)
     case COMMUNITY_RECIPE_CATEGORIES.new:
     default:
       return list.sort((a, b) => {

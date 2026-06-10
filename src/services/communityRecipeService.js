@@ -20,7 +20,7 @@ function averageRating(ratings) {
 
 function mapMockRecipe(recipe) {
   const ratingsCount = recipe.ratingCount ?? 0
-  const savesCount = recipe.likeCount ?? 0
+  const likeCount = recipe.likeCount ?? 0
   const viewsCount = recipe.views ?? 0
   const sharesCount = recipe.sharesCount ?? 0
   const averageRatingValue = recipe.rating ?? 0
@@ -43,8 +43,8 @@ function mapMockRecipe(recipe) {
     ratingsCount,
     views: viewsCount,
     viewsCount,
-    likeCount: savesCount,
-    savesCount,
+    likeCount,
+    savesCount: 0,
     sharesCount,
     userLiked: false,
     userRating: null,
@@ -58,7 +58,7 @@ function mapDbRecipe(row, { profileMap, likeCountMap, shareCountMap, ratingsByRe
   const recipeRatings = ratingsByRecipe.get(row.id) ?? []
   const ratingsCount = recipeRatings.length
   const averageRatingValue = averageRating(recipeRatings)
-  const savesCount = likeCountMap.get(row.id) ?? 0
+  const likeCount = likeCountMap.get(row.id) ?? 0
   const viewsCount = row.view_count ?? 0
   const sharesCount = shareCountMap.get(row.id) ?? 0
   const commentCount = commentCountMap?.get(row.id) ?? 0
@@ -81,8 +81,8 @@ function mapDbRecipe(row, { profileMap, likeCountMap, shareCountMap, ratingsByRe
     ratingsCount,
     views: viewsCount,
     viewsCount,
-    likeCount: savesCount,
-    savesCount,
+    likeCount,
+    savesCount: 0,
     sharesCount,
     userLiked: userLikeSet.has(row.id),
     userRating: userRatingMap.get(row.id) ?? null,

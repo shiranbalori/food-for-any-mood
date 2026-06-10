@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { useLanguage } from '../i18n/useLanguage'
 import { fetchCommunityRecipes } from '../services/communityRecipeService'
+import { enrichCommunityRecipeSaveCount } from '../utils/storage'
 import {
   COMMUNITY_RECIPE_CATEGORIES,
   sortCommunityRecipesByCategory,
@@ -23,6 +24,8 @@ const CATEGORY_OPTIONS = [
 export default function CommunityRecipes({
   initialExpandedRecipeId = null,
   onExpandedRecipeChange,
+  onSavedChanged,
+  onFavoritesChanged,
 }) {
   const { t } = useLanguage()
   const { user, isAuthenticated, isSupabaseReady, loading: authLoading, displayName } = useAuth()
@@ -40,7 +43,7 @@ export default function CommunityRecipes({
     setError('')
     try {
       const items = await fetchCommunityRecipes(user?.id)
-      setRecipes(items)
+      setRecipes(items.map(enrichCommunityRecipeSaveCount))
     } catch (err) {
       console.error('[CommunityRecipes] load failed:', err)
       setError(t('communityLoadError'))
@@ -139,6 +142,8 @@ export default function CommunityRecipes({
             currentUserDisplayName={displayName}
             initialExpanded={initialExpandedRecipeId === recipe.id}
             onOpenRecipeChange={onExpandedRecipeChange}
+            onSavedChanged={onSavedChanged}
+            onFavoritesChanged={onFavoritesChanged}
           />
         ))}
       </div>

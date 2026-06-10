@@ -5,6 +5,7 @@ const STORAGE_VERSION = 1
 // Community recipe saves (separate key — does not touch generated recipes)
 // ---------------------------------------------------------------------------
 const COMMUNITY_SAVES_KEY = 'food-for-any-mood-community-saves'
+const COMMUNITY_SAVE_COUNTS_KEY = 'food-for-any-mood-community-save-counts'
 
 function isValidRecipe(recipe) {
   return (
@@ -87,12 +88,59 @@ function writeCommunityList(list) {
   }
 }
 
+function readCommunitySaveCounts() {
+  try {
+    const raw = localStorage.getItem(COMMUNITY_SAVE_COUNTS_KEY)
+    const parsed = raw ? JSON.parse(raw) : {}
+    return parsed && typeof parsed === 'object' ? parsed : {}
+  } catch {
+    return {}
+  }
+}
+
+function writeCommunitySaveCounts(counts) {
+  try {
+    localStorage.setItem(COMMUNITY_SAVE_COUNTS_KEY, JSON.stringify(counts))
+  } catch {
+    // ignore storage errors
+  }
+}
+
+function adjustCommunitySaveCount(recipeId, delta) {
+  const counts = readCommunitySaveCounts()
+  const next = Math.max(0, (counts[recipeId] ?? 0) + delta)
+  if (next === 0) {
+    delete counts[recipeId]
+  } else {
+    counts[recipeId] = next
+  }
+  writeCommunitySaveCounts(counts)
+  return next
+}
+
+export function getCommunitySaveCount(recipeId) {
+  const counts = readCommunitySaveCounts()
+  if (counts[recipeId] != null) return counts[recipeId]
+  return readCommunityList().some((r) => r.id === recipeId) ? 1 : 0
+}
+
+export function isCommunityRecipeSaved(recipeId) {
+  return readCommunityList().some((r) => r.id === recipeId)
+}
+
+export function enrichCommunityRecipeSaveCount(recipe) {
+  return {
+    ...recipe,
+    savesCount: getCommunitySaveCount(recipe.id),
+  }
+}
+
 export function getSavedCommunityRecipes() {
   return readCommunityList()
 }
 
 /**
- * Persist a liked community recipe for display in Saved Recipes.
+ * Persist a saved community recipe for display in Saved Recipes.
  * Stores only the fields needed for the saved card — not the full recipe object.
  */
 export function saveCommunityRecipe(recipe) {
@@ -112,9 +160,15 @@ export function saveCommunityRecipe(recipe) {
     steps: Array.isArray(recipe.steps) ? recipe.steps : [],
     savedAt: new Date().toISOString(),
   }
+  adjustCommunitySaveCount(recipe.id, 1)
   return writeCommunityList([entry, ...list])
 }
 
 export function removeSavedCommunityRecipe(recipeId) {
-  return writeCommunityList(readCommunityList().filter((r) => r.id !== recipeId))
+  const hadEntry = readCommunityList().some((r) => r.id === recipeId)
+  const next = writeCommunityList(readCommunityList().filter((r) => r.id !== recipeId))
+  if (hadEntry) {
+    adjustCommunitySaveCount(recipeId, -1)
+  }
+  return next
 }

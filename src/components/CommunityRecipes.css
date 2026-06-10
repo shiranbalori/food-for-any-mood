@@ -270,6 +270,25 @@
   font-weight: 600;
 }
 
+.community-card__likes {
+  font-weight: 600;
+}
+
+.community-card__like-icon {
+  flex-shrink: 0;
+  font-size: 1rem;
+  line-height: 1;
+  color: #dc2626;
+}
+
+.community-card__like-label {
+  line-height: 1;
+}
+
+.community-card__like:not(.community-card__like--active) .community-card__like-icon {
+  color: var(--text-muted, #666);
+}
+
 .community-card__title {
   margin: 0 0 0.35rem;
   font-size: 0.98rem;
@@ -298,9 +317,10 @@
   margin-bottom: 0.55rem;
 }
 
-.community-card__like {
-  flex: 1;
-  min-width: 7rem;
+.community-card__like,
+.community-card__save {
+  flex: 1 1 calc(50% - 0.25rem);
+  min-width: 6.5rem;
   padding: 0.45rem 0.65rem;
   border-radius: var(--radius-xs);
   border: 1.5px solid rgba(148, 163, 184, 0.2);
@@ -313,6 +333,19 @@
 .community-card__like--active {
   border-color: rgba(220, 38, 38, 0.35);
   background: rgba(254, 226, 226, 0.5);
+}
+
+.community-card__like {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  direction: ltr;
+}
+
+.community-card__save--active {
+  border-color: rgba(134, 59, 255, 0.35);
+  background: rgba(134, 59, 255, 0.1);
 }
 
 .community-card__expand {

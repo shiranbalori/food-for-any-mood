@@ -528,6 +528,8 @@ export default function App() {
           <CommunityRecipes
             initialExpandedRecipeId={openRecipeId}
             onExpandedRecipeChange={setOpenRecipeId}
+            onSavedChanged={() => setSavedCommunityRecipes(getSavedCommunityRecipes())}
+            onFavoritesChanged={() => setFavoriteRecipes(getFavoriteRecipes())}
           />
         )
       case MY_AREA_PANELS.story:

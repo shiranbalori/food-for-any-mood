@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { useLanguage } from '../i18n/useLanguage'
 import { fetchCommunityRecipes } from '../services/communityRecipeService'
+import { enrichCommunityRecipeSaveCount } from '../utils/storage'
 import { getTopRatedCommunityRecipes } from '../utils/communityRecipeRanking'
 import { getTheme } from '../utils/themes'
 import './CommunityTop5.css'
@@ -22,7 +23,7 @@ export default function CommunityTop5() {
       try {
         const items = await fetchCommunityRecipes(user?.id)
         if (!cancelled) {
-          setRecipes(getTopRatedCommunityRecipes(items, 5))
+          setRecipes(getTopRatedCommunityRecipes(items.map(enrichCommunityRecipeSaveCount), 5))
         }
       } catch (error) {
         console.error('[CommunityTop5] load failed:', error)
@@ -53,7 +54,8 @@ export default function CommunityTop5() {
           const theme = getTheme(recipe.category ?? 'parve')
           const averageRating = recipe.averageRating ?? recipe.rating ?? 0
           const totalRatings = recipe.totalRatings ?? recipe.ratingCount ?? 0
-          const savesCount = recipe.savesCount ?? recipe.likeCount ?? 0
+          const likeCount = recipe.likeCount ?? 0
+          const savesCount = recipe.savesCount ?? 0
 
           return (
             <article
@@ -86,7 +88,8 @@ export default function CommunityTop5() {
                   ⭐ {averageRating > 0 ? averageRating.toFixed(1) : '—'}
                   {totalRatings > 0 ? ` ${t('communityRatingsCount', { count: totalRatings })}` : ''}
                 </span>
-                <span>❤️ {savesCount}</span>
+                <span>❤️ {likeCount}</span>
+                <span>📌 {savesCount}</span>
               </div>
             </article>
           )
