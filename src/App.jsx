@@ -20,7 +20,6 @@ import FavoriteRecipes from './components/FavoriteRecipes'
 import WeeklyMealPlanner from './components/WeeklyMealPlanner'
 import MyAreaDrawer, { MY_AREA_PANELS, getMyAreaNavItem } from './components/MyAreaDrawer'
 import MyAreaPageSection from './components/MyAreaPageSection'
-import ProfileSetupModal from './components/ProfileSetupModal'
 import HomeDailyPills from './components/HomeDailyPills'
 import DailyChallengeModal from './components/dailyChallenge/DailyChallengeModal'
 import DailyQuizModal from './components/dailyQuiz/DailyQuizModal'
@@ -726,8 +725,6 @@ export default function App() {
         )}
 
       </main>
-
-      <ProfileSetupModal onUpdated={handleCommunityDataChanged} />
 
       <MyAreaDrawer
         open={myAreaOpen}
