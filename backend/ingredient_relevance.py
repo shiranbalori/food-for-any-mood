@@ -45,6 +45,10 @@ INGREDIENT_SYNONYMS: dict[str, list[str]] = {
     "baking powder": ["אבקת אפייה"],
     "vanilla": ["vanilla extract", "תמצית וניל", "וניל"],
     "milk": ["חלב"],
+    "flour": ["קמח", "flour", "all-purpose flour"],
+    "sugar": ["סוכר", "sugar", "white sugar"],
+    "cinnamon": ["קינמון", "cinnamon", "ground cinnamon"],
+    "tuna": ["טונה", "tuna"],
     "strawberry": ["strawberries", "תות", "תותים"],
     "strawberries": ["strawberry", "תות", "תותים"],
 }
@@ -88,26 +92,42 @@ def canonical_ingredient(raw: str) -> str | None:
     return normalized.split()[0] if normalized else None
 
 
+from measurement_units import strip_quantity_prefix
+
+UNIT_TOKENS = frozenset(
+    {
+        "cup", "cups", "tbsp", "tsp", "gram", "grams", "g", "ml", "piece", "pieces", "pcs",
+        "כף", "כפות", "כפית", "כפיות", "גרם", "כוס", "כוסות", "יחידה", "יחידות",
+    }
+)
+
+
+def _ingredient_name_core(raw: str) -> str:
+    normalized = normalize_ingredient(raw)
+    if not normalized:
+        return ""
+    stripped = strip_quantity_prefix(normalized) or normalized
+    return stripped.strip()
+
+
 def ingredients_match(user_ing: str, recipe_ing: str) -> bool:
-    user = normalize_ingredient(user_ing)
-    recipe = normalize_ingredient(recipe_ing)
-    if not user or not recipe:
+    user_core = _ingredient_name_core(user_ing)
+    recipe_core = _ingredient_name_core(recipe_ing)
+    if not user_core or not recipe_core:
         return False
 
-    if user == recipe or user in recipe or recipe in user:
+    if user_core == recipe_core or user_core in recipe_core or recipe_core in user_core:
         return True
 
-    user_canon = canonical_ingredient(user)
-    recipe_canon = canonical_ingredient(recipe)
+    user_canon = canonical_ingredient(user_core)
+    recipe_canon = canonical_ingredient(recipe_core)
     if user_canon and recipe_canon and user_canon == recipe_canon:
         return True
 
-    user_words = user.split()
-    recipe_words = recipe.split()
+    user_words = [word for word in user_core.split() if len(word) > 2 and word not in UNIT_TOKENS]
+    recipe_words = [word for word in recipe_core.split() if len(word) > 2 and word not in UNIT_TOKENS]
     return any(
-        len(uw) > 2
-        and len(rw) > 2
-        and (uw in rw or rw in uw)
+        uw in rw or rw in uw
         for uw in user_words
         for rw in recipe_words
     )
@@ -229,6 +249,7 @@ def build_ingredient_fallback_recipe(
     """Build a localized recipe centered on the user's ingredients."""
     from recipe_copy import get_recipe_copy
     from recipe_diversity import pick_alternate_dessert_variant
+    from recipe_dish_patterns import build_pattern_steps, get_best_dish_pattern
     from recipe_title import build_descriptive_dish_title, build_title_from_ingredients
 
     copy = get_recipe_copy(language)
@@ -252,6 +273,12 @@ def build_ingredient_fallback_recipe(
             ]
 
     match_ratio = len(display) / max(len(user_ingredients), 1)
+
+    pattern_match = get_best_dish_pattern(
+        user_ingredients,
+        recipe_type=recipe_type,
+        category=category,
+    )
 
     mismatch_note = ""
     if len(user_ingredients) > 1 and match_ratio < MIN_INGREDIENT_MATCH_RATIO:
@@ -303,42 +330,72 @@ def build_ingredient_fallback_recipe(
             name = variant["name"]
             steps = variant["steps"]
         else:
-            name = build_title_from_ingredients(
-                ingredients,
-                language=language,
-                recipe_type="dessert",
-            )
-            steps = build_steps_from_user_ingredients(
-                display,
-                recipe_type="dessert",
-                language=language,
-                cooking_time=cooking_time,
-            )
+            if pattern_match and pattern_match.pattern.recipe_type == "dessert":
+                pattern = pattern_match.pattern
+                name = pattern.name_he if language == "he" else pattern.name_en
+                steps = build_pattern_steps(
+                    pattern,
+                    display,
+                    language=language,
+                    cooking_time=cooking_time,
+                ) or build_steps_from_user_ingredients(
+                    display,
+                    recipe_type="dessert",
+                    language=language,
+                    cooking_time=cooking_time,
+                )
+            else:
+                name = build_title_from_ingredients(
+                    ingredients,
+                    language=language,
+                    recipe_type="dessert",
+                )
+                steps = build_steps_from_user_ingredients(
+                    display,
+                    recipe_type="dessert",
+                    language=language,
+                    cooking_time=cooking_time,
+                )
     else:
-        steps = build_steps_from_user_ingredients(
-            display,
-            recipe_type="meal",
-            language=language,
-            cooking_time=cooking_time,
-        )
-        if language == "en":
-            name = build_descriptive_dish_title(
-                ingredients,
-                cooking_time=cooking_time,
-                steps=steps,
-                style="quick",
-                tags=tags or ["comfortFood"],
+        if pattern_match:
+            pattern = pattern_match.pattern
+            name = pattern.name_he if language == "he" else pattern.name_en
+            steps = build_pattern_steps(
+                pattern,
+                display,
                 language=language,
+                cooking_time=cooking_time,
+            ) or build_steps_from_user_ingredients(
+                display,
+                recipe_type="meal",
+                language=language,
+                cooking_time=cooking_time,
             )
         else:
-            name = build_descriptive_dish_title(
-                ingredients,
-                cooking_time=cooking_time,
-                steps=steps,
-                style="quick",
-                tags=tags or ["comfortFood"],
+            steps = build_steps_from_user_ingredients(
+                display,
+                recipe_type="meal",
                 language=language,
+                cooking_time=cooking_time,
             )
+            if language == "en":
+                name = build_descriptive_dish_title(
+                    ingredients,
+                    cooking_time=cooking_time,
+                    steps=steps,
+                    style="quick",
+                    tags=tags or ["comfortFood"],
+                    language=language,
+                )
+            else:
+                name = build_descriptive_dish_title(
+                    ingredients,
+                    cooking_time=cooking_time,
+                    steps=steps,
+                    style="quick",
+                    tags=tags or ["comfortFood"],
+                    language=language,
+                )
 
     from chef_intro import build_chef_intro
     from nutrition_score import calculate_health_score_from_recipe

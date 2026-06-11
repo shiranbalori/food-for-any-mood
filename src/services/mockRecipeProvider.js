@@ -23,6 +23,11 @@ import { applyRecipeIngredientParser } from '../utils/recipeIngredientParser'
 import { buildGroundedChefTitle, validateTitleGrounding } from '../utils/recipeGrounding'
 import { isLiteralIngredientTitle } from '../utils/recipeTitle'
 import { buildDessertDishTitle } from '../utils/dessertDishTitle'
+import {
+  buildPatternSteps,
+  getBestDishPattern,
+  getDishPatternName,
+} from '../utils/recipeDishPatterns'
 import { buildChefIntro } from '../utils/chefIntro'
 import { buildStepsFromUserIngredients } from '../utils/userIngredientSteps'
 import {
@@ -1024,7 +1029,16 @@ export function buildIngredientFirstFallbackRecipe(
     name = variant.name
     recipeSteps = variant.steps
   } else if (effectiveRecipeType === 'dessert') {
-    name = buildDessertDishTitle(finalIngredients, { language }).name
+    const pattern = getBestDishPattern(filteredUserIngredients, {
+      recipeType: 'dessert',
+      category: kosherCategory,
+    })
+    if (pattern) {
+      name = getDishPatternName(pattern, language)
+      recipeSteps = buildPatternSteps(pattern, { language, cookingTime }) ?? steps
+    } else {
+      name = buildDessertDishTitle(finalIngredients, { language }).name
+    }
   } else if (hasRegenerationConstraints) {
     const variant = pickAlternateMealVariant({
       ingredients: finalIngredients,

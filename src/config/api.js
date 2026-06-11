@@ -4,6 +4,9 @@
  * Local development (.env):
  *   VITE_API_BASE_URL=http://127.0.0.1:8010
  *
+ * Backend must listen on the same port (see backend/run.ps1 — default 8010).
+ * Do not use --port 8000 unless you also set VITE_API_BASE_URL to match.
+ *
  * Production (Vercel environment variables):
  *   VITE_API_BASE_URL=https://your-service.onrender.com
  *
@@ -14,6 +17,8 @@ const rawBaseUrl = import.meta.env.VITE_API_BASE_URL ?? 'http://127.0.0.1:8010'
 
 /** Render / local backend base URL — no trailing slash. */
 export const API_BASE_URL = rawBaseUrl.replace(/\/$/, '')
+
+console.log('[config/api] API_BASE_URL:', API_BASE_URL)
 
 export const HEALTH_URL = `${API_BASE_URL}/health`
 export const GENERATE_RECIPE_URL = `${API_BASE_URL}/generate-recipe`

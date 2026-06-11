@@ -1,3 +1,5 @@
+import { stripQuantityPrefix } from '../utils/measurementUnits'
+
 export const INGREDIENT_SYNONYMS = {
   chicken: ['עוף', 'chicken breast', 'chicken thigh', 'פilet עוף', 'חזה עוף'],
   beef: ['בקר', 'steak', 'ground beef', 'בשר בקר', 'אנטריקוט'],
@@ -10,7 +12,7 @@ export const INGREDIENT_SYNONYMS = {
   cheese: ['גבינה', 'cheddar', 'mozzarella', 'gouda'],
   cream: ['שמנת', 'heavy cream', 'whipping cream', 'שמנת מתוקה'],
   milk: ['חלב'],
-  butter: ['חמאה'],
+    butter: ['חמאה', 'butter', 'unsalted butter'],
   salt: ['מלח', 'sea salt', 'מלח ים'],
   garlic: ['שום', 'שום טרי'],
   onion: ['בצל', 'red onion', 'בצל סגול'],
@@ -39,8 +41,9 @@ export const INGREDIENT_SYNONYMS = {
   ricotta: ['ricotta', 'ricotta cheese', 'גבינת ריקotta'],
   feta: ['feta', 'feta cheese', 'גבינה בולגרית'],
   parmesan: ['parmesan', 'פרמזן', 'גבינה קשה'],
-  flour: ['קמח'],
-  sugar: ['סוכר'],
+    flour: ['קמח', 'flour', 'all-purpose flour'],
+    sugar: ['סוכר', 'sugar', 'white sugar'],
+    cinnamon: ['קינמון', 'cinnamon', 'ground cinnamon'],
   honey: ['דבש'],
   blueberry: ['blueberries', 'אוכמניות'],
   blueberries: ['blueberry', 'אוכמניות'],
@@ -117,21 +120,35 @@ export function normalizeIngredient(str) {
     .replace(/\s+/g, ' ')
 }
 
+const UNIT_TOKENS = new Set([
+  'cup', 'cups', 'tbsp', 'tsp', 'gram', 'grams', 'g', 'ml', 'piece', 'pieces', 'pcs',
+  'כף', 'כפות', 'כפית', 'כפיות', 'גרם', 'כוס', 'כוסות', 'יחידה', 'יחידות',
+])
+
+function ingredientNameCore(raw) {
+  const normalized = normalizeIngredient(raw)
+  if (!normalized) return ''
+  const stripped = stripQuantityPrefix(normalized) || normalized
+  return stripped.trim()
+}
+
 export function ingredientsMatch(userIng, recipeIng) {
-  const user = normalizeIngredient(userIng)
-  const recipe = normalizeIngredient(recipeIng)
-  if (!user || !recipe) return false
+  const userCore = ingredientNameCore(userIng)
+  const recipeCore = ingredientNameCore(recipeIng)
+  if (!userCore || !recipeCore) return false
 
-  if (user === recipe || user.includes(recipe) || recipe.includes(user)) return true
+  if (userCore === recipeCore || userCore.includes(recipeCore) || recipeCore.includes(userCore)) {
+    return true
+  }
 
-  const userCanon = canonicalIngredient(user)
-  const recipeCanon = canonicalIngredient(recipe)
+  const userCanon = canonicalIngredient(userCore)
+  const recipeCanon = canonicalIngredient(recipeCore)
   if (userCanon && recipeCanon && userCanon === recipeCanon) return true
 
-  const userWords = user.split(/\s+/)
-  const recipeWords = recipe.split(/\s+/)
+  const userWords = userCore.split(/\s+/).filter((word) => word.length > 2 && !UNIT_TOKENS.has(word))
+  const recipeWords = recipeCore.split(/\s+/).filter((word) => word.length > 2 && !UNIT_TOKENS.has(word))
   return userWords.some((uw) =>
-    recipeWords.some((rw) => uw.length > 2 && rw.length > 2 && (uw.includes(rw) || rw.includes(uw))),
+    recipeWords.some((rw) => uw.includes(rw) || rw.includes(uw)),
   )
 }
 

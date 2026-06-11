@@ -328,6 +328,8 @@ def validate_recipe_quality(
     language: str = "he",
     *,
     user_ingredients_raw: str = "",
+    recipe_type: str = "meal",
+    category: str = "dairy",
 ) -> dict:
     relevance = validate_recipe_relevance(user_ingredients, recipe)
     steps_text = "\n".join(recipe.get("steps") or [])
@@ -358,7 +360,13 @@ def validate_recipe_quality(
 
     language_ok = not english_ingredients if language == "he" else not hebrew_ingredients
 
-    pre_return = validate_recipe_before_return(recipe, user_ingredients_raw, language=language)
+    pre_return = validate_recipe_before_return(
+        recipe,
+        user_ingredients_raw,
+        language=language,
+        recipe_type=recipe_type,
+        category=category,
+    )
     unauthorized = find_unauthorized_recipe_ingredients(recipe, user_ingredients_raw)
     unauthorized_ok = not user_ingredients or not unauthorized
 
@@ -426,6 +434,11 @@ def apply_recipe_ingredient_parser(
             language=language,
         )
     if user_ingredients:
+        quantified["ingredients"] = _ensure_user_ingredients_in_list(
+            user_ingredients,
+            list(quantified.get("ingredients") or []),
+            language,
+        )
         quantified = repair_recipe_grounding(quantified, user_ingredients_raw, language)
     quantified = apply_derived_recipe_tags(
         quantified,
@@ -440,6 +453,8 @@ def apply_recipe_ingredient_parser(
         quantified,
         language,
         user_ingredients_raw=user_ingredients_raw,
+        recipe_type=recipe_type or "meal",
+        category=category or "dairy",
     )
     if user_ingredients:
         quantified["matchPercentage"] = round(validation["match_ratio"] * 100)

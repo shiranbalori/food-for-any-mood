@@ -4,10 +4,13 @@ from home_cooking_language import HOME_COOKING_RULES_EN, HOME_COOKING_RULES_HE
 
 CHEF_THINKING_RULES_HE = """
 גישת שף (חובה — חשוב לפני שכותבים):
-1. נתח/י את המרכיבים שהמשתמש סיפק — מה באמת אפשר להכין מהם?
-2. חשוב/י על 2–4 מנות ריאליות ומושכות שאפשר להכין מהם (לא שילובים לא הגיוניים).
+1. נתח/י את המרכיבים שהמשתמש סיפק — אילו מנות מוכרות מהעולם האמיתי מתאימות?
+2. חשוב/י על 2–4 מנות מוכרות וריאליות (שקשוקה, פסטה בשמנת, סלט טונה — לא המצאות).
 3. בחר/י את המנה הכי מתאימה — פשוטה, טעימה, ריאלית לזמן ההכנה ולקטגוריה.
-4. רק אז כתוב/י את המתכון המלא.
+4. התאם/י את המנה למרכיבים ולכללי הכשרות — כתוב/י ניסוח מקורי, לא העתקה מאתרים.
+5. רק אז כתוב/י את המתכון המלא.
+
+Base the recipe on familiar real-world dishes and cooking patterns. Do not invent unrealistic recipes.
 
 שדה description (חובה כשיש מרכיבים):
 - כתוב/י בעברית ידידותית וטבעית — כמו שף שמסביר/ה לחבר/ה.
@@ -30,10 +33,13 @@ CHEF_THINKING_RULES_HE = """
 
 CHEF_THINKING_RULES_EN = """
 CHEF APPROACH (mandatory — think before writing):
-1. Analyze the user's ingredients — what can realistically be made?
-2. Consider 2–4 realistic, appealing dishes (no unrealistic combinations).
+1. Analyze the user's ingredients — which familiar real-world dishes could they make?
+2. Consider 2–4 realistic, well-known dishes (shakshuka, creamy pasta, tuna salad — not random inventions).
 3. Pick the best fit — simple, tasty, fits cooking time and category.
-4. Only then write the full recipe.
+4. Adapt the dish to their ingredients and kosher rules — write original wording, do not copy websites.
+5. Only then write the full recipe.
+
+Base the recipe on familiar real-world dishes and cooking patterns. Do not invent unrealistic recipes.
 
 description field (required when user listed ingredients):
 - Friendly, natural language — like a chef explaining to a friend.
@@ -72,7 +78,9 @@ CHEF_RULES_HE = """
 - לעולם אל תשאיר כמויות לא מוגדרות.
 
 מתכון אמיתי:
-- המתכון חייב להיות מנה אמיתית שאדם היה מכין ואוכל — לא מתכון מזויף רק כי סופקו מרכיבים.
+- המתכון חייב להיות מנה מוכרת מהעולם האמיתי — לא המצאה אקראית רק כי סופקו מרכיבים.
+- דוגמאות: פסטה+שמנת+פטריות → פסטה בשמנת ופטריות; ביצים+עגבניות → שקשוקה; אורז+עוף → תבשיל אורז ועוף.
+- אם אין התאמה מושלמת — בחר/י את סגנון הבישול הקרוב ביותר והתאם/י בבירור.
 - אם המרכיבים לא יכולים ליצור מנה משמעותית — ציין בתיאור מה חסר (לא להמציא מנה לא הגיונית).
 
 התאמת מתכון (matchPercentage):
@@ -138,7 +146,9 @@ Ingredients:
 - Never leave ingredient quantities undefined.
 
 Real dish:
-- The recipe must be a real dish someone would actually prepare and eat — not a fake recipe just because ingredients were listed.
+- The recipe must be a familiar real-world dish — not a random AI invention just because ingredients were listed.
+- Examples: pasta+cream+mushrooms → creamy mushroom pasta; eggs+tomato → shakshuka; rice+chicken → chicken and rice bake.
+- If there is no perfect match, choose the closest real cooking style and adapt clearly.
 - If ingredients cannot make a meaningful dish, explain what's missing in the description (do not invent an unrealistic dish).
 
 Match score (matchPercentage):

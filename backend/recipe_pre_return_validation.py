@@ -39,7 +39,7 @@ COOKING_ACTIONS = (
     "peel", "grate", "spread", "layer", "roll", "knead", "rest", "rise",
     "חותך", "קוצץ", "מקציף", "מערבב", "אופה", "מטגן", "מבשל", "מרתיח",
     "ממיס", "מקרר", "מעביר", "מסנן", "שוטף", "מקליף", "מגרד", "ממרח", "מגלגל",
-    "מסדר", "מניח", "יוצק", "מעצב", "מבשלים", "מערבבים", "חותכים", "אופים",
+    "מסדר", "מניח", "יוצק", "מעצב", "מבשלים", "מערבבים", "חותכים", "אופים", "לשים",
 )
 
 WEAK_ONLY_ACTIONS = frozenset(
@@ -115,7 +115,13 @@ def _ingredient_line_has_quantity(line: str) -> bool:
     if measured and measured.get("amount") is not None:
         unit = measured.get("unit") or "whole"
         return is_valid_quantified_display(text, unit)
-    return bool(re.match(r"^\d+(?:\s+\d+/\d+)?\s+\S", text))
+    if re.match(r"^\d+(?:\s+\d+/\d+)?\s+\S", text):
+        return True
+    if re.match(r"^\d+/\d+\s+\S", text):
+        return True
+    if re.match(r"^(?:כפית|כפיות|כף|כפות|כוס|כוסות|גרם|מ\"?ל)\s+", text):
+        return True
+    return False
 
 
 def _has_placeholder_text(text: str) -> bool:
@@ -275,6 +281,8 @@ def validate_recipe_before_return(
     user_ingredients_raw: str = "",
     *,
     language: str = "he",
+    recipe_type: str = "meal",
+    category: str = "dairy",
 ) -> dict:
     """Run the full pre-return checklist. Returns ok + detailed failures."""
     ingredients = list(recipe.get("ingredients") or [])
@@ -336,7 +344,13 @@ def validate_recipe_before_return(
         ]
         if missing_user:
             failures.append("missing_user_ingredients")
-        coherence = validate_recipe_coherence(user_ingredients, recipe, language=language)
+        coherence = validate_recipe_coherence(
+            user_ingredients,
+            recipe,
+            language=language,
+            recipe_type=recipe_type,
+            category=category,
+        )
         for failure in coherence.get("failures") or []:
             if failure not in failures:
                 failures.append(failure)
@@ -374,11 +388,11 @@ def build_validation_failure_message(
             else "Not all ingredients you entered appear in the recipe — please try generating again.",
         ), missing
 
-    if "title_grounding" in failures or "generic_title" in failures:
+    if "title_grounding" in failures or "generic_title" in failures or "not_real_dish" in failures:
         return (
-            "שם המתכון לא תואם למרכיבים — נסו שוב."
+            "שם המתכון לא נשמע כמו מנה מוכרת — נסו שוב."
             if is_he
-            else "The recipe title does not match the ingredients — please try again.",
+            else "The recipe name does not sound like a familiar real dish — please try again.",
         ), missing
 
     if "unnatural_steps" in failures:

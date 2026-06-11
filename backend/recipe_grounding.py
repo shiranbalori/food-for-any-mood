@@ -151,7 +151,17 @@ def repair_recipe_grounding(recipe: dict, user_ingredients_raw: str, language: s
     description = recipe.get("description", "")
 
     if not validate_title_grounding(name, recipe_ingredients, user_ingredients)["ok"]:
-        name = build_grounded_chef_title(user_ingredients, recipe_ingredients, language)
+        from recipe_dish_patterns import validate_real_world_dish
+
+        preserved = validate_real_world_dish(
+            {"name": name, "ingredients": recipe_ingredients, "steps": recipe.get("steps") or []},
+            user_ingredients,
+            recipe_type="dessert",
+            category="dairy",
+            language=language,
+        )
+        if not preserved.get("ok"):
+            name = build_grounded_chef_title(user_ingredients, recipe_ingredients, language)
 
     if not validate_description_grounding(description, recipe_ingredients, user_ingredients)["ok"]:
         description = (

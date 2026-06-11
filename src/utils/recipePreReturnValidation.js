@@ -6,6 +6,7 @@ import { canonicalIngredient } from '../data/ingredientKnowledge'
 import { ingredientsMatch } from '../data/ingredientKnowledge'
 import { ingredientAppearsInText, parseUserIngredients } from './ingredientRelevance'
 import { parseAnyLeadingMeasurement } from './measurementUnits'
+import { isValidQuantifiedDisplay } from './recipeQuantities'
 import { hasRepeatedParentheticalIngredients } from './ingredientFormatting'
 import { findUnauthorizedRecipeIngredients, SYSTEM_PANTRY_CANONICAL } from './ingredientAllowlist'
 import { assessCategoryFit } from './recipeCategoryFit'
@@ -53,7 +54,7 @@ const SPICE_ONLY_CANON = new Set([
 
 const SWEET_CANON = new Set([
   'sugar', 'honey', 'chocolate', 'marshmallow', 'marshmallows', 'cookie',
-  'cookies', 'candy', 'coconut', 'cream', 'butter', 'flour', 'milk',
+  'cookies', 'candy', 'coconut', 'cream', 'butter', 'flour', 'milk', 'cinnamon',
 ])
 
 const FRUIT_CANON = new Set([
@@ -89,8 +90,14 @@ function ingredientLineHasQuantity(line) {
   const text = String(line ?? '').trim()
   if (!text) return false
   const measured = parseAnyLeadingMeasurement(text)
-  if (measured?.amount != null) return true
-  return /^\d+(?:\s+\d+\/\d+)?\s+\S/.test(text)
+  if (measured?.amount != null) {
+    const unit = measured.unit || 'whole'
+    return isValidQuantifiedDisplay(text, unit)
+  }
+  if (/^\d+(?:\s+\d+\/\d+)?\s+\S/.test(text)) return true
+  if (/^\d+\/\d+\s+\S/.test(text)) return true
+  if (/^(?:כפית|כפיות|כף|כפות|כוס|כוסות|גרם|מ"?ל)\s+/.test(text)) return true
+  return false
 }
 
 function hasPlaceholderText(text) {

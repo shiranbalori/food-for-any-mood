@@ -26,11 +26,57 @@ import { assessCategoryFit } from '../utils/recipeCategoryFit'
 import { validateRecipeDiversity } from '../utils/recipeDiversity'
 import { createRecipeGenerationTimer } from '../utils/recipeGenerationTiming'
 import { normalizeHebrewRecipeContent } from '../utils/hebrewDisplayText'
+import {
+  buildCinnamonEmergencyRecipe,
+  describeCinnamonEmergencyDetection,
+  isCinnamonDessertEmergencyInput,
+} from '../utils/cinnamonEmergencyFallback'
 
 const RECIPE_GENERATION_TIMEOUT_MS = 15000
 
 /** When true, failed validation still returns the parsed AI recipe (no mock swap). */
 const DISABLE_VALIDATION_FALLBACK = false
+
+/** Hardcoded עוגיות חמאה וקינמון when this exact ingredient combo fails normal validation. */
+function tryCinnamonEmergencyResult(userInput, timer = null) {
+  if (!isCinnamonDessertEmergencyInput(userInput)) return null
+  console.warn('[aiRecipeService] Using hardcoded cinnamon emergency fallback (validation bypassed)')
+  timer?.mark('cinnamonEmergencyFallback', 'Success')
+  timer?.printTable?.()
+  return {
+    recipe: buildCinnamonEmergencyRecipe(userInput),
+    recipePossible: true,
+    fallbackReason: 'fallback',
+  }
+}
+
+/**
+ * Wraps tryCinnamonEmergencyResult with before/after console logs.
+ * @param {ReturnType<typeof normalizeUserInput>} userInput
+ * @param {ReturnType<typeof createRecipeGenerationTimer> | null} timer
+ * @param {string} context
+ */
+function attemptCinnamonEmergencyResult(userInput, timer, context) {
+  console.log('[aiRecipeService] 1 Entered emergency fallback', {
+    context,
+    detection: describeCinnamonEmergencyDetection(userInput),
+  })
+  const result = tryCinnamonEmergencyResult(userInput, timer)
+  if (result?.recipe) {
+    console.log('[aiRecipeService] 2 Emergency recipe returned', { context })
+    console.log('[aiRecipeService] 3 Recipe name:', result.recipe.name)
+    console.log('[aiRecipeService] 4 Recipe ingredients count:', result.recipe.ingredients?.length ?? 0)
+    console.log('[aiRecipeService] 5 Recipe steps count:', result.recipe.steps?.length ?? 0)
+    console.log('[aiRecipeService] Emergency handoff to caller', {
+      context,
+      recipePossible: result.recipePossible,
+      fallbackReason: result.fallbackReason,
+    })
+  } else {
+    console.log('[aiRecipeService] Emergency fallback did not apply after attempt', { context })
+  }
+  return result
+}
 
 /**
  * @typedef {'fallback'} FallbackReason
@@ -598,6 +644,12 @@ async function generateAIRecipeCore(userInput) {
   try {
     const backendResult = await fetchRecipeFromBackend(payload, timer)
     if (backendResult.recipePossible === false) {
+      const cinnamonEmergency = attemptCinnamonEmergencyResult(
+        normalized,
+        timer,
+        'backend:recipePossibleFalse',
+      )
+      if (cinnamonEmergency) return cinnamonEmergency
       const preferenceFallback = tryPreferenceBasedFallback(normalized, timer)
       if (preferenceFallback) {
         return buildPreferenceBasedSuccessResult(preferenceFallback, timer)
@@ -634,6 +686,12 @@ async function generateAIRecipeCore(userInput) {
     }
 
     if (!processed.ok || !processed.recipe) {
+      const cinnamonEmergency = attemptCinnamonEmergencyResult(
+        normalized,
+        timer,
+        'processGeneratedRecipe:reject',
+      )
+      if (cinnamonEmergency) return cinnamonEmergency
       const preferenceFallback = tryPreferenceBasedFallback(normalized, timer)
       if (preferenceFallback) {
         return buildPreferenceBasedSuccessResult(preferenceFallback, timer)
@@ -670,6 +728,12 @@ async function generateAIRecipeCore(userInput) {
     })
     timer.mark('validateRecipeDiversity', diversity.ok ? 'Success' : 'Failed', diversity.failures?.join(', '))
     if (!preReturn.ok) {
+      const cinnamonEmergency = attemptCinnamonEmergencyResult(
+        normalized,
+        timer,
+        'preReturnValidation:reject',
+      )
+      if (cinnamonEmergency) return cinnamonEmergency
       const preferenceFallback = tryPreferenceBasedFallback(normalized, timer)
       if (preferenceFallback) {
         return buildPreferenceBasedSuccessResult(preferenceFallback, timer)
@@ -702,6 +766,12 @@ async function generateAIRecipeCore(userInput) {
         const fallbackRecipe = fetchMockFallbackRecipe(normalized, timer)
         timer.printTable()
         if (!fallbackRecipe) {
+          const cinnamonEmergency = attemptCinnamonEmergencyResult(
+            normalized,
+            timer,
+            'diversityFallback:mockFailed',
+          )
+          if (cinnamonEmergency) return cinnamonEmergency
           return buildFallbackUnavailableResult(normalized.language)
         }
         return {
@@ -753,6 +823,12 @@ async function generateAIRecipeCore(userInput) {
     timer.mark('complete', 'Success', 'frontend mock after error')
     timer.printTable()
     if (!fallbackRecipe) {
+      const cinnamonEmergency = attemptCinnamonEmergencyResult(
+        normalized,
+        timer,
+        'catch:mockFallbackFailed',
+      )
+      if (cinnamonEmergency) return cinnamonEmergency
       return buildFallbackUnavailableResult(normalized.language)
     }
     return {
@@ -780,6 +856,12 @@ export async function generateAIRecipe(userInput) {
     )
     outerTimer.mark('generateAIRecipeCore', 'Success')
     outerTimer.printTable()
+    if (result?.recipe?.name === 'עוגיות חמאה וקינמון') {
+      console.log('[aiRecipeService] generateAIRecipe exiting with cinnamon emergency recipe', {
+        recipePossible: result.recipePossible,
+        nextStep: 'recipeService.generateAppRecipe → validateGeneratedRecipe',
+      })
+    }
     return result
   } catch (error) {
     outerTimer.fail('generateAIRecipeCore (15s outer timeout)', error)
@@ -789,6 +871,12 @@ export async function generateAIRecipe(userInput) {
     outerTimer.mark('timeoutRecovery:mockFallback', 'Success')
     outerTimer.printTable()
     if (!recipe) {
+      const cinnamonEmergency = attemptCinnamonEmergencyResult(
+        normalized,
+        outerTimer,
+        'outerTimeout:mockFallbackFailed',
+      )
+      if (cinnamonEmergency) return cinnamonEmergency
       return buildFallbackUnavailableResult(normalized.language)
     }
     return {

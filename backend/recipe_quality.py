@@ -506,6 +506,8 @@ def log_quality_rejections(reasons: list[str]) -> None:
             print("[FOOD FOR ANY MOOD] Gemini recipe rejected: duplicate cooking method")
         elif reason == "duplicate_dessert_category":
             print("[FOOD FOR ANY MOOD] Gemini recipe rejected: duplicate dessert category")
+        elif reason == "not_real_dish":
+            print("[FOOD FOR ANY MOOD] Gemini recipe rejected: does not resemble a real dish")
 
 
 def log_recipe_validation(

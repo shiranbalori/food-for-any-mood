@@ -36,7 +36,19 @@ def suggest_dish_options(
     *,
     language: str = "he",
     recipe_type: str = "meal",
+    category: str = "dairy",
 ) -> list[str]:
+    from recipe_dish_patterns import get_dish_suggestions
+
+    suggestions = get_dish_suggestions(
+        ingredients,
+        language=language,
+        recipe_type=recipe_type,
+        category=category,
+    )
+    if suggestions:
+        return suggestions
+
     if recipe_type == "dessert":
         main = pick_primary_flavor_label(ingredients, language)
         options = [

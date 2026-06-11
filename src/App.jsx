@@ -120,6 +120,7 @@ export default function App() {
   const [challengeSubmitOpen, setChallengeSubmitOpen] = useState(false)
   const [challengeAuthOpen, setChallengeAuthOpen] = useState(false)
   const [challengeSubmittedToday, setChallengeSubmittedToday] = useState(false)
+  const [showRecipeForm, setShowRecipeForm] = useState(true)
 
   const refreshMyRecipesCount = useCallback(async () => {
     if (!isAuthenticated || !user?.id || !isUserRecipesAvailable()) {
@@ -287,6 +288,7 @@ export default function App() {
 
         if (recipePossible === false) {
           setRecipe(null)
+          setShowRecipeForm(true)
           setImpossibleRecipe({
             reason: impossibleReason,
             missingIngredients: missingIngredients ?? [],
@@ -295,6 +297,7 @@ export default function App() {
         }
 
         setRecipe(newRecipe)
+        setShowRecipeForm(false)
         setBackendNotice(fallbackReason)
         setUsedTemplateKeys((prev) =>
           regenerate ? [...prev, newRecipe.templateKey] : [newRecipe.templateKey],
@@ -318,6 +321,7 @@ export default function App() {
       } catch (error) {
         console.error('[App] Recipe generation failed:', error)
         setBackendNotice('error')
+        setShowRecipeForm(true)
       } finally {
         setLoading(false)
       }
@@ -479,7 +483,13 @@ export default function App() {
     }
   }, [recipe, ideasLoading, category, form])
 
+  const handleBackToEdit = () => {
+    setShowRecipeForm(true)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
   const handleChallengeGenerateRecipe = (ingredients, categoryHint) => {
+    setShowRecipeForm(true)
     setForm((prev) => ({
       ...prev,
       ingredients: ingredients.join(', '),
@@ -630,6 +640,7 @@ export default function App() {
     setUpgradedRecipe(null)
     setUpgradeError(null)
     setSaveError(false)
+    setShowRecipeForm(false)
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
@@ -680,32 +691,36 @@ export default function App() {
           }}
         />
 
-        <CategorySelector
-          selected={category}
-          onSelect={setCategory}
-          recipeType={recipeType}
-          onRecipeTypeChange={setRecipeType}
-        />
+        {showRecipeForm && (
+          <>
+            <CategorySelector
+              selected={category}
+              onSelect={setCategory}
+              recipeType={recipeType}
+              onRecipeTypeChange={setRecipeType}
+            />
 
-        <DietaryPreferences
-          glutenFree={form.glutenFree}
-          onChange={(value) => handleFormChange('glutenFree', value)}
-          theme={theme}
-        />
+            <DietaryPreferences
+              glutenFree={form.glutenFree}
+              onChange={(value) => handleFormChange('glutenFree', value)}
+              theme={theme}
+            />
 
-        <MusicPlatformSelector
-          selected={form.musicPlatform}
-          onChange={(value) => handleFormChange('musicPlatform', value)}
-          theme={theme}
-        />
+            <MusicPlatformSelector
+              selected={form.musicPlatform}
+              onChange={(value) => handleFormChange('musicPlatform', value)}
+              theme={theme}
+            />
 
-        <RecipeForm
-          form={form}
-          onChange={handleFormChange}
-          onSubmit={() => handleGenerate()}
-          disabled={loading}
-          theme={theme}
-        />
+            <RecipeForm
+              form={form}
+              onChange={handleFormChange}
+              onSubmit={() => handleGenerate()}
+              disabled={loading}
+              theme={theme}
+            />
+          </>
+        )}
 
         {loading && <LoadingAnimation theme={theme} />}
 
@@ -765,10 +780,11 @@ export default function App() {
             ideasLoading={ideasLoading}
             onLoadMoreIdeas={handleLoadMoreIdeas}
             onMealPlanUpdated={handleMealPlanUpdated}
+            onBackToEdit={!showRecipeForm ? handleBackToEdit : undefined}
           />
         )}
 
-        {!activeMyAreaPage && !activeGlobalPage && (
+        {showRecipeForm && !activeMyAreaPage && !activeGlobalPage && (
           <CommunityTop5
             onRecipeClick={openCommunityRecipe}
             onSavedChanged={handleCommunityDataChanged}

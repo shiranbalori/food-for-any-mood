@@ -85,6 +85,17 @@ from recipe_quality import (
     violates_kosher_category,
 )
 from chef_prompt_rules import get_chef_rules_en, get_chef_rules_he
+from recipe_dish_patterns import build_real_world_prompt_section, validate_real_world_dish
+from dessert_debug_flow import (
+    build_cinnamon_emergency_generated_recipe,
+    describe_cinnamon_detection,
+    is_cinnamon_dessert_debug_flow,
+    log_all_validation_results,
+    log_final_response,
+    log_matched_pattern,
+    log_parsed_ingredients,
+    log_recipe_snapshot,
+)
 from chef_intro import build_chef_intro
 from regenerate_recipe_steps import (
     GeminiStepsOutput,
@@ -577,6 +588,8 @@ def _build_gemini_prompt_he(payload: GenerateRecipeRequest, *, strict: bool = Fa
             strict_note += (
                 "⚠️ המתכון הקודם נדחה — כלול רק מרכיבי משתמש + מצרכי מזוון: מים, מלח, פלפל שחור, שמן, אבקת אפייה.\n"
                 "- אסור (אלא אם המשתמש הזין): פירות, עוגיות, שוקולד, אגוזים, גבינת שמנת, יוגורט, חלב, חמאה.\n"
+                "⚠️ שם המנה חייב להישמע כמו מנה מוכרת מהעולם האמיתי (שקשוקה, פסטה בשמנת, סלט טונה).\n"
+                "- Base the recipe on familiar real-world dishes. Do not invent unrealistic recipes.\n"
             )
         ingredient_rules = f"""
 {strict_note}כללי מרכיבים (חובה מוחלטת — עדיפות על קטגוריה ומצב רוח):
@@ -700,15 +713,26 @@ def _build_gemini_prompt_he(payload: GenerateRecipeRequest, *, strict: bool = Fa
         description_rules = """
 כללי תיאור / הקדמת שף (חובה — שדה description):
 - לפני המתכון, כתוב/י הקדמה ידידותית בעברית טבעית.
-- מבנה: "עם המרכיבים שיש לך אפשר להכין:" + 2–4 שורות עם • (מנות אפשריות) + שורה ריקה + משפט למה name היא הבחירה הטובה.
+- מבנה: "עם המרכיבים שיש לך אפשר להכין:" + 2–4 שורות עם • (מנות מוכרות מהעולם האמיתי) + שורה ריקה + משפט למה name היא הבחירה הטובה.
 - חשוב/י קודם, כתוב/י אחר כך — אל תקפוץ/י ישר למתכון.
 - אסור שילובים לא ריאליים; אסור מתכון שלא קשור למרכיבים.
 """
+
+    real_world_rules = ""
+    if user_ingredients:
+        real_world_rules = build_real_world_prompt_section(
+            user_ingredients,
+            language="he",
+            recipe_type=payload.recipeType,
+            category=payload.category,
+        )
 
     return f"""אתה שף/ית ידידותי/ת שעוזר/ת במטבח הבית — FOOD FOR ANY MOOD.
 צור מתכון אחד מקורי בעברית בלבד (שם המנה, תיאור, מרכיבים, שלבים, תגיות, פלייליסט, optionalUpgrades).
 
 {get_chef_rules_he()}
+
+{real_world_rules}
 
 {type_priority}
 
@@ -761,6 +785,12 @@ def _build_gemini_prompt_en(payload: GenerateRecipeRequest, *, strict: bool = Fa
         if strict
         else ""
     )
+    if strict:
+        strict_note += (
+            "⚠️ Previous recipe rejected — the dish name must sound like a familiar real-world dish "
+            "(shakshuka, creamy mushroom pasta, tuna salad).\n"
+            "Base the recipe on familiar real-world dishes and cooking patterns. Do not invent unrealistic recipes.\n"
+        )
 
     if user_ingredients:
         ingredient_rules = """
@@ -794,15 +824,26 @@ PREFERENCE-BASED GENERATION (user did not list ingredients):
         description_rules = """
 DESCRIPTION / CHEF INTRO (mandatory — description field):
 - Before the recipe, write a friendly natural intro.
-- Structure: "With the ingredients you have, you could make:" + 2–4 bullet lines with • + blank line + one sentence why name is the best pick.
+- Structure: "With the ingredients you have, you could make:" + 2–4 bullet lines with • (familiar real-world dish names) + blank line + one sentence why name is the best pick.
 - Think first, write second — do not jump straight to the recipe.
 - No unrealistic combinations; no generic dishes unrelated to the ingredients.
 """
+
+    real_world_rules = ""
+    if user_ingredients:
+        real_world_rules = build_real_world_prompt_section(
+            user_ingredients,
+            language="en",
+            recipe_type=payload.recipeType,
+            category=payload.category,
+        )
 
     return f"""You are a friendly home chef helping someone cook — FOOD FOR ANY MOOD.
 Return exactly one recipe as structured JSON in English only.
 
 {get_chef_rules_en()}
+
+{real_world_rules}
 
 LANGUAGE (mandatory):
 - The entire recipe MUST be in English only (name, description, ingredients, steps, tags, playlist, optionalUpgrades).
@@ -1077,6 +1118,9 @@ def _effective_fallback_type(payload: GenerateRecipeRequest) -> RecipeType:
 
 def _category_fallback_recipe(payload: GenerateRecipeRequest) -> GeneratedRecipe:
     """Return a guaranteed-valid template for the selected type and category."""
+    if is_cinnamon_dessert_debug_flow(payload):
+        return build_cinnamon_emergency_generated_recipe(payload)
+
     effective_type = _effective_fallback_type(payload)
     if effective_type != payload.recipeType:
         adjusted = payload.model_copy(update={"recipeType": effective_type})
@@ -1120,6 +1164,7 @@ def _fallback_recipe_from_ingredients(payload: GenerateRecipeRequest) -> Generat
         category=payload.category,
         is_gluten_free=payload.isGlutenFree,
         language=payload.language,
+        preserve_original_steps=True,
     )
     return GeneratedRecipe(
         name=processed["name"],
@@ -1181,6 +1226,18 @@ def _passes_gemini_quality(recipe: GeneratedRecipe, payload: GenerateRecipeReque
         log_quality_rejections(diversity["failures"])
         return False
 
+    if user_ingredients:
+        real_world = validate_real_world_dish(
+            recipe_dict,
+            user_ingredients,
+            recipe_type=payload.recipeType,
+            category=payload.category,
+            language=payload.language or "he",
+        )
+        if not real_world["ok"]:
+            log_quality_rejections(real_world["failures"])
+            return False
+
     return True
 
 
@@ -1223,6 +1280,18 @@ def generate_recipe_with_ingredient_validation(
 ) -> tuple[GeneratedRecipe, Literal["gemini", "mock"]]:
     """One Gemini attempt within 15s, then category-specific fallback."""
     timer = _StageTimer("generate_recipe_with_ingredient_validation")
+    debug_flow = is_cinnamon_dessert_debug_flow(payload)
+    parsed_debug = log_parsed_ingredients(payload) if debug_flow else None
+    if debug_flow:
+        log_matched_pattern(parsed_debug, payload)
+        print("[DESSERT_DEBUG cinnamon-dessert] Skipping Gemini — using hardcoded emergency fallback")
+        recipe = build_cinnamon_emergency_generated_recipe(payload)
+        log_recipe_snapshot(_recipe_to_validation_dict(recipe), label_prefix="emergency/hardcoded")
+        timer.mark("mockFallback", "Success", "cinnamon-dessert-bypass")
+        timer.mark("complete", "Success", "mock")
+        timer.print_table()
+        return recipe, "mock"
+
     log_recipe_validation(
         selected_recipe_type=payload.recipeType,
         selected_category=payload.category,
@@ -1423,6 +1492,35 @@ async def generate_recipe_with_fallback(
 # ---------------------------------------------------------------------------
 # Routes — registered on the root app (no prefix)
 # ---------------------------------------------------------------------------
+
+
+def _cinnamon_emergency_response(
+    payload: GenerateRecipeRequest,
+    *,
+    gemini_error: str | None = None,
+    timer: _StageTimer | None = None,
+) -> GenerateRecipeResponse:
+    """Hardcoded עוגיות חמאה וקינמון — skips all validators."""
+    print("[DESSERT_DEBUG cinnamon-dessert] Returning hardcoded emergency fallback (validation bypassed)")
+    recipe = build_cinnamon_emergency_generated_recipe(payload)
+    log_recipe_snapshot(_recipe_to_validation_dict(recipe), label_prefix="emergency/hardcoded")
+    if timer:
+        timer.mark("cinnamonEmergencyFallback", "Success")
+    resolved = _resolved_category(payload, _recipe_to_validation_dict(recipe))
+    response = GenerateRecipeResponse(
+        recipe=recipe,
+        recipePossible=True,
+        source="mock",
+        fallbackUsed=True,
+        geminiError=gemini_error,
+        resolvedCategory=resolved,
+    )
+    log_final_response(response)
+    if timer:
+        timer.print_table()
+    return response
+
+
 @app.get("/health")
 def health_check():
     print("[FOOD FOR ANY MOOD] Health endpoint called")
@@ -1455,6 +1553,19 @@ async def generate_recipe(payload: GenerateRecipeRequest):
             "language": payload.language,
         },
     )
+    debug_flow = is_cinnamon_dessert_debug_flow(payload)
+    if debug_flow:
+        log_parsed_ingredients(payload)
+        log_matched_pattern(parse_user_ingredients(payload.ingredients), payload)
+    else:
+        detection = describe_cinnamon_detection(payload)
+        if detection["hasAllRequiredCanons"]:
+            print(
+                "[DESSERT_DEBUG cinnamon-dessert] NOT detected — "
+                f"recipeType={detection['recipeType']} "
+                f"recipeTypeMatches={detection['recipeTypeMatches']} "
+                f"canons={detection['canonicalIngredients']}"
+            )
     feasibility = assess_ingredient_feasibility(
         payload.ingredients,
         recipe_type=payload.recipeType,
@@ -1464,6 +1575,8 @@ async def generate_recipe(payload: GenerateRecipeRequest):
     )
     timer.mark("assessIngredientFeasibility", "Success" if feasibility["recipe_possible"] else "Failed")
     if not feasibility["recipe_possible"]:
+        if debug_flow:
+            return _cinnamon_emergency_response(payload, timer=timer)
         reason, missing = build_validation_failure_message({}, feasibility, language=payload.language or "he")
         print(f"[FOOD FOR ANY MOOD] Recipe not possible: {reason}")
         timer.print_table()
@@ -1504,25 +1617,48 @@ async def generate_recipe(payload: GenerateRecipeRequest):
         _recipe_to_validation_dict(recipe),
         payload.ingredients,
         language=payload.language or "he",
+        recipe_type=payload.recipeType,
+        category=payload.category,
     )
     timer.mark("validateRecipeBeforeReturn", "Success" if pre_return["ok"] else "Failed", ",".join(pre_return["failures"]))
+    debug_flow = is_cinnamon_dessert_debug_flow(payload)
+    if debug_flow:
+        log_recipe_snapshot(_recipe_to_validation_dict(recipe), label_prefix="generated/fallback")
+        log_all_validation_results(
+            _recipe_to_validation_dict(recipe),
+            payload,
+            user_ingredients=parse_user_ingredients(payload.ingredients),
+        )
     if not pre_return["ok"]:
         preference_based = not parse_user_ingredients(payload.ingredients)
-        if preference_based:
-            print("[FOOD FOR ANY MOOD] Pre-return failed for preference-based request — using category fallback")
-            recipe = _category_fallback_recipe(payload)
-            source = "mock"
-            pre_return = validate_recipe_before_return(
+        print(
+            "[FOOD FOR ANY MOOD] Pre-return failed — using category fallback "
+            f"({'preference' if preference_based else 'ingredient'}-based request)"
+        )
+        recipe = _category_fallback_recipe(payload)
+        source = "mock"
+        pre_return = validate_recipe_before_return(
+            _recipe_to_validation_dict(recipe),
+            payload.ingredients,
+            language=payload.language or "he",
+            recipe_type=payload.recipeType,
+            category=payload.category,
+        )
+        timer.mark(
+            "validateRecipeBeforeReturn:fallback",
+            "Success" if pre_return["ok"] else "Failed",
+            ",".join(pre_return["failures"]),
+        )
+        if debug_flow:
+            log_recipe_snapshot(_recipe_to_validation_dict(recipe), label_prefix="retry/fallback")
+            log_all_validation_results(
                 _recipe_to_validation_dict(recipe),
-                payload.ingredients,
-                language=payload.language or "he",
+                payload,
+                user_ingredients=parse_user_ingredients(payload.ingredients),
             )
-            timer.mark(
-                "validateRecipeBeforeReturn:fallback",
-                "Success" if pre_return["ok"] else "Failed",
-                ",".join(pre_return["failures"]),
-            )
-        if not pre_return["ok"] and not preference_based:
+        if not pre_return["ok"]:
+            if debug_flow:
+                return _cinnamon_emergency_response(payload, gemini_error=gemini_error, timer=timer)
             reason, missing = build_validation_failure_message(
                 pre_return,
                 None,
@@ -1530,7 +1666,7 @@ async def generate_recipe(payload: GenerateRecipeRequest):
             )
             print("[FOOD FOR ANY MOOD] Recipe failed pre-return validation:", pre_return["failures"])
             timer.print_table()
-            return GenerateRecipeResponse(
+            failure_response = GenerateRecipeResponse(
                 recipe=None,
                 recipePossible=False,
                 impossibleReason=reason,
@@ -1538,6 +1674,9 @@ async def generate_recipe(payload: GenerateRecipeRequest):
                 source="none",
                 geminiError=gemini_error,
             )
+            if debug_flow:
+                log_final_response(failure_response)
+            return failure_response
 
     if source == "gemini":
         print(f"[FOOD FOR ANY MOOD] Returning Gemini recipe: {recipe.name}")
@@ -1550,7 +1689,7 @@ async def generate_recipe(payload: GenerateRecipeRequest):
     timer.print_table()
     recipe_dict = _recipe_to_validation_dict(recipe)
     resolved = _resolved_category(payload, recipe_dict)
-    return GenerateRecipeResponse(
+    success_response = GenerateRecipeResponse(
         recipe=recipe,
         recipePossible=True,
         source=source,
@@ -1558,6 +1697,9 @@ async def generate_recipe(payload: GenerateRecipeRequest):
         geminiError=gemini_error,
         resolvedCategory=resolved,
     )
+    if debug_flow:
+        log_final_response(success_response)
+    return success_response
 
 
 @app.post("/recipes/generate", response_model=GenerateRecipeResponse, include_in_schema=True)

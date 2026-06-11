@@ -10,9 +10,10 @@ from hebrew_step_wording import (
     to_step_ingredient_reference,
 )
 
-_MELT_KEYWORDS = ("marshmallow", "מרשמלו", "chocolate", "שוקולד", "שמנת", "cream")
-_SUGAR_KEYWORDS = ("sugar", "סוכר", "דבש", "honey")
+_MELT_KEYWORDS = ("marshmallow", "מרשמלו", "chocolate", "שוקולד", "שמנת", "cream", "butter", "חמאה")
+_SUGAR_KEYWORDS = ("sugar", "סוכר", "דבש", "honey", "cinnamon", "קינמון")
 _DRY_KEYWORDS = ("coconut", "קוקוס", "קמח", "flour", "אבקת", "cocoa", "קקאו", "oats", "שיבולת")
+_DRY_OR_SUGAR_KEYWORDS = _DRY_KEYWORDS + _SUGAR_KEYWORDS
 
 
 def _bare_name(raw: str) -> str:
@@ -54,7 +55,7 @@ def build_steps_from_user_ingredients(
 
     if recipe_type == "dessert":
         melt_name = _pick_by_keywords(names, _MELT_KEYWORDS)
-        dry_names = [n for n in names if n != melt_name and _matches_any(n, _DRY_KEYWORDS | _SUGAR_KEYWORDS)]
+        dry_names = [n for n in names if n != melt_name and _matches_any(n, _DRY_OR_SUGAR_KEYWORDS)]
         other_names = [n for n in names if n != melt_name and n not in dry_names]
 
         if language == "en":

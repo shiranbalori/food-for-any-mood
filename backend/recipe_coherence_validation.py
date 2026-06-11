@@ -6,9 +6,11 @@ import re
 
 from ingredient_relevance import ingredients_match, parse_user_ingredients
 from recipe_grounding import validate_title_grounding
+from recipe_dish_patterns import validate_real_world_dish
 
 GENERIC_TITLE_PATTERNS = (
     r"מנה ביתית|קסם במחבת|מהמטבח|חביתה מהירה עם וניל|homestyle|kitchen magic",
+    r"quick\s+dish|homemade\s+stew|mixed\s+ingredients|creative\s+combo",
 )
 
 UNNATURAL_STEP_PATTERNS = (
@@ -20,7 +22,7 @@ def _is_generic_title(title: str, user_ingredients: list[str]) -> bool:
     text = (title or "").strip()
     if not text:
         return True
-    if re.search(GENERIC_TITLE_PATTERNS, text, re.I):
+    if any(re.search(pattern, text, re.I) for pattern in GENERIC_TITLE_PATTERNS):
         return True
     if user_ingredients and re.search(r"וניל|vanilla", text, re.I):
         if not any(re.search(r"וניל|vanilla", item, re.I) for item in user_ingredients):
@@ -36,7 +38,14 @@ def _unnatural_steps(steps: list[str]) -> list[str]:
     return hits
 
 
-def validate_recipe_coherence(user_ingredients: list[str], recipe: dict, *, language: str = "he") -> dict:
+def validate_recipe_coherence(
+    user_ingredients: list[str],
+    recipe: dict,
+    *,
+    language: str = "he",
+    recipe_type: str = "meal",
+    category: str = "dairy",
+) -> dict:
     title = recipe.get("name", "")
     ingredients = list(recipe.get("ingredients") or [])
     steps = list(recipe.get("steps") or [])
@@ -56,6 +65,17 @@ def validate_recipe_coherence(user_ingredients: list[str], recipe: dict, *, lang
     unnatural = _unnatural_steps(steps)
     if unnatural:
         failures.append("unnatural_steps")
+    if user_ingredients:
+        real_world = validate_real_world_dish(
+            recipe,
+            user_ingredients,
+            recipe_type=recipe_type,
+            category=category,
+            language=language,
+        )
+        for failure in real_world.get("failures") or []:
+            if failure not in failures:
+                failures.append(failure)
     return {
         "ok": not failures,
         "failures": failures,

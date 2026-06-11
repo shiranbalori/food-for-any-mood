@@ -206,6 +206,8 @@ export default function RecipeCard({
 
   onMealPlanUpdated,
 
+  onBackToEdit,
+
 }) {
 
   const { t, dir, isRtl } = useLanguage()
@@ -287,6 +289,16 @@ export default function RecipeCard({
 
 
       <header className="recipe-card__header animate-in">
+
+        {onBackToEdit && (
+          <button
+            type="button"
+            className="btn btn--secondary recipe-card__back-to-edit"
+            onClick={onBackToEdit}
+          >
+            {t('backToEdit')}
+          </button>
+        )}
 
         <h2>{recipe.name}</h2>
 

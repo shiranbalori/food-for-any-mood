@@ -36,6 +36,16 @@
   margin-bottom: 0.85rem;
 }
 
+.recipe-card__back-to-edit {
+  display: inline-flex;
+  align-items: center;
+  margin-bottom: 0.65rem;
+  padding: 0.35rem 0.75rem;
+  min-height: auto;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
 .recipe-card--compact .recipe-card__header h2 {
   font-size: clamp(1.25rem, 3.8vw, 1.5rem);
   margin-bottom: 0.45rem;
@@ -686,6 +696,14 @@ html[dir='rtl'] .recipe-card__section ol li:hover {
   .recipe-card.recipe-card--compact {
     padding: 0.75rem 0.85rem;
     margin-bottom: 0.6rem;
+  }
+
+  .recipe-card__back-to-edit {
+    min-height: auto !important;
+    width: auto !important;
+    padding: 0.35rem 0.75rem !important;
+    font-size: 0.82rem !important;
+    margin-bottom: 0.5rem !important;
   }
 
   .recipe-card--compact .recipe-card__header {
