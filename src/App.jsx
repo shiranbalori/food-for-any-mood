@@ -60,9 +60,11 @@ import {
   applyNavigationRoute,
   getStartupNavigationRoute,
   parseNavigationHash,
+  pushNavigationRoute,
   writeNavigationRoute,
 } from './utils/navigationRoute'
 import './App.css'
+import './HomeDesktopLayout.css'
 
 const GLOBAL_PAGES = {
   dailyChallenge: 'dailyChallenge',
@@ -121,8 +123,62 @@ export default function App() {
   const [challengeAuthOpen, setChallengeAuthOpen] = useState(false)
   const [challengeSubmittedToday, setChallengeSubmittedToday] = useState(false)
   const [showRecipeForm, setShowRecipeForm] = useState(true)
+  const [recipeResultOpen, setRecipeResultOpen] = useState(false)
   const recipeResultRef = useRef(null)
   const pendingRecipeScrollRef = useRef(false)
+  const prevRecipeResultOpenRef = useRef(false)
+  const recipeRef = useRef(null)
+
+  useEffect(() => {
+    recipeRef.current = recipe
+  }, [recipe])
+
+  const getNavigationSnapshot = useCallback(
+    (overrides = {}) => ({
+      activeMyAreaPage,
+      activeGlobalPage,
+      quizModalOpen,
+      openRecipeId,
+      recipeResultOpen,
+      ...overrides,
+    }),
+    [activeMyAreaPage, activeGlobalPage, quizModalOpen, openRecipeId, recipeResultOpen],
+  )
+
+  const clearRecipeDisplayState = useCallback(() => {
+    setRecipe(null)
+    setRecipeIdeas(null)
+    setUpgradedRecipe(null)
+    setUpgradeError(null)
+    setImpossibleRecipe(null)
+    setBackendNotice(null)
+    setStepsRegenerateError(null)
+    setSaveError(false)
+  }, [])
+
+  const openRecipeResultView = useCallback(() => {
+    console.log('[App] recipe result opened')
+    setShowRecipeForm(false)
+    setRecipeResultOpen(true)
+    prevRecipeResultOpenRef.current = true
+    pushNavigationRoute(getNavigationSnapshot({ recipeResultOpen: true }))
+  }, [getNavigationSnapshot])
+
+  const returnToMainForm = useCallback(
+    ({ clearRecipe = false, logReturned = false } = {}) => {
+      if (clearRecipe) {
+        clearRecipeDisplayState()
+      }
+      setShowRecipeForm(true)
+      setRecipeResultOpen(false)
+      prevRecipeResultOpenRef.current = false
+      writeNavigationRoute(getNavigationSnapshot({ recipeResultOpen: false }))
+      if (logReturned) {
+        console.log('[App] returned to main form')
+      }
+    },
+    [clearRecipeDisplayState, getNavigationSnapshot],
+  )
 
   const refreshMyRecipesCount = useCallback(async () => {
     if (!isAuthenticated || !user?.id || !isUserRecipesAvailable()) {
@@ -162,27 +218,41 @@ export default function App() {
       setActiveGlobalPage,
       setQuizModalOpen,
       setOpenRecipeId,
+      setRecipeResultOpen,
+      setShowRecipeForm,
     })
   }, [])
 
   useLayoutEffect(() => {
-    writeNavigationRoute({
-      activeMyAreaPage,
-      activeGlobalPage,
-      quizModalOpen,
-      openRecipeId,
-    })
-  }, [activeMyAreaPage, activeGlobalPage, quizModalOpen, openRecipeId])
+    writeNavigationRoute(getNavigationSnapshot())
+  }, [getNavigationSnapshot])
 
   useEffect(() => {
     const applyHash = () => {
-      applyNavigationRoute(parseNavigationHash(window.location.hash), {
+      let nav = parseNavigationHash(window.location.hash)
+      const wasRecipeResult = prevRecipeResultOpenRef.current
+
+      if (nav.recipeResultOpen && !recipeRef.current) {
+        nav = { ...nav, recipeResultOpen: false }
+        writeNavigationRoute(nav)
+      }
+
+      applyNavigationRoute(nav, {
         setMyAreaOpen,
         setActiveMyAreaPage,
         setActiveGlobalPage,
         setQuizModalOpen,
         setOpenRecipeId,
+        setRecipeResultOpen,
+        setShowRecipeForm,
       })
+
+      if (wasRecipeResult && !nav.recipeResultOpen) {
+        console.log('[App] browser back pressed')
+        console.log('[App] returned to main form')
+      }
+
+      prevRecipeResultOpenRef.current = nav.recipeResultOpen ?? false
     }
 
     window.addEventListener('hashchange', applyHash)
@@ -308,7 +378,7 @@ export default function App() {
         }
 
         setRecipe(newRecipe)
-        setShowRecipeForm(false)
+        openRecipeResultView()
         pendingRecipeScrollRef.current = true
         setBackendNotice(fallbackReason)
         setUsedTemplateKeys((prev) =>
@@ -338,7 +408,7 @@ export default function App() {
         setLoading(false)
       }
     },
-    [category, form, t, language, recipeType],
+    [category, form, t, language, recipeType, openRecipeResultView],
   )
 
   const handleSave = () => {
@@ -496,7 +566,7 @@ export default function App() {
   }, [recipe, ideasLoading, category, form])
 
   const handleBackToEdit = () => {
-    setShowRecipeForm(true)
+    returnToMainForm()
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
@@ -519,11 +589,13 @@ export default function App() {
   }
 
   const goHome = () => {
+    console.log('[App] home clicked')
     setMyAreaOpen(false)
     setActiveMyAreaPage(null)
     setActiveGlobalPage(null)
     setOpenRecipeId(null)
     setQuizModalOpen(false)
+    returnToMainForm({ clearRecipe: true, logReturned: true })
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
@@ -652,7 +724,7 @@ export default function App() {
     setUpgradedRecipe(null)
     setUpgradeError(null)
     setSaveError(false)
-    setShowRecipeForm(false)
+    openRecipeResultView()
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
@@ -704,34 +776,48 @@ export default function App() {
         />
 
         {showRecipeForm && (
-          <>
-            <CategorySelector
-              selected={category}
-              onSelect={setCategory}
-              recipeType={recipeType}
-              onRecipeTypeChange={setRecipeType}
-            />
+          <div className="app__home-recipe">
+            <div className="app__home-options">
+              <CategorySelector
+                selected={category}
+                onSelect={setCategory}
+                recipeType={recipeType}
+                onRecipeTypeChange={setRecipeType}
+              />
 
-            <DietaryPreferences
-              glutenFree={form.glutenFree}
-              onChange={(value) => handleFormChange('glutenFree', value)}
-              theme={theme}
-            />
+              <div className="app__home-options-prefs">
+                <DietaryPreferences
+                  glutenFree={form.glutenFree}
+                  onChange={(value) => handleFormChange('glutenFree', value)}
+                  theme={theme}
+                />
 
-            <MusicPlatformSelector
-              selected={form.musicPlatform}
-              onChange={(value) => handleFormChange('musicPlatform', value)}
-              theme={theme}
-            />
+                <MusicPlatformSelector
+                  selected={form.musicPlatform}
+                  onChange={(value) => handleFormChange('musicPlatform', value)}
+                  theme={theme}
+                />
+              </div>
+            </div>
 
-            <RecipeForm
-              form={form}
-              onChange={handleFormChange}
-              onSubmit={() => handleGenerate()}
-              disabled={loading}
-              theme={theme}
-            />
-          </>
+            <div className="app__home-kitchen">
+              <RecipeForm
+                form={form}
+                onChange={handleFormChange}
+                onSubmit={() => handleGenerate()}
+                disabled={loading}
+                theme={theme}
+              />
+            </div>
+
+            <div className="app__home-community">
+              <CommunityTop5
+                onRecipeClick={openCommunityRecipe}
+                onSavedChanged={handleCommunityDataChanged}
+                onFavoritesChanged={handleCommunityDataChanged}
+              />
+            </div>
+          </div>
         )}
 
         {loading && <LoadingAnimation theme={theme} />}
@@ -796,14 +882,6 @@ export default function App() {
             onBackToEdit={!showRecipeForm ? handleBackToEdit : undefined}
           />
           </div>
-        )}
-
-        {showRecipeForm && !activeMyAreaPage && !activeGlobalPage && (
-          <CommunityTop5
-            onRecipeClick={openCommunityRecipe}
-            onSavedChanged={handleCommunityDataChanged}
-            onFavoritesChanged={handleCommunityDataChanged}
-          />
         )}
           </>
         )}

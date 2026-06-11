@@ -20,6 +20,7 @@ const EMPTY_NAV = {
   activeGlobalPage: null,
   quizModalOpen: false,
   openRecipeId: null,
+  recipeResultOpen: false,
 }
 
 function hasNavTarget(nav) {
@@ -58,6 +59,10 @@ export function parseNavigationHash(hash = window.location.hash) {
     }
   }
 
+  if (pathPart === 'recipe') {
+    return { ...EMPTY_NAV, recipeResultOpen: true }
+  }
+
   return { ...EMPTY_NAV }
 }
 
@@ -69,6 +74,7 @@ export function buildNavigationHash({
   activeGlobalPage,
   quizModalOpen,
   openRecipeId,
+  recipeResultOpen = false,
 }) {
   if (quizModalOpen) return '#/quiz'
   if (activeGlobalPage === NAV_GLOBAL_PAGES.dailyChallenge) return '#/daily-challenge'
@@ -82,6 +88,7 @@ export function buildNavigationHash({
     }
     return base
   }
+  if (recipeResultOpen) return '#/recipe'
   return '#/'
 }
 
@@ -121,12 +128,7 @@ export function getStartupNavigationRoute() {
   return { ...EMPTY_NAV }
 }
 
-/**
- * Persist route to URL (replaceState) and localStorage.
- */
-export function writeNavigationRoute(state) {
-  const hash = buildNavigationHash(state)
-
+function persistNavigationHash(hash, { replace = true } = {}) {
   try {
     localStorage.setItem(NAV_STORAGE_KEY, hash)
   } catch {
@@ -135,9 +137,27 @@ export function writeNavigationRoute(state) {
 
   const nextUrl = buildUrlWithHash(hash)
   const currentNormalized = normalizeNavigationHash(window.location.hash)
-  if (currentNormalized !== hash) {
+  if (currentNormalized === hash) return
+
+  if (replace) {
     window.history.replaceState(null, '', nextUrl)
+  } else {
+    window.history.pushState(null, '', nextUrl)
   }
+}
+
+/**
+ * Persist route to URL (replaceState) and localStorage.
+ */
+export function writeNavigationRoute(state) {
+  persistNavigationHash(buildNavigationHash(state), { replace: true })
+}
+
+/**
+ * Push a new history entry for the route (e.g. opening recipe result).
+ */
+export function pushNavigationRoute(state) {
+  persistNavigationHash(buildNavigationHash(state), { replace: false })
 }
 
 export function applyNavigationRoute(nav, setters) {
@@ -146,4 +166,6 @@ export function applyNavigationRoute(nav, setters) {
   setters.setActiveGlobalPage(nav.activeGlobalPage)
   setters.setQuizModalOpen(nav.quizModalOpen)
   setters.setOpenRecipeId(nav.openRecipeId)
+  setters.setRecipeResultOpen?.(nav.recipeResultOpen ?? false)
+  setters.setShowRecipeForm?.(!(nav.recipeResultOpen ?? false))
 }

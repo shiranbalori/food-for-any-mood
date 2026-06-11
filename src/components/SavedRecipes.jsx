@@ -1,11 +1,13 @@
-import { useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { getTheme } from '../utils/themes'
 import { useLanguage } from '../i18n/useLanguage'
 import SpiceLevel from './SpiceLevel'
 import './SavedRecipes.css'
 
+const SAVED_RECIPES_PANEL = 'saved'
+
 export default function SavedRecipes({
-  recipes,
+  recipes: recipesProp = [],
   onRemove,
   onSelect,
   initialExpandedId = null,
@@ -13,6 +15,30 @@ export default function SavedRecipes({
 }) {
   const { t } = useLanguage()
   const [expandedId, setExpandedId] = useState(initialExpandedId)
+  const [loadedRecipes, setLoadedRecipes] = useState([])
+  const [loading, setLoading] = useState(true)
+
+  const loadSavedRecipes = useCallback(() => {
+    console.log('[SavedRecipes] selected category:', SAVED_RECIPES_PANEL)
+    console.log('[SavedRecipes] loading start')
+    setLoading(true)
+
+    try {
+      const data = Array.isArray(recipesProp) ? recipesProp : []
+      console.log('[SavedRecipes] data returned:', data)
+      setLoadedRecipes(data)
+    } catch (error) {
+      console.error('[SavedRecipes] load failed:', error)
+      setLoadedRecipes([])
+    } finally {
+      console.log('[SavedRecipes] loading end')
+      setLoading(false)
+    }
+  }, [recipesProp])
+
+  useEffect(() => {
+    loadSavedRecipes()
+  }, [loadSavedRecipes])
 
   useEffect(() => {
     setExpandedId(initialExpandedId)
@@ -24,7 +50,11 @@ export default function SavedRecipes({
     onExpandedChange?.(next)
   }
 
-  if (recipes.length === 0) {
+  if (loading) {
+    return null
+  }
+
+  if (loadedRecipes.length === 0) {
     return (
       <section className="saved-recipes saved-recipes--empty">
         <h2 className="section-title">{t('savedRecipes')}</h2>
@@ -39,10 +69,10 @@ export default function SavedRecipes({
   return (
     <section className="saved-recipes">
       <h2 className="section-title">
-        {t('savedRecipesCount', { count: recipes.length })}
+        {t('savedRecipesCount', { count: loadedRecipes.length })}
       </h2>
       <div className="saved-recipes__grid">
-        {recipes.map((recipe) => {
+        {loadedRecipes.map((recipe) => {
           const theme = getTheme(recipe.category ?? 'parve')
           const categoryId = recipe.category ?? 'parve'
           const isCommunity = recipe.isCommunity === true

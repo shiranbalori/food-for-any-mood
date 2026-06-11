@@ -112,7 +112,7 @@ html[dir='rtl'] .header__auth {
   }
 }
 
-/* RTL: flex-start = right edge — order Home → האזור שלי → עברית → התקנה */
+/* RTL: flex-start = right edge — order Home → אזור אישי → עברית → התקנה */
 html[dir='rtl'] .header__toolbar {
   justify-content: flex-start;
 }

@@ -143,7 +143,20 @@
   min-height: 44px;
 }
 
-.recipe-form .btn--primary {
+.recipe-form__ingredients-text {
+  min-width: 0;
+}
+
+.recipe-form__controls {
+  display: contents;
+}
+
+.recipe-form__meta-grid {
+  display: contents;
+}
+
+.recipe-form .btn--primary,
+.recipe-form__submit {
   margin-top: 0.65rem;
   width: 100%;
 }
