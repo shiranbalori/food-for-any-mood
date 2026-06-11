@@ -203,9 +203,14 @@ export default function App() {
       return undefined
     }
     let cancelled = false
-    userSubmittedToday(user.id).then((submitted) => {
-      if (!cancelled) setChallengeSubmittedToday(submitted)
-    })
+    userSubmittedToday(user.id)
+      .then((submitted) => {
+        if (!cancelled) setChallengeSubmittedToday(submitted)
+      })
+      .catch((error) => {
+        console.error('[App] challenge submission check failed:', error)
+        if (!cancelled) setChallengeSubmittedToday(false)
+      })
     return () => {
       cancelled = true
     }

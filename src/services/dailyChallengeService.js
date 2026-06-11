@@ -1,4 +1,8 @@
 import { isSupabaseConfigured, supabase } from '../lib/supabaseClient'
+import {
+  isSupabaseTableUsable,
+  markSupabaseTableMissing,
+} from '../lib/supabaseTableGuard'
 import { getUnlockedAchievements } from '../utils/dailyChallenge/achievements'
 import {
   generateDailyChallenge,
@@ -16,6 +20,26 @@ export const CHALLENGE_IMAGE_ACCEPT = 'image/jpeg,image/jpg,image/png,image/webp
 const LS_SUBMISSIONS = 'ffam_challenge_submissions'
 const LS_GAMIFICATION = 'ffam_user_gamification'
 const LS_LIKES = 'ffam_challenge_submission_likes'
+const CHALLENGE_SUBMISSIONS_TABLE = 'challenge_submissions'
+const USER_GAMIFICATION_TABLE = 'user_gamification'
+
+function useChallengeSubmissionsDb() {
+  return isSupabaseConfigured && Boolean(supabase) && isSupabaseTableUsable(CHALLENGE_SUBMISSIONS_TABLE)
+}
+
+function useGamificationDb() {
+  return isSupabaseConfigured && Boolean(supabase) && isSupabaseTableUsable(USER_GAMIFICATION_TABLE)
+}
+
+function logChallengeSubmissionsError(error, context) {
+  if (markSupabaseTableMissing(CHALLENGE_SUBMISSIONS_TABLE, error)) return
+  console.error(`[dailyChallengeService] ${context}:`, error)
+}
+
+function logGamificationError(error, context) {
+  if (markSupabaseTableMissing(USER_GAMIFICATION_TABLE, error)) return
+  console.error(`[dailyChallengeService] ${context}:`, error)
+}
 
 export function isDailyChallengeAvailable() {
   return true
@@ -94,7 +118,7 @@ async function getWeeklyTopSubmissions(limit = 5) {
   since.setUTCDate(since.getUTCDate() - 7)
   const sinceIso = since.toISOString()
 
-  if (!isSupabaseConfigured || !supabase) {
+  if (!useChallengeSubmissionsDb()) {
     const likes = readJson(LS_LIKES, {})
     const likeCountBySubmission = new Map()
     for (const key of Object.keys(likes)) {
@@ -114,11 +138,15 @@ async function getWeeklyTopSubmissions(limit = 5) {
   }
 
   const { data, error } = await supabase
-    .from('challenge_submissions')
+    .from(CHALLENGE_SUBMISSIONS_TABLE)
     .select('id, user_id, created_at')
     .gte('created_at', sinceIso)
 
-  if (error || !data?.length) return []
+  if (error) {
+    logChallengeSubmissionsError(error, 'weekly top submissions')
+    return []
+  }
+  if (!data?.length) return []
 
   const ids = data.map((row) => row.id)
   const { data: likesData } = await supabase
@@ -149,7 +177,7 @@ async function processWeeklyTopAwards() {
     if (!submission.userId || submission.likeCount <= 0) continue
     const awardKey = weeklyAwardKey(weekKey, submission.id)
 
-    if (!isSupabaseConfigured || !supabase) {
+    if (!useGamificationDb()) {
       let stats = getLocalGamification(submission.userId)
       if (stats.weeklyTopAwards.includes(awardKey)) continue
       stats = applyPoints(stats, POINT_AWARDS.TOP_WEEKLY, {
@@ -169,18 +197,18 @@ async function processWeeklyTopAwards() {
 }
 
 async function loadGamificationStats(userId) {
-  if (!isSupabaseConfigured || !supabase) {
+  if (!useGamificationDb()) {
     return getLocalGamification(userId)
   }
 
   const { data, error } = await supabase
-    .from('user_gamification')
+    .from(USER_GAMIFICATION_TABLE)
     .select('*')
     .eq('user_id', userId)
     .maybeSingle()
 
   if (error) {
-    console.error('[dailyChallengeService] gamification fetch:', error)
+    logGamificationError(error, 'gamification fetch')
     return getLocalGamification(userId)
   }
 
@@ -295,12 +323,12 @@ export async function fetchUserGamification(userId) {
 }
 
 async function upsertGamification(stats) {
-  if (!isSupabaseConfigured || !supabase) {
+  if (!useGamificationDb()) {
     saveLocalGamification(stats.userId, stats)
     return stats
   }
 
-  const { error } = await supabase.from('user_gamification').upsert(
+  const { error } = await supabase.from(USER_GAMIFICATION_TABLE).upsert(
     {
       user_id: stats.userId,
       total_points: stats.totalPoints,
@@ -328,7 +356,7 @@ async function upsertGamification(stats) {
   )
 
   if (error) {
-    console.error('[dailyChallengeService] gamification upsert:', error)
+    logGamificationError(error, 'gamification upsert')
     saveLocalGamification(stats.userId, stats)
   }
   return stats
@@ -350,7 +378,7 @@ function mapSubmission(row, profileName, likeCount = 0, userLiked = false) {
 }
 
 export async function fetchChallengeSubmissions(challengeDate, userId) {
-  if (!isSupabaseConfigured || !supabase) {
+  if (!useChallengeSubmissionsDb()) {
     const submissions = getLocalSubmissions(challengeDate)
     const likes = readJson(LS_LIKES, {})
     return submissions.map((item) => ({
@@ -361,13 +389,13 @@ export async function fetchChallengeSubmissions(challengeDate, userId) {
   }
 
   const { data, error } = await supabase
-    .from('challenge_submissions')
+    .from(CHALLENGE_SUBMISSIONS_TABLE)
     .select('id, challenge_date, user_id, dish_name, description, photo_url, created_at')
     .eq('challenge_date', challengeDate)
     .order('created_at', { ascending: false })
 
   if (error) {
-    console.error('[dailyChallengeService] submissions fetch:', error)
+    logChallengeSubmissionsError(error, 'submissions fetch')
     return []
   }
 
@@ -407,7 +435,7 @@ export async function fetchChallengeSubmissions(challengeDate, userId) {
 }
 
 export async function fetchAllChallengeSubmissions(userId, limit = 50) {
-  if (!isSupabaseConfigured || !supabase) {
+  if (!useChallengeSubmissionsDb()) {
     const likes = readJson(LS_LIKES, {})
     return getAllLocalSubmissions()
       .slice(0, limit)
@@ -418,13 +446,13 @@ export async function fetchAllChallengeSubmissions(userId, limit = 50) {
   }
 
   const { data, error } = await supabase
-    .from('challenge_submissions')
+    .from(CHALLENGE_SUBMISSIONS_TABLE)
     .select('id, challenge_date, user_id, dish_name, description, photo_url, created_at')
     .order('created_at', { ascending: false })
     .limit(limit)
 
   if (error) {
-    console.error('[dailyChallengeService] all submissions fetch:', error)
+    logChallengeSubmissionsError(error, 'all submissions fetch')
     return []
   }
 
@@ -480,7 +508,7 @@ export async function submitDailyChallenge(userId, authorName, payload) {
   const challengeDate = getChallengeDateKey()
   const hasPhoto = Boolean(payload.imageFile)
 
-  if (!isSupabaseConfigured || !supabase) {
+  if (!useChallengeSubmissionsDb()) {
     const existing = getLocalSubmissions(challengeDate).find((item) => item.userId === userId)
     if (existing) throw new Error('ALREADY_SUBMITTED')
 
@@ -504,17 +532,25 @@ export async function submitDailyChallenge(userId, authorName, payload) {
     return submission
   }
 
-  const { data: existing } = await supabase
-    .from('challenge_submissions')
+  const { data: existing, error: existingError } = await supabase
+    .from(CHALLENGE_SUBMISSIONS_TABLE)
     .select('id')
     .eq('challenge_date', challengeDate)
     .eq('user_id', userId)
     .maybeSingle()
 
+  if (existingError) {
+    if (markSupabaseTableMissing(CHALLENGE_SUBMISSIONS_TABLE, existingError)) {
+      return submitDailyChallenge(userId, authorName, payload)
+    }
+    logChallengeSubmissionsError(existingError, 'submit existing check')
+    throw existingError
+  }
+
   if (existing) throw new Error('ALREADY_SUBMITTED')
 
   const { data, error } = await supabase
-    .from('challenge_submissions')
+    .from(CHALLENGE_SUBMISSIONS_TABLE)
     .insert({
       challenge_date: challengeDate,
       user_id: userId,
@@ -524,12 +560,18 @@ export async function submitDailyChallenge(userId, authorName, payload) {
     .select('id, challenge_date, user_id, dish_name, description, photo_url, created_at')
     .single()
 
-  if (error) throw error
+  if (error) {
+    if (markSupabaseTableMissing(CHALLENGE_SUBMISSIONS_TABLE, error)) {
+      return submitDailyChallenge(userId, authorName, payload)
+    }
+    logChallengeSubmissionsError(error, 'submit insert')
+    throw error
+  }
 
   let photoUrl = null
   if (payload.imageFile) {
     photoUrl = await uploadChallengePhoto(userId, data.id, payload.imageFile)
-    await supabase.from('challenge_submissions').update({ photo_url: photoUrl }).eq('id', data.id)
+    await supabase.from(CHALLENGE_SUBMISSIONS_TABLE).update({ photo_url: photoUrl }).eq('id', data.id)
     data.photo_url = photoUrl
   }
 
@@ -541,7 +583,7 @@ export async function submitDailyChallenge(userId, authorName, payload) {
 }
 
 export async function toggleChallengeSubmissionLike(userId, submissionId, currentlyLiked, ownerId) {
-  if (!isSupabaseConfigured || !supabase) {
+  if (!useChallengeSubmissionsDb()) {
     const likes = readJson(LS_LIKES, {})
     const key = `${userId}:${submissionId}`
     const all = getAllLocalSubmissions()
@@ -605,7 +647,7 @@ export async function toggleChallengeSubmissionLike(userId, submissionId, curren
 export async function fetchChallengeLeaderboard(limit = 10) {
   await processWeeklyTopAwards()
 
-  if (!isSupabaseConfigured || !supabase) {
+  if (!useGamificationDb()) {
     const all = readJson(LS_GAMIFICATION, {})
     const entries = Object.values(all).sort(sortLeaderboardEntries).slice(0, limit)
 
@@ -620,12 +662,12 @@ export async function fetchChallengeLeaderboard(limit = 10) {
   }
 
   const { data, error } = await supabase
-    .from('user_gamification')
+    .from(USER_GAMIFICATION_TABLE)
     .select('user_id, total_points, challenges_completed, current_streak')
     .limit(100)
 
   if (error) {
-    console.error('[dailyChallengeService] leaderboard fetch:', error)
+    logGamificationError(error, 'leaderboard fetch')
     return []
   }
 
@@ -666,7 +708,7 @@ export async function fetchChallengeLeaderboard(limit = 10) {
 async function enrichSubmissionsWithLikes(submissions, userId) {
   if (!submissions.length) return []
 
-  if (!isSupabaseConfigured || !supabase) {
+  if (!useChallengeSubmissionsDb()) {
     const likes = readJson(LS_LIKES, {})
     return submissions.map((item) => ({
       ...item,
@@ -716,7 +758,7 @@ export async function fetchChallengeHistory(userId, daysBack = 14) {
 
   let submissionsByDate = new Map()
 
-  if (!isSupabaseConfigured || !supabase) {
+  if (!useChallengeSubmissionsDb()) {
     const all = getAllLocalSubmissions()
     for (const item of all) {
       if (!dateKeys.includes(item.challengeDate)) continue
@@ -726,13 +768,13 @@ export async function fetchChallengeHistory(userId, daysBack = 14) {
     }
   } else {
     const { data, error } = await supabase
-      .from('challenge_submissions')
+      .from(CHALLENGE_SUBMISSIONS_TABLE)
       .select('id, challenge_date, user_id, dish_name, description, photo_url, created_at')
       .in('challenge_date', dateKeys)
       .order('created_at', { ascending: false })
 
     if (error) {
-      console.error('[dailyChallengeService] history fetch:', error)
+      logChallengeSubmissionsError(error, 'history fetch')
     } else {
       const grouped = new Map()
       for (const row of data ?? []) {
@@ -789,16 +831,16 @@ export async function fetchWeeklyChallengeWinner() {
 
   let submissions = []
 
-  if (!isSupabaseConfigured || !supabase) {
+  if (!useChallengeSubmissionsDb()) {
     submissions = getAllLocalSubmissions().filter((item) => item.createdAt >= sinceIso)
   } else {
     const { data, error } = await supabase
-      .from('challenge_submissions')
+      .from(CHALLENGE_SUBMISSIONS_TABLE)
       .select('id, challenge_date, user_id, dish_name, description, photo_url, created_at')
       .gte('created_at', sinceIso)
 
     if (error) {
-      console.error('[dailyChallengeService] weekly winner fetch:', error)
+      logChallengeSubmissionsError(error, 'weekly winner fetch')
       return null
     }
 
@@ -822,16 +864,21 @@ export async function userSubmittedToday(userId) {
   if (!userId) return false
   const challengeDate = getChallengeDateKey()
 
-  if (!isSupabaseConfigured || !supabase) {
+  if (!useChallengeSubmissionsDb()) {
     return getLocalSubmissions(challengeDate).some((item) => item.userId === userId)
   }
 
-  const { data } = await supabase
-    .from('challenge_submissions')
+  const { data, error } = await supabase
+    .from(CHALLENGE_SUBMISSIONS_TABLE)
     .select('id')
     .eq('challenge_date', challengeDate)
     .eq('user_id', userId)
     .maybeSingle()
+
+  if (error) {
+    logChallengeSubmissionsError(error, 'userSubmittedToday')
+    return getLocalSubmissions(challengeDate).some((item) => item.userId === userId)
+  }
 
   return Boolean(data)
 }

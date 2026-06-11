@@ -18,9 +18,14 @@ export default function GamificationPage() {
       return undefined
     }
     let cancelled = false
-    fetchUserGamification(user.id).then((data) => {
-      if (!cancelled) setStats(data)
-    })
+    fetchUserGamification(user.id)
+      .then((data) => {
+        if (!cancelled) setStats(data)
+      })
+      .catch((error) => {
+        console.error('[GamificationPage] gamification load failed:', error)
+        if (!cancelled) setStats(null)
+      })
     return () => {
       cancelled = true
     }

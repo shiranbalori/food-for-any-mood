@@ -32,9 +32,14 @@ export default function DailyChallengePanel({
       return undefined
     }
     let cancelled = false
-    fetchUserGamification(userId).then((data) => {
-      if (!cancelled) setStats(data)
-    })
+    fetchUserGamification(userId)
+      .then((data) => {
+        if (!cancelled) setStats(data)
+      })
+      .catch((error) => {
+        console.error('[DailyChallengePanel] gamification load failed:', error)
+        if (!cancelled) setStats(null)
+      })
     return () => {
       cancelled = true
     }

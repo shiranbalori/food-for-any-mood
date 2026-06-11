@@ -34,25 +34,33 @@ export default function DailyChallengePage() {
 
   const refresh = useCallback(async () => {
     if (authLoading) return
-    const uid = user?.id
-    if (uid) {
-      const [gamification, hasSubmitted, today, history] = await Promise.all([
-        fetchUserGamification(uid),
-        userSubmittedToday(uid),
-        fetchChallengeSubmissions(challenge.challengeDate, uid),
-        fetchAllChallengeSubmissions(uid, 30),
-      ])
-      setStats(gamification)
-      setSubmittedToday(hasSubmitted)
-      setTodaySubmissions(today)
-      setHistorySubmissions(history)
-    } else {
-      const today = await fetchChallengeSubmissions(challenge.challengeDate, null)
-      const history = await fetchAllChallengeSubmissions(null, 30)
+    try {
+      const uid = user?.id
+      if (uid) {
+        const [gamification, hasSubmitted, today, history] = await Promise.all([
+          fetchUserGamification(uid),
+          userSubmittedToday(uid),
+          fetchChallengeSubmissions(challenge.challengeDate, uid),
+          fetchAllChallengeSubmissions(uid, 30),
+        ])
+        setStats(gamification)
+        setSubmittedToday(hasSubmitted)
+        setTodaySubmissions(today)
+        setHistorySubmissions(history)
+      } else {
+        const today = await fetchChallengeSubmissions(challenge.challengeDate, null)
+        const history = await fetchAllChallengeSubmissions(null, 30)
+        setStats(null)
+        setSubmittedToday(false)
+        setTodaySubmissions(today)
+        setHistorySubmissions(history)
+      }
+    } catch (error) {
+      console.error('[DailyChallengePage] refresh failed:', error)
       setStats(null)
       setSubmittedToday(false)
-      setTodaySubmissions(today)
-      setHistorySubmissions(history)
+      setTodaySubmissions([])
+      setHistorySubmissions([])
     }
   }, [authLoading, user?.id, challenge.challengeDate])
 

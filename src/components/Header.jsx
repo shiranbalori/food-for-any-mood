@@ -22,9 +22,14 @@ export default function Header({ onOpenMyArea, onGoHome, gamificationRefreshKey 
       return undefined
     }
     let cancelled = false
-    fetchUserGamification(user.id).then((stats) => {
-      if (!cancelled) setGamificationStats(stats)
-    })
+    fetchUserGamification(user.id)
+      .then((stats) => {
+        if (!cancelled) setGamificationStats(stats)
+      })
+      .catch((error) => {
+        console.error('[Header] gamification load failed:', error)
+        if (!cancelled) setGamificationStats(null)
+      })
     return () => {
       cancelled = true
     }

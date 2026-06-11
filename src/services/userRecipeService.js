@@ -1,4 +1,9 @@
 import { isSupabaseConfigured, supabase } from '../lib/supabaseClient'
+import {
+  handleSupabaseTableResult,
+  isSupabaseTableUsable,
+  markSupabaseTableMissing,
+} from '../lib/supabaseTableGuard'
 
 /** @typedef {'dairy' | 'meat' | 'parve' | 'any'} KosherCategory */
 /** @typedef {'meal' | 'dessert'} RecipeType */
@@ -18,6 +23,8 @@ import { isSupabaseConfigured, supabase } from '../lib/supabaseClient'
  * @property {string | null} sharedCommunityRecipeId
  * @property {string | null} createdAt
  */
+
+const USER_RECIPES_TABLE = 'user_recipes'
 
 function mapDbRow(row) {
   return {
@@ -50,6 +57,18 @@ function parseStepsField(value) {
     .filter(Boolean)
 }
 
+function assertUserRecipesTableReady() {
+  if (!supabase) throw new Error('SUPABASE_NOT_CONFIGURED')
+  if (!isSupabaseTableUsable(USER_RECIPES_TABLE)) throw new Error('USER_RECIPES_UNAVAILABLE')
+}
+
+function handleUserRecipesMutationError(error) {
+  if (markSupabaseTableMissing(USER_RECIPES_TABLE, error)) {
+    throw new Error('USER_RECIPES_UNAVAILABLE')
+  }
+  throw error
+}
+
 /** Map private "any" to a community-safe kosher category. */
 export function kosherCategoryForCommunity(category) {
   return category === 'any' ? 'parve' : category
@@ -60,18 +79,24 @@ export function kosherCategoryForCommunity(category) {
  * @returns {Promise<UserRecipe[]>}
  */
 export async function fetchUserRecipes(userId) {
-  if (!supabase || !userId) throw new Error('SUPABASE_NOT_CONFIGURED')
+  if (!supabase || !userId) return []
+  if (!isSupabaseTableUsable(USER_RECIPES_TABLE)) return []
 
   const { data, error } = await supabase
-    .from('user_recipes')
+    .from(USER_RECIPES_TABLE)
     .select(
       'id, user_id, title, description, ingredients, steps, kosher_category, recipe_type, cooking_time, servings, shared_community_recipe_id, created_at',
     )
     .eq('user_id', userId)
     .order('created_at', { ascending: false })
 
-  if (error) throw error
-  return (data ?? []).map(mapDbRow)
+  const result = handleSupabaseTableResult(USER_RECIPES_TABLE, { data, error }, [])
+  if (result.error) {
+    console.error('[userRecipeService] fetch failed:', result.error)
+    return []
+  }
+
+  return (result.data ?? []).map(mapDbRow)
 }
 
 /**
@@ -80,6 +105,7 @@ export async function fetchUserRecipes(userId) {
  */
 export async function createUserRecipe(userId, payload) {
   if (!supabase || !userId) throw new Error('SUPABASE_NOT_CONFIGURED')
+  assertUserRecipesTableReady()
 
   const ingredients = parseListField(payload.ingredients)
   const steps = parseStepsField(payload.steps)
@@ -89,7 +115,7 @@ export async function createUserRecipe(userId, payload) {
   }
 
   const { data, error } = await supabase
-    .from('user_recipes')
+    .from(USER_RECIPES_TABLE)
     .insert({
       user_id: userId,
       title: payload.title.trim(),
@@ -106,7 +132,7 @@ export async function createUserRecipe(userId, payload) {
     )
     .single()
 
-  if (error) throw error
+  if (error) handleUserRecipesMutationError(error)
   return mapDbRow(data)
 }
 
@@ -116,15 +142,16 @@ export async function createUserRecipe(userId, payload) {
  */
 export async function deleteUserRecipe(userId, recipeId) {
   if (!supabase || !userId) throw new Error('SUPABASE_NOT_CONFIGURED')
+  assertUserRecipesTableReady()
 
   const { data: row, error: fetchError } = await supabase
-    .from('user_recipes')
+    .from(USER_RECIPES_TABLE)
     .select('shared_community_recipe_id')
     .eq('id', recipeId)
     .eq('user_id', userId)
     .maybeSingle()
 
-  if (fetchError) throw fetchError
+  if (fetchError) handleUserRecipesMutationError(fetchError)
 
   if (row?.shared_community_recipe_id) {
     const { error: communityDeleteError } = await supabase
@@ -137,12 +164,12 @@ export async function deleteUserRecipe(userId, recipeId) {
   }
 
   const { error } = await supabase
-    .from('user_recipes')
+    .from(USER_RECIPES_TABLE)
     .delete()
     .eq('id', recipeId)
     .eq('user_id', userId)
 
-  if (error) throw error
+  if (error) handleUserRecipesMutationError(error)
 }
 
 /**
@@ -153,6 +180,7 @@ export async function deleteUserRecipe(userId, recipeId) {
  */
 export async function shareUserRecipeToCommunity(userId, recipe) {
   if (!supabase || !userId) throw new Error('SUPABASE_NOT_CONFIGURED')
+  assertUserRecipesTableReady()
   if (recipe.sharedCommunityRecipeId) {
     throw new Error('ALREADY_SHARED')
   }
@@ -175,7 +203,7 @@ export async function shareUserRecipeToCommunity(userId, recipe) {
   if (insertError) throw insertError
 
   const { error: updateError } = await supabase
-    .from('user_recipes')
+    .from(USER_RECIPES_TABLE)
     .update({
       shared_community_recipe_id: communityRow.id,
       updated_at: new Date().toISOString(),
@@ -183,7 +211,7 @@ export async function shareUserRecipeToCommunity(userId, recipe) {
     .eq('id', recipe.id)
     .eq('user_id', userId)
 
-  if (updateError) throw updateError
+  if (updateError) handleUserRecipesMutationError(updateError)
 
   return communityRow.id
 }
@@ -195,6 +223,7 @@ export async function shareUserRecipeToCommunity(userId, recipe) {
  */
 export async function unshareUserRecipeFromCommunity(userId, recipe) {
   if (!supabase || !userId) throw new Error('SUPABASE_NOT_CONFIGURED')
+  assertUserRecipesTableReady()
 
   const communityId = recipe.sharedCommunityRecipeId
   if (!communityId) {
@@ -210,7 +239,7 @@ export async function unshareUserRecipeFromCommunity(userId, recipe) {
   if (deleteError) throw deleteError
 
   const { error: updateError } = await supabase
-    .from('user_recipes')
+    .from(USER_RECIPES_TABLE)
     .update({
       shared_community_recipe_id: null,
       updated_at: new Date().toISOString(),
@@ -218,7 +247,7 @@ export async function unshareUserRecipeFromCommunity(userId, recipe) {
     .eq('id', recipe.id)
     .eq('user_id', userId)
 
-  if (updateError) throw updateError
+  if (updateError) handleUserRecipesMutationError(updateError)
 }
 
 /** Whether the private recipe is currently published to the community. */
