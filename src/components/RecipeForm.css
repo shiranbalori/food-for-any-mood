@@ -23,6 +23,18 @@
   margin-bottom: 1.4rem;
 }
 
+.recipe-form__field--ingredients {
+  margin-bottom: 0.55rem;
+}
+
+.recipe-form__field--ingredients .recipe-form__hint {
+  margin-top: 0.35rem;
+}
+
+.recipe-form__field--time {
+  margin-bottom: 1.4rem;
+}
+
 .recipe-form__field label {
   display: block;
   font-weight: 600;
@@ -146,11 +158,11 @@
     margin-bottom: 0.9rem;
   }
 
-  .recipe-form__field:has(.ingredient-image-upload) {
-    margin-bottom: 0.75rem;
+  .recipe-form__field--ingredients {
+    margin-bottom: 0.4rem;
   }
 
-  .recipe-form__field:has(.ingredient-image-upload) label {
+  .recipe-form__field--ingredients label {
     margin-bottom: 0.35rem;
   }
 

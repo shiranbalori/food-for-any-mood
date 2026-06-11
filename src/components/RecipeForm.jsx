@@ -21,7 +21,7 @@ export default function RecipeForm({ form, onChange, onSubmit, disabled, theme }
     >
       <h2 className="section-title">{t('formTitle')}</h2>
 
-      <div className="recipe-form__field">
+      <div className="recipe-form__field recipe-form__field--ingredients">
         <div className="voice-field__label-row">
           <label htmlFor="ingredients">{t('ingredientsLabel')}</label>
           <VoiceInputButton
@@ -48,8 +48,7 @@ export default function RecipeForm({ form, onChange, onSubmit, disabled, theme }
         <span className="recipe-form__hint">{t('ingredientsHint')}</span>
       </div>
 
-      <div className="recipe-form__row">
-        <div className="recipe-form__field">
+      <div className="recipe-form__field recipe-form__field--time">
           <label htmlFor="time">
             {t('timeLabel')}: <strong>{t('timeMinutes', { count: form.time })}</strong>
           </label>
@@ -66,7 +65,6 @@ export default function RecipeForm({ form, onChange, onSubmit, disabled, theme }
             <span>{t('timeMin')}</span>
             <span>{t('timeMax')}</span>
           </div>
-        </div>
       </div>
 
       <div className="recipe-form__field">
