@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useLayoutEffect } from 'react'
+import { useState, useCallback, useEffect, useLayoutEffect, useRef } from 'react'
 import BackgroundDecor from './components/BackgroundDecor'
 import Header from './components/Header'
 import CategorySelector from './components/CategorySelector'
@@ -121,6 +121,8 @@ export default function App() {
   const [challengeAuthOpen, setChallengeAuthOpen] = useState(false)
   const [challengeSubmittedToday, setChallengeSubmittedToday] = useState(false)
   const [showRecipeForm, setShowRecipeForm] = useState(true)
+  const recipeResultRef = useRef(null)
+  const pendingRecipeScrollRef = useRef(false)
 
   const refreshMyRecipesCount = useCallback(async () => {
     if (!isAuthenticated || !user?.id || !isUserRecipesAvailable()) {
@@ -190,6 +192,15 @@ export default function App() {
       window.removeEventListener('popstate', applyHash)
     }
   }, [])
+
+  useEffect(() => {
+    if (!recipe || loading || showRecipeForm || !pendingRecipeScrollRef.current) return undefined
+    pendingRecipeScrollRef.current = false
+    const frameId = window.requestAnimationFrame(() => {
+      recipeResultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    })
+    return () => window.cancelAnimationFrame(frameId)
+  }, [recipe, loading, showRecipeForm])
 
   useEffect(() => {
     if (!myAreaOpen) return undefined
@@ -298,6 +309,7 @@ export default function App() {
 
         setRecipe(newRecipe)
         setShowRecipeForm(false)
+        pendingRecipeScrollRef.current = true
         setBackendNotice(fallbackReason)
         setUsedTemplateKeys((prev) =>
           regenerate ? [...prev, newRecipe.templateKey] : [newRecipe.templateKey],
@@ -749,6 +761,7 @@ export default function App() {
         )}
 
         {recipe && !loading && (
+          <div ref={recipeResultRef}>
           <RecipeCard
             key={recipe.id}
             recipe={recipe}
@@ -782,6 +795,7 @@ export default function App() {
             onMealPlanUpdated={handleMealPlanUpdated}
             onBackToEdit={!showRecipeForm ? handleBackToEdit : undefined}
           />
+          </div>
         )}
 
         {showRecipeForm && !activeMyAreaPage && !activeGlobalPage && (
