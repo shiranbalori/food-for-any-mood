@@ -2,9 +2,9 @@ import { useLanguage } from '../i18n/useLanguage'
 import { buildSmartPlaylistSearch } from '../utils/playlistEngine'
 import './PlaylistCard.css'
 
-function SpotifyIcon() {
+function SpotifyIcon({ className = 'playlist-card__brand-icon' }) {
   return (
-    <svg viewBox="0 0 24 24" aria-hidden="true" className="playlist-card__brand-icon">
+    <svg viewBox="0 0 24 24" aria-hidden="true" className={className}>
       <circle cx="12" cy="12" r="12" fill="#1db954" />
       <path
         fill="#fff"
@@ -14,9 +14,9 @@ function SpotifyIcon() {
   )
 }
 
-function YouTubeIcon() {
+function YouTubeIcon({ className = 'playlist-card__brand-icon' }) {
   return (
-    <svg viewBox="0 0 24 24" aria-hidden="true" className="playlist-card__brand-icon">
+    <svg viewBox="0 0 24 24" aria-hidden="true" className={className}>
       <rect width="24" height="24" rx="6" fill="#ff0000" />
       <path fill="#fff" d="M10 8.5v7l6-3.5-6-3.5z" />
     </svg>
@@ -32,6 +32,7 @@ export default function PlaylistCard({
   cookTime,
   style,
   spiceLevel,
+  compact = false,
 }) {
   const { t, language } = useLanguage()
   const data = buildSmartPlaylistSearch(
@@ -47,6 +48,34 @@ export default function PlaylistCard({
     language,
   )
   const isSpotify = data.platform === 'spotify'
+  const openLabel = isSpotify ? 'פתח ב-Spotify' : t('openInYouTube')
+
+  if (compact) {
+    return (
+      <div
+        className={`playlist-card playlist-card--compact playlist-card--${data.platform}`}
+        style={{ '--playlist-accent': isSpotify ? '#1db954' : '#ff0000' }}
+      >
+        <div className="playlist-card__compact-main">
+          <span className="playlist-card__label">פלייליסט מומלץ</span>
+          <p className="playlist-card__compact-title">{data.name}</p>
+          {data.matchPercent != null && (
+            <span className="playlist-card__compact-match">{data.matchPercent}% התאמה</span>
+          )}
+        </div>
+        <a
+          href={data.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={`playlist-card__btn-compact playlist-card__btn-compact--${data.platform}`}
+          aria-label={openLabel}
+        >
+          {isSpotify ? <SpotifyIcon className="playlist-card__btn-icon" /> : null}
+          {openLabel}
+        </a>
+      </div>
+    )
+  }
 
   return (
     <div
@@ -62,9 +91,7 @@ export default function PlaylistCard({
 
       <div className="playlist-card__body">
         <div className="playlist-card__header">
-          <span className="playlist-card__label">
-            {t('playlistRecommendation')}
-          </span>
+          <span className="playlist-card__label">{t('playlistRecommendation')}</span>
           <span className="playlist-card__match">
             {data.matchPercent}% {t('match')}
           </span>

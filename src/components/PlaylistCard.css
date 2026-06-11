@@ -1,3 +1,112 @@
+.playlist-card--compact {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.75rem 0.85rem;
+  margin-bottom: 0.75rem;
+  border-radius: var(--radius-xs);
+  border: 1px solid rgba(148, 163, 184, 0.12);
+  background: rgba(255, 255, 255, 0.55);
+}
+
+.playlist-card--compact.playlist-card--spotify {
+  box-shadow: 0 4px 16px rgba(29, 185, 84, 0.1);
+}
+
+.playlist-card--compact.playlist-card--youtube {
+  box-shadow: 0 4px 16px rgba(255, 0, 0, 0.06);
+}
+
+.playlist-card__compact-main {
+  min-width: 0;
+  flex: 1;
+}
+
+.playlist-card__compact-title {
+  margin: 0.15rem 0 0.2rem;
+  font-size: 0.88rem;
+  font-weight: 700;
+  line-height: 1.35;
+  color: var(--text);
+}
+
+.playlist-card__compact-match {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--playlist-accent);
+}
+
+.playlist-card__btn-compact {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.4rem 0.65rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  border-radius: 999px;
+  text-decoration: none;
+  white-space: nowrap;
+  border: 1px solid transparent;
+  transition: transform var(--transition), box-shadow var(--transition);
+}
+
+.playlist-card__btn-compact--spotify {
+  color: #fff;
+  background: #1db954;
+}
+
+.playlist-card__btn-compact--spotify:hover {
+  box-shadow: 0 4px 14px rgba(29, 185, 84, 0.35);
+}
+
+.playlist-card__btn-compact--youtube {
+  color: #fff;
+  background: #ff0000;
+}
+
+.playlist-card__btn-icon {
+  width: 16px;
+  height: 16px;
+}
+
+@media (max-width: 767px) {
+  .playlist-card--compact {
+    padding: 0.35rem 0.45rem;
+    gap: 0.35rem;
+    margin-bottom: 0.15rem;
+    align-items: center;
+  }
+
+  .playlist-card__label {
+    font-size: 0.68rem;
+  }
+
+  .playlist-card__compact-title {
+    margin: 0.05rem 0 0.08rem;
+    font-size: 0.78rem;
+    line-height: 1.25;
+  }
+
+  .playlist-card__compact-match {
+    font-size: 0.65rem;
+  }
+
+  .playlist-card__btn-compact {
+    padding: 0.25rem 0.45rem;
+    font-size: 0.65rem;
+    min-height: 28px;
+    gap: 0.2rem;
+    border-radius: 999px;
+  }
+
+  .playlist-card__btn-icon {
+    width: 12px;
+    height: 12px;
+  }
+}
+
 .playlist-card {
   display: grid;
   grid-template-columns: auto 1fr;
@@ -205,6 +314,16 @@
 }
 
 @media (max-width: 480px) {
+  .playlist-card--compact {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .playlist-card__btn-compact {
+    justify-content: center;
+    width: 100%;
+  }
+
   .playlist-card {
     grid-template-columns: 1fr;
     text-align: center;

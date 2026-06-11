@@ -123,3 +123,56 @@ html[dir='ltr'] .dietary-toggle__switch--on .dietary-toggle__knob {
     gap: 0.7rem;
   }
 }
+
+@media (max-width: 767px) {
+  .dietary-preferences {
+    margin-bottom: 0.75rem;
+  }
+
+  .dietary-toggle {
+    padding: 0.5rem 0.75rem;
+    gap: 0.55rem;
+    border-radius: calc(var(--radius) - 4px);
+  }
+
+  .dietary-toggle__icon {
+    font-size: 1.05rem;
+  }
+
+  .dietary-toggle__text strong {
+    font-size: 0.82rem;
+  }
+
+  .dietary-toggle__text small {
+    font-size: 0.68rem;
+  }
+
+  .dietary-toggle__switch {
+    width: 40px;
+    height: 22px;
+  }
+
+  .dietary-toggle__knob {
+    width: 16px;
+    height: 16px;
+    top: 3px;
+  }
+
+  .dietary-toggle__switch--on .dietary-toggle__knob {
+    transform: translateX(18px);
+  }
+
+  html[dir='rtl'] .dietary-toggle__switch--on .dietary-toggle__knob {
+    transform: translateX(-18px);
+  }
+
+  html[dir='ltr'] .dietary-toggle__switch--on .dietary-toggle__knob {
+    transform: translateX(18px);
+  }
+
+  .dietary-preferences__note {
+    margin-top: 0.4rem;
+    padding: 0.45rem 0.75rem;
+    font-size: 0.72rem;
+  }
+}

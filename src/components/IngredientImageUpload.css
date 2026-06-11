@@ -67,3 +67,64 @@
   border: 1px solid rgba(217, 119, 6, 0.24);
   color: #92400e;
 }
+
+@media (max-width: 767px) {
+  .ingredient-image-upload {
+    margin: 0 0 0.3rem;
+    padding: 0;
+    border: none;
+    background: transparent;
+    border-radius: 0;
+  }
+
+  .ingredient-image-upload__actions {
+    gap: 0.35rem;
+    margin: 0;
+  }
+
+  .ingredient-image-upload .btn {
+    font-size: 13px;
+    font-weight: 600;
+    min-height: 38px;
+    max-height: 38px;
+    padding: 8px 10px;
+    border-radius: 12px;
+    letter-spacing: 0;
+    line-height: 1.2;
+    gap: 4px;
+  }
+
+  .ingredient-image-upload__pick {
+    width: 100%;
+  }
+
+  .ingredient-image-upload__remove {
+    width: auto;
+    min-height: 38px;
+    padding: 8px 10px;
+  }
+
+  .ingredient-image-upload__analyze {
+    margin-top: 0.35rem;
+    width: 100%;
+    font-size: 13px;
+    min-height: 38px;
+    padding: 8px 10px;
+    border-radius: 12px;
+  }
+
+  .ingredient-image-upload__preview-wrap {
+    margin-top: 0.35rem;
+  }
+
+  .ingredient-image-upload__preview {
+    max-height: 100px;
+  }
+
+  .ingredient-image-upload__notice {
+    margin-top: 0.35rem;
+    padding: 0.4rem 0.5rem;
+    font-size: 0.72rem;
+    line-height: 1.35;
+  }
+}

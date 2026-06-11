@@ -22,7 +22,7 @@ function InsightRow({ active, label }) {
   )
 }
 
-export default function NutritionCoach({ recipe }) {
+export default function NutritionCoach({ recipe, tipsOnly = false }) {
   const { t, dir, isRtl, language } = useLanguage()
   const textDir = isRtl ? 'rtl' : dir
   const [analysis, setAnalysis] = useState(null)
@@ -45,6 +45,20 @@ export default function NutritionCoach({ recipe }) {
       cancelled = true
     }
   }, [recipe?.id, recipe?.name, language])
+
+  if (tipsOnly) {
+    if (loading || !analysis?.tips?.length) return null
+
+    return (
+      <section className="nutrition-coach nutrition-coach--tips-only animate-in" dir={textDir}>
+        <ul className="nutrition-coach__tips-list">
+          {analysis.tips.map((tip, index) => (
+            <li key={`${index}-${tip.slice(0, 12)}`}>{tip}</li>
+          ))}
+        </ul>
+      </section>
+    )
+  }
 
   const score = analysis?.nutritionScore ?? 0
   const classification = getNutritionScoreClassification(score)
