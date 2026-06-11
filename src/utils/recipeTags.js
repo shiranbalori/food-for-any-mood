@@ -9,6 +9,8 @@ const DAIRY_EGG_CANON = new Set([
   'milk', 'egg', 'eggs', 'cheese', 'butter', 'cream', 'yogurt', 'ricotta', 'parmesan', 'feta',
 ])
 
+const HONEY_CANON = new Set(['honey'])
+
 const GLUTEN_CANON = new Set(['flour', 'pasta', 'bread', 'wheat', 'noodles', 'tortilla'])
 
 const SPICY_CANON = new Set(['chili', 'pepper flakes', 'hot sauce', 'curry powder'])
@@ -42,13 +44,14 @@ export function deriveRecipeTags(
   const canons = ingredientCanons(recipe)
   const hasMeatFish = canons.some((item) => MEAT_FISH_CANON.has(item))
   const hasDairyEgg = canons.some((item) => DAIRY_EGG_CANON.has(item))
+  const hasHoney = canons.some((item) => HONEY_CANON.has(item))
   const hasGlutenIng = canons.some((item) => GLUTEN_CANON.has(item))
   const hasSpicyIng = canons.some((item) => SPICY_CANON.has(item))
 
   if (RECIPE_TAGS.vegetarian.categories.includes(category) && !hasMeatFish) {
     tags.add('vegetarian')
   }
-  if (!hasMeatFish && !hasDairyEgg) {
+  if (!hasMeatFish && !hasDairyEgg && !hasHoney) {
     tags.add('vegan')
   }
   if (isGlutenFree && !hasGlutenIng) {
@@ -122,7 +125,7 @@ export function deriveRecipeTags(
   if (hasMeatFish) {
     tags.delete('vegetarian')
     tags.delete('vegan')
-  } else if (hasDairyEgg) {
+  } else if (hasDairyEgg || hasHoney) {
     tags.delete('vegan')
   }
 

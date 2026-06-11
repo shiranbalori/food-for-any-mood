@@ -4,6 +4,7 @@
  * Dairy: milk, cheese, yogurt, cream, butter.
  * Meat: meat, chicken, turkey, fish.
  * Parve: neither dairy nor meat.
+ * Vegan: no meat, dairy, eggs, honey, or animal products.
  * Any: inferred from recipe after generation.
  */
 
@@ -48,6 +49,36 @@ const DAIRY_PATTERNS = [
   /ricotta/i,
   /parmesan/i,
   /cream cheese/i,
+]
+
+const EGG_PATTERNS = [/ביצ/, /\begg\b/i, /\beggs\b/i]
+
+const HONEY_PATTERNS = [/דבש/, /\bhoney\b/i]
+
+const ANIMAL_PRODUCT_PATTERNS = [
+  /ג'לatin/i,
+  /gelatin/i,
+  /whey/i,
+  /casein/i,
+]
+
+const SOUP_STEW_TITLE_SIGNALS = [
+  'מרק',
+  'תבשיל',
+  'נזיד',
+  'מרקון',
+  "צ'ולנט",
+  'cholent',
+  'stew',
+  'soup',
+  'casserole',
+  'chili',
+  'curry',
+  'one-pot',
+  'pot',
+  'broth',
+  'bisque',
+  'chowder',
 ]
 
 const DESSERT_TITLE_KEYWORDS = [
@@ -97,14 +128,14 @@ export function isAnyCategory(category) {
   return category === 'any'
 }
 
+export function isVeganCategory(category) {
+  return category === 'vegan'
+}
+
 export function isInvalidRecipeSelection(recipeType, category) {
   return recipeType === 'dessert' && category === 'meat'
 }
 
-/**
- * Classify generated recipe as dairy / meat / parve from ingredients and steps.
- * Used when the user selected «ללא העדפה» (any).
- */
 export function inferRecipeCategory(recipe) {
   const hasMeat = recipeHasMeat(recipe)
   const hasDairy = recipeHasDairy(recipe)
@@ -113,9 +144,11 @@ export function inferRecipeCategory(recipe) {
   return 'parve'
 }
 
-/** Kosher category used for validation, tags, and UI after generation. */
 export function resolveKosherCategory(selectedCategory, recipe) {
   if (isAnyCategory(selectedCategory)) return inferRecipeCategory(recipe)
+  if (isVeganCategory(selectedCategory)) {
+    return isVeganValid(recipe) ? 'parve' : inferRecipeCategory(recipe)
+  }
 
   const inferred = inferRecipeCategory(recipe)
   if (selectedCategory === 'dairy' && recipeHasDairy(recipe) && !recipeHasMeat(recipe)) {
@@ -151,9 +184,44 @@ export function recipeHasDairy(recipe) {
   return DAIRY_PATTERNS.some((pattern) => pattern.test(text))
 }
 
+export function recipeHasEggs(recipe) {
+  const text = recipeTextBlob(recipe)
+  return EGG_PATTERNS.some((pattern) => pattern.test(text))
+}
+
+export function recipeHasHoney(recipe) {
+  const text = recipeTextBlob(recipe)
+  return HONEY_PATTERNS.some((pattern) => pattern.test(text))
+}
+
+export function recipeHasAnimalProducts(recipe) {
+  const text = recipeTextBlob(recipe)
+  return ANIMAL_PRODUCT_PATTERNS.some((pattern) => pattern.test(text))
+}
+
+export function isVeganValid(recipe) {
+  return (
+    !recipeHasMeat(recipe) &&
+    !recipeHasDairy(recipe) &&
+    !recipeHasEggs(recipe) &&
+    !recipeHasHoney(recipe) &&
+    !recipeHasAnimalProducts(recipe)
+  )
+}
+
 function titleHasDessertKeyword(title) {
   const text = String(title ?? '').toLowerCase()
   return DESSERT_TITLE_KEYWORDS.some((keyword) => text.includes(keyword))
+}
+
+function titleHasSoupStewKeyword(title) {
+  const text = String(title ?? '').toLowerCase()
+  return SOUP_STEW_TITLE_SIGNALS.some((keyword) => text.includes(keyword.toLowerCase()))
+}
+
+function textHasSoupStewSignal(recipe) {
+  const text = recipeTextBlob(recipe)
+  return SOUP_STEW_TITLE_SIGNALS.some((keyword) => text.includes(keyword.toLowerCase()))
 }
 
 function isDairyDessertValid(recipe) {
@@ -167,6 +235,11 @@ function isDairyDessertValid(recipe) {
 function isParveDessertValid(recipe) {
   if (recipeHasMeat(recipe) || recipeHasDairy(recipe)) return false
   return titleHasDessertKeyword(recipe?.name)
+}
+
+function isVeganDessertValid(recipe) {
+  if (!isVeganValid(recipe)) return false
+  return isParveDessertValid(recipe)
 }
 
 function isMeatMealValid(recipe) {
@@ -186,31 +259,60 @@ function isParveMealValid(recipe) {
   return !titleHasDessertKeyword(recipe?.name)
 }
 
-export function validateRecipeCategory(recipeType, category, recipe) {
-  if (isInvalidRecipeSelection(recipeType, category)) return false
+function isVeganMealValid(recipe) {
+  if (!isVeganValid(recipe)) return false
+  return !titleHasDessertKeyword(recipe?.name)
+}
 
-  const effectiveCategory = resolveKosherCategory(category, recipe)
+function isSoupStewValid(recipe) {
+  if (titleHasDessertKeyword(recipe?.name)) return false
+  if (recipeHasMeat(recipe) && recipeHasDairy(recipe)) return false
+  return titleHasSoupStewKeyword(recipe?.name) || textHasSoupStewSignal(recipe)
+}
+
+function validateCategoryRules(recipeType, effectiveCategory, selectedCategory, recipe) {
+  if (selectedCategory === 'vegan' && !isVeganValid(recipe)) return false
 
   const tags = (recipe?.tags ?? []).map((tag) => String(tag).toLowerCase())
   if (tags.includes('vegetarian') && recipeHasMeat(recipe)) return false
+  if (tags.includes('vegan') && !isVeganValid(recipe)) return false
 
   if (effectiveCategory === 'meat' && recipeHasDairy(recipe)) return false
   if (effectiveCategory === 'dairy' && recipeHasMeat(recipe)) return false
-  if (effectiveCategory === 'parve' && (recipeHasMeat(recipe) || recipeHasDairy(recipe))) return false
+  if (effectiveCategory === 'parve' && (recipeHasMeat(recipe) || recipeHasDairy(recipe))) {
+    if (selectedCategory !== 'vegan') return false
+  }
 
   if (recipeType === 'dessert') {
+    if (selectedCategory === 'vegan') return isVeganDessertValid(recipe)
     if (effectiveCategory === 'dairy') return isDairyDessertValid(recipe)
     if (effectiveCategory === 'parve') return isParveDessertValid(recipe)
     return false
   }
 
+  if (recipeType === 'soup_stew') {
+    if (!isSoupStewValid(recipe)) return false
+    if (selectedCategory === 'vegan') return isVeganMealValid(recipe)
+    if (effectiveCategory === 'meat') return isMeatMealValid(recipe)
+    if (effectiveCategory === 'dairy') return isDairyMealValid(recipe)
+    if (effectiveCategory === 'parve') return isParveMealValid(recipe)
+    return false
+  }
+
   if (recipeType === 'meal') {
+    if (selectedCategory === 'vegan') return isVeganMealValid(recipe)
     if (effectiveCategory === 'meat') return isMeatMealValid(recipe)
     if (effectiveCategory === 'dairy') return isDairyMealValid(recipe)
     if (effectiveCategory === 'parve') return isParveMealValid(recipe)
   }
 
   return true
+}
+
+export function validateRecipeCategory(recipeType, category, recipe) {
+  if (isInvalidRecipeSelection(recipeType, category)) return false
+  const effectiveCategory = resolveKosherCategory(category, recipe)
+  return validateCategoryRules(recipeType, effectiveCategory, category, recipe)
 }
 
 export function logRecipeValidation({

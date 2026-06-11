@@ -20,7 +20,7 @@ import {
   validateRecipeRelevance,
 } from '../utils/ingredientRelevance'
 import { applyRecipeIngredientParser } from '../utils/recipeIngredientParser'
-import { buildGroundedChefTitle, validateTitleGrounding } from '../utils/recipeGrounding'
+import { buildGroundedChefTitle, buildGroundedSoupStewTitle, validateTitleGrounding } from '../utils/recipeGrounding'
 import { isLiteralIngredientTitle } from '../utils/recipeTitle'
 import { buildDessertDishTitle } from '../utils/dessertDishTitle'
 import {
@@ -278,6 +278,7 @@ function scoreTemplate(template, userIngredients, time, mood, preferredStyles, g
 }
 
 function resolveTemplateCategory(category, ingredientsRaw) {
+  if (category === 'vegan') return 'parve'
   if (!isAnyCategory(category)) return category
   const { suggestedCategory } = assessCategoryFit(ingredientsRaw, { category: 'any' })
   return suggestedCategory === 'any' ? 'parve' : suggestedCategory
@@ -1039,6 +1040,8 @@ export function buildIngredientFirstFallbackRecipe(
     } else {
       name = buildDessertDishTitle(finalIngredients, { language }).name
     }
+  } else if (effectiveRecipeType === 'soup_stew') {
+    name = buildGroundedSoupStewTitle(filteredUserIngredients, finalIngredients, language, { excludeTitles })
   } else if (hasRegenerationConstraints) {
     const variant = pickAlternateMealVariant({
       ingredients: finalIngredients,

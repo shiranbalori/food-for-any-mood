@@ -112,6 +112,44 @@ export function buildStepsFromUserIngredients(
     ]
   }
 
+  if (recipeType === 'soup_stew') {
+    const simmerMinutes = Math.min(cookingTime, Math.max(15, Math.round(cookingTime * 0.75)))
+    if (language === 'en') {
+      if (names.length === 1) {
+        return [
+          'Heat a pot over medium heat with a little oil.',
+          `Add ${refs[0]} and sauté for 2–3 minutes until fragrant.`,
+          `Add water or broth to cover, bring to a boil, then simmer for about ${simmerMinutes} minutes until tender.`,
+          'Taste and adjust seasoning.',
+          'Serve hot in bowls.',
+        ]
+      }
+      return [
+        'Heat a pot over medium heat with a little oil.',
+        `Add ${listPhrase} and sauté for 3–4 minutes.`,
+        'Add water or broth to cover the ingredients and bring to a boil.',
+        `Reduce heat and simmer for about ${simmerMinutes} minutes until everything is tender and the flavors meld.`,
+        'Taste, adjust seasoning, and serve hot.',
+      ]
+    }
+    if (names.length === 1) {
+      return [
+        'מחממים סיר על אש בינונית עם מעט שמן.',
+        `מוסיפים את ${refs[0]} ומטגנים 2–3 דקות עד שמתפתחת ארומה.`,
+        `מוסיפים מים או ציר לכיסוי, מרתיחים ואז מבשלים על אש נמוכה כ-${simmerMinutes} דקות עד שהמרכיב רך.`,
+        'טועמים ומתבלים לפי הצורך.',
+        'מגישים חם בקערות.',
+      ]
+    }
+    return [
+      'מחממים סיר על אש בינונית עם מעט שמן.',
+      `מוסיפים את ${listPhrase} ומטגנים 3–4 דקות.`,
+      'מוסיפים מים או ציר לכיסוי המרכיבים ומרתיחים.',
+      `מנמיכים את האש ומבשלים כ-${simmerMinutes} דקות עד שהמרכיבים רכים והטעמים מתמזגים.`,
+      'טועמים, מתבלים ומגישים חם.',
+    ]
+  }
+
   if (language === 'en') {
     if (names.length === 1) {
       return [

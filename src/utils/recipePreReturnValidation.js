@@ -191,7 +191,7 @@ export function assessIngredientFeasibility(
     }
   }
 
-  if (recipeType === 'meal' && !profile.hasSavoryMain) {
+  if ((recipeType === 'meal' || recipeType === 'soup_stew') && !profile.hasSavoryMain) {
     if (canons.length <= 2 && !profile.hasSweet) {
       return {
         recipePossible: false,

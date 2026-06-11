@@ -47,6 +47,9 @@ MEAT_FISH_CANON = frozenset(
 
 GLUTEN_CANON = frozenset({"flour", "pasta", "bread", "wheat", "noodles", "tortilla", "bulgur", "semolina"})
 
+EGG_CANON = frozenset({"egg", "eggs"})
+HONEY_CANON = frozenset({"honey"})
+
 DAIRY_TEXT = re.compile(
     r"חלב|גבינ|שמנת|חמאה|יוגורט|קוטג|מוצרל|פרמז|ריקוט|מסקרפונ|"
     r"\bmilk\b|cheese|cream|butter|yogurt",
@@ -57,6 +60,8 @@ MEAT_TEXT = re.compile(
     r"chicken|beef|fish|salmon|tuna|turkey|lamb|pork|\bmeat\b|steak",
     re.IGNORECASE,
 )
+EGG_TEXT = re.compile(r"ביצ|\begg\b|\beggs\b", re.IGNORECASE)
+HONEY_TEXT = re.compile(r"דבש|\bhoney\b", re.IGNORECASE)
 
 
 def _ingredient_profile(user_ingredients: list[str]) -> dict:
@@ -71,12 +76,16 @@ def _ingredient_profile(user_ingredients: list[str]) -> dict:
 
     has_dairy = bool(canon_set & DAIRY_CANON) or bool(DAIRY_TEXT.search(text_blob))
     has_meat = bool(canon_set & MEAT_FISH_CANON) or bool(MEAT_TEXT.search(text_blob))
+    has_eggs = bool(canon_set & EGG_CANON) or bool(EGG_TEXT.search(text_blob))
+    has_honey = bool(canon_set & HONEY_CANON) or bool(HONEY_TEXT.search(text_blob))
     has_gluten = bool(canon_set & GLUTEN_CANON)
 
     return {
         "canons": canons,
         "has_dairy": has_dairy,
         "has_meat": has_meat,
+        "has_eggs": has_eggs,
+        "has_honey": has_honey,
         "has_gluten": has_gluten,
     }
 
@@ -93,8 +102,8 @@ def _suggest_category(profile: dict) -> str:
 
 def _category_label(category: str, *, language: str) -> str:
     if language == "en":
-        return {"dairy": "dairy", "meat": "meat", "parve": "parve"}.get(category, category)
-    return {"dairy": "חלבי", "meat": "בשרי", "parve": "פרווה"}.get(category, category)
+        return {"dairy": "dairy", "meat": "meat", "parve": "parve", "vegan": "vegan"}.get(category, category)
+    return {"dairy": "חלבי", "meat": "בשרי", "parve": "פרווה", "vegan": "טבעוני"}.get(category, category)
 
 
 def assess_category_fit(
@@ -176,6 +185,36 @@ def assess_category_fit(
             "reason": "",
             "suggested_category": suggested,
             "missing_ingredients": [],
+        }
+
+    if category == "vegan" and (
+        profile["has_meat"] or profile["has_dairy"] or profile["has_eggs"] or profile["has_honey"]
+    ):
+        vegan_conflicts = [
+            item
+            for item in user_ingredients
+            if (
+                canonical_ingredient(item) in MEAT_FISH_CANON
+                or canonical_ingredient(item) in DAIRY_CANON
+                or canonical_ingredient(item) in EGG_CANON
+                or canonical_ingredient(item) in HONEY_CANON
+                or MEAT_TEXT.search(item)
+                or DAIRY_TEXT.search(item)
+                or EGG_TEXT.search(item)
+                or HONEY_TEXT.search(item)
+            )
+        ]
+        return {
+            "category_ok": False,
+            "reason": (
+                "בחרתם «טבעוני» אבל יש במרכיבים בשר, חלב, ביצים, דבש או מוצרים מן החי. "
+                "הסירו אותם או בחרו קטגוריה אחרת."
+                if is_he
+                else "Vegan is selected but your ingredients include meat, dairy, eggs, honey, or animal products. "
+                "Remove them or choose another category."
+            ),
+            "suggested_category": "parve",
+            "missing_ingredients": vegan_conflicts[:4],
         }
 
     return {

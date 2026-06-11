@@ -9,9 +9,9 @@ from typing import Literal
 from ingredient_allowlist import find_unauthorized_recipe_ingredients
 from ingredient_relevance import MIN_INGREDIENT_MATCH_RATIO, validate_recipe_relevance
 
-RecipeType = Literal["meal", "dessert"]
+RecipeType = Literal["meal", "dessert", "soup_stew"]
 Category = Literal["dairy", "meat", "parve"]
-UserCategory = Literal["dairy", "meat", "parve", "any"]
+UserCategory = Literal["dairy", "meat", "parve", "vegan", "any"]
 
 TIME_BUFFER_RATIO = 1.35
 TIME_BUFFER_MINUTES = 15
@@ -130,6 +130,43 @@ SAVORY_MEAL_SIGNALS = (
     "ארוחה",
 )
 
+SOUP_STEW_TITLE_SIGNALS = (
+    "מרק",
+    "תבשיל",
+    "נזיד",
+    "מרקון",
+    "צ'ולנט",
+    "cholent",
+    "stew",
+    "soup",
+    "casserole",
+    "chili",
+    "curry",
+    "one-pot",
+    "pot",
+    "broth",
+    "bisque",
+    "chowder",
+)
+
+EGG_PATTERNS = (
+    r"ביצ",
+    r"\begg\b",
+    r"\beggs\b",
+)
+
+HONEY_PATTERNS = (
+    r"דבש",
+    r"\bhoney\b",
+)
+
+ANIMAL_PRODUCT_PATTERNS = (
+    r"gelatin",
+    r"ג'לatin",
+    r"whey",
+    r"casein",
+)
+
 MEAT_PATTERNS = (
     r"עוף",
     r"חזה\s*עוף",
@@ -234,6 +271,16 @@ def is_clearly_savory_meal(recipe: dict) -> bool:
     return any(signal in text for signal in SAVORY_MEAL_SIGNALS)
 
 
+def title_has_soup_stew_keyword(title: str) -> bool:
+    text = (title or "").lower()
+    return any(signal in text for signal in SOUP_STEW_TITLE_SIGNALS)
+
+
+def text_has_soup_stew_signal(recipe: dict) -> bool:
+    text = recipe_text_blob(recipe)
+    return any(signal in text for signal in SOUP_STEW_TITLE_SIGNALS)
+
+
 def validate_recipe_type(recipe_type: RecipeType, recipe: dict) -> bool:
     name = (recipe.get("name") or "").strip()
     if recipe_type == "dessert":
@@ -249,6 +296,12 @@ def validate_recipe_type(recipe_type: RecipeType, recipe: dict) -> bool:
             if savory_hits >= 1 and not title_has_dessert_keyword(name):
                 return False
         return True
+    if recipe_type == "soup_stew":
+        if title_has_dessert_keyword(name):
+            return False
+        if is_likely_dessert(recipe):
+            return False
+        return title_has_soup_stew_keyword(name) or text_has_soup_stew_signal(recipe)
     if recipe_type == "meal":
         lower_name = name.lower()
         if any(keyword in lower_name for keyword in MEAL_DESSERT_BLOCKED_IN_TITLE):
@@ -271,6 +324,31 @@ def recipe_has_dairy(recipe: dict) -> bool:
     return any(re.search(pattern, text) for pattern in DAIRY_PATTERNS)
 
 
+def recipe_has_eggs(recipe: dict) -> bool:
+    text = recipe_text_blob(recipe)
+    return any(re.search(pattern, text) for pattern in EGG_PATTERNS)
+
+
+def recipe_has_honey(recipe: dict) -> bool:
+    text = recipe_text_blob(recipe)
+    return any(re.search(pattern, text) for pattern in HONEY_PATTERNS)
+
+
+def recipe_has_animal_products(recipe: dict) -> bool:
+    text = recipe_text_blob(recipe)
+    return any(re.search(pattern, text) for pattern in ANIMAL_PRODUCT_PATTERNS)
+
+
+def is_vegan_valid(recipe: dict) -> bool:
+    return (
+        not recipe_has_meat(recipe)
+        and not recipe_has_dairy(recipe)
+        and not recipe_has_eggs(recipe)
+        and not recipe_has_honey(recipe)
+        and not recipe_has_animal_products(recipe)
+    )
+
+
 def is_invalid_recipe_selection(recipe_type: RecipeType, category: str) -> bool:
     """Dessert + meat category is never allowed."""
     return recipe_type == "dessert" and category == "meat"
@@ -290,6 +368,8 @@ def infer_recipe_category(recipe: dict) -> Category:
 def resolve_kosher_category(selected_category: str, recipe: dict) -> Category:
     if selected_category == "any":
         return infer_recipe_category(recipe)
+    if selected_category == "vegan":
+        return "parve" if is_vegan_valid(recipe) else infer_recipe_category(recipe)
     inferred = infer_recipe_category(recipe)
     if selected_category == "dairy" and recipe_has_dairy(recipe) and not recipe_has_meat(recipe):
         return "dairy"
@@ -353,6 +433,22 @@ def is_parve_meal_valid(recipe: dict) -> bool:
     return True
 
 
+def is_vegan_meal_valid(recipe: dict) -> bool:
+    return is_vegan_valid(recipe) and not title_has_dessert_keyword(recipe.get("name", ""))
+
+
+def is_vegan_dessert_valid(recipe: dict) -> bool:
+    return is_vegan_valid(recipe) and is_parve_dessert_valid(recipe)
+
+
+def is_soup_stew_valid(recipe: dict) -> bool:
+    if not validate_recipe_type("soup_stew", recipe):
+        return False
+    if recipe_has_meat(recipe) and recipe_has_dairy(recipe):
+        return False
+    return True
+
+
 def validateRecipeCategory(
     recipe_type: RecipeType,
     category: Category,
@@ -375,18 +471,40 @@ def validate_recipe_category(
     tags = [str(tag).lower() for tag in (recipe.get("tags") or [])]
     if "vegetarian" in tags and recipe_has_meat(recipe):
         return False
+    if "vegan" in tags and not is_vegan_valid(recipe):
+        return False
+
+    if category == "vegan" and not is_vegan_valid(recipe):
+        return False
 
     if violates_kosher_category(effective, recipe):
         return False
 
     if recipe_type == "dessert":
+        if category == "vegan":
+            return is_vegan_dessert_valid(recipe)
         if effective == "dairy":
             return is_dairy_dessert_valid(recipe)
         if effective == "parve":
             return is_parve_dessert_valid(recipe)
         return False
 
+    if recipe_type == "soup_stew":
+        if not is_soup_stew_valid(recipe):
+            return False
+        if category == "vegan":
+            return is_vegan_meal_valid(recipe)
+        if effective == "meat":
+            return is_meat_meal_valid(recipe)
+        if effective == "dairy":
+            return is_dairy_meal_valid(recipe)
+        if effective == "parve":
+            return is_parve_meal_valid(recipe)
+        return False
+
     if recipe_type == "meal":
+        if category == "vegan":
+            return is_vegan_meal_valid(recipe)
         if effective == "meat":
             return is_meat_meal_valid(recipe)
         if effective == "dairy":
@@ -449,6 +567,8 @@ def violates_kosher_category(category: str, recipe: dict) -> bool:
         return has_meat
     if category == "parve":
         return has_meat or has_dairy
+    if category == "vegan":
+        return not is_vegan_valid(recipe)
     return False
 
 

@@ -18,8 +18,13 @@ const MEAT_FISH_CANON = new Set([
 
 const GLUTEN_CANON = new Set(['flour', 'pasta', 'bread', 'wheat', 'noodles', 'tortilla', 'bulgur', 'semolina'])
 
+const EGG_CANON = new Set(['egg', 'eggs'])
+const HONEY_CANON = new Set(['honey'])
+
 const DAIRY_TEXT = /חלב|גבינ|שמנת|חמאה|יוגורט|קוטג|מוצרל|פרמז|ריקוט|מסקרפונ|\bmilk\b|cheese|cream|butter|yogurt/i
 const MEAT_TEXT = /עוף|בשר|בקר|כבש|הודו|דג|סלמון|טונה|נקניק|קבב|סטייק|chicken|beef|fish|salmon|tuna|turkey|lamb|pork|\bmeat\b|steak/i
+const EGG_TEXT = /ביצ|\begg\b|\beggs\b/i
+const HONEY_TEXT = /דבש|\bhoney\b/i
 
 function ingredientProfile(userIngredients) {
   const canons = userIngredients
@@ -30,6 +35,8 @@ function ingredientProfile(userIngredients) {
   return {
     hasDairy: [...canonSet].some((c) => DAIRY_CANON.has(c)) || DAIRY_TEXT.test(textBlob),
     hasMeat: [...canonSet].some((c) => MEAT_FISH_CANON.has(c)) || MEAT_TEXT.test(textBlob),
+    hasEggs: [...canonSet].some((c) => EGG_CANON.has(c)) || EGG_TEXT.test(textBlob),
+    hasHoney: [...canonSet].some((c) => HONEY_CANON.has(c)) || HONEY_TEXT.test(textBlob),
     hasGluten: [...canonSet].some((c) => GLUTEN_CANON.has(c)),
   }
 }
@@ -41,8 +48,10 @@ function suggestCategory(profile) {
 }
 
 function categoryLabel(category, language) {
-  if (language === 'en') return { dairy: 'dairy', meat: 'meat', parve: 'parve' }[category] ?? category
-  return { dairy: 'חלבי', meat: 'בשרי', parve: 'פרווה' }[category] ?? category
+  if (language === 'en') {
+    return { dairy: 'dairy', meat: 'meat', parve: 'parve', vegan: 'vegan' }[category] ?? category
+  }
+  return { dairy: 'חלבי', meat: 'בשרי', parve: 'פרווה', vegan: 'טבעוני' }[category] ?? category
 }
 
 export function assessCategoryFit(userIngredientsRaw, { category = 'dairy', isGlutenFree = false, language = 'he' } = {}) {
@@ -115,6 +124,30 @@ export function assessCategoryFit(userIngredientsRaw, { category = 'dairy', isGl
       reason: '',
       suggestedCategory: suggested,
       missingIngredients: [],
+    }
+  }
+
+  if (category === 'vegan' && (profile.hasMeat || profile.hasDairy || profile.hasEggs || profile.hasHoney)) {
+    const veganConflicts = userIngredients.filter((item) => {
+      const canon = canonicalIngredient(item)
+      return (
+        MEAT_FISH_CANON.has(canon) ||
+        DAIRY_CANON.has(canon) ||
+        EGG_CANON.has(canon) ||
+        HONEY_CANON.has(canon) ||
+        MEAT_TEXT.test(item) ||
+        DAIRY_TEXT.test(item) ||
+        EGG_TEXT.test(item) ||
+        HONEY_TEXT.test(item)
+      )
+    })
+    return {
+      categoryOk: false,
+      reason: isHe
+        ? 'בחרתם «טבעוני» אבל יש במרכיבים בשר, חלב, ביצים, דבש או מוצרים מן החי. הסירו אותם או בחרו קטגוריה אחרת.'
+        : 'Vegan is selected but your ingredients include meat, dairy, eggs, honey, or animal products. Remove them or choose another category.',
+      suggestedCategory: 'parve',
+      missingIngredients: veganConflicts.slice(0, 4),
     }
   }
 

@@ -4,11 +4,12 @@ import './CategorySelector.css'
 
 const RECIPE_TYPES = [
   { id: 'meal', emoji: '🍽️' },
+  { id: 'soup_stew', emoji: '🍲' },
   { id: 'dessert', emoji: '🍰' },
 ]
 
-/** Display order: פרווה, בשרי, חלבי, ללא העדפה */
-const CATEGORY_DISPLAY_ORDER = ['parve', 'meat', 'dairy', 'any']
+/** Display order: חלבי, בשרי, פרווה, טבעוני, ללא העדפה */
+const CATEGORY_DISPLAY_ORDER = ['dairy', 'meat', 'parve', 'vegan', 'any']
 
 export default function CategorySelector({ selected, onSelect, recipeType, onRecipeTypeChange }) {
   const { t } = useLanguage()

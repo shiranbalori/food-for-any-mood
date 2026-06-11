@@ -299,6 +299,9 @@ def build_ingredient_fallback_recipe(
     tags: list[str] = ["quick"] if cooking_time <= 25 else []
     if category == "parve":
         tags.append("vegetarian")
+    if category == "vegan":
+        tags.append("vegetarian")
+        tags.append("vegan")
 
     if recipe_type == "dessert" and category == "meat":
         name = build_title_from_ingredients(
@@ -356,6 +359,18 @@ def build_ingredient_fallback_recipe(
                     language=language,
                     cooking_time=cooking_time,
                 )
+    elif recipe_type == "soup_stew":
+        steps = build_steps_from_user_ingredients(
+            display,
+            recipe_type="soup_stew",
+            language=language,
+            cooking_time=cooking_time,
+        )
+        name = build_title_from_ingredients(
+            ingredients,
+            language=language,
+            recipe_type="soup_stew",
+        )
     else:
         if pattern_match:
             pattern = pattern_match.pattern

@@ -35,6 +35,18 @@ export const CATEGORIES = {
     cardBg: 'rgba(209, 250, 229, 0.6)',
     shadow: '0 24px 48px rgba(5, 150, 105, 0.18), 0 0 0 1px rgba(255,255,255,0.5) inset',
   },
+  vegan: {
+    id: 'vegan',
+    emoji: '🌱',
+    gradient: 'linear-gradient(135deg, #fef9c3 0%, #facc15 42%, #ca8a04 100%)',
+    mesh: 'radial-gradient(at 25% 25%, rgba(253, 224, 71, 0.45) 0%, transparent 50%), radial-gradient(at 75% 70%, rgba(250, 204, 21, 0.28) 0%, transparent 45%)',
+    accent: '#ca8a04',
+    accentLight: 'rgba(254, 249, 195, 0.85)',
+    accentDark: '#a16207',
+    glow: 'rgba(234, 179, 8, 0.4)',
+    cardBg: 'rgba(254, 249, 195, 0.6)',
+    shadow: '0 24px 48px rgba(202, 138, 4, 0.18), 0 0 0 1px rgba(255,255,255,0.5) inset',
+  },
   any: {
     id: 'any',
     emoji: '🎯',

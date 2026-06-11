@@ -6,7 +6,7 @@ import { mergeTranscriptIntoField } from '../utils/speechTranscription'
 import VoiceInputButton from './VoiceInputButton'
 import './UploadCommunityRecipeModal.css'
 
-const RECIPE_TYPES = ['meal', 'dessert']
+const RECIPE_TYPES = ['meal', 'dessert', 'soup_stew']
 const SERVING_OPTIONS = [1, 2, 4, 6, 8]
 
 const INITIAL_FORM = {

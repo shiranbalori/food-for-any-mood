@@ -578,7 +578,7 @@ export default function App() {
     }))
     if (categoryHint === 'dessert') {
       setRecipeType('dessert')
-    } else if (categoryHint && categoryHint !== 'none' && ['dairy', 'meat', 'parve'].includes(categoryHint)) {
+    } else if (categoryHint && categoryHint !== 'none' && ['dairy', 'meat', 'parve', 'vegan'].includes(categoryHint)) {
       setCategory(categoryHint)
     }
     setChallengeModalOpen(false)

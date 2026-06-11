@@ -11,7 +11,7 @@ import VoiceInputButton from './VoiceInputButton'
 import './UploadCommunityRecipeModal.css'
 import './DietaryPreferences.css'
 
-const RECIPE_TYPES = ['meal', 'dessert']
+const RECIPE_TYPES = ['meal', 'dessert', 'soup_stew']
 
 const INITIAL_FORM = {
   title: '',

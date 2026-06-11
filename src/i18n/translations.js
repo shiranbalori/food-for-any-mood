@@ -156,6 +156,7 @@ export const translations = {
     recipeTypes: {
       meal: 'ארוחה',
       dessert: 'קינוח',
+      soup_stew: 'מרק/תבשיל',
     },
     dietaryTitle: 'העדפות תזונה',
     glutenFreeLabel: 'ללא גלוטן',
@@ -173,6 +174,7 @@ export const translations = {
       dairy: 'חלבי',
       meat: 'בשרי',
       parve: 'פרווה',
+      vegan: 'טבעוני',
       any: 'ללא העדפה',
     },
     formTitle: 'מה יש לך במטבח?',
@@ -686,6 +688,7 @@ export const translations = {
     recipeTypes: {
       meal: 'Meal',
       dessert: 'Dessert',
+      soup_stew: 'Soup/Stew',
     },
     dietaryTitle: 'Dietary preferences',
     glutenFreeLabel: 'Gluten Free',
@@ -703,6 +706,7 @@ export const translations = {
       dairy: 'Dairy',
       meat: 'Meat',
       parve: 'Parve',
+      vegan: 'Vegan',
       any: 'No preference',
     },
     formTitle: "What's in your kitchen?",

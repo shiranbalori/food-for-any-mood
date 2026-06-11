@@ -113,6 +113,40 @@ def build_steps_from_user_ingredients(
             "מגישים.",
         ]
 
+    if recipe_type == "soup_stew":
+        simmer_minutes = min(cooking_time, max(15, int(cooking_time * 0.75)))
+        if language == "en":
+            if len(names) == 1:
+                return [
+                    "Heat a pot over medium heat with a little oil.",
+                    f"Add {refs[0]} and sauté for 2–3 minutes until fragrant.",
+                    f"Add water or broth to cover, bring to a boil, then simmer for about {simmer_minutes} minutes until tender.",
+                    "Taste and adjust seasoning.",
+                    "Serve hot in bowls.",
+                ]
+            return [
+                "Heat a pot over medium heat with a little oil.",
+                f"Add {list_phrase} and sauté for 3–4 minutes.",
+                "Add water or broth to cover the ingredients and bring to a boil.",
+                f"Reduce heat and simmer for about {simmer_minutes} minutes until everything is tender and the flavors meld.",
+                "Taste, adjust seasoning, and serve hot.",
+            ]
+        if len(names) == 1:
+            return [
+                "מחממים סיר על אש בינונית עם מעט שמן.",
+                f"מוסיפים את {refs[0]} ומטגנים 2–3 דקות עד שמתפתחת ארומה.",
+                f"מוסיפים מים או ציר לכיסוי, מרתיחים ואז מבשלים על אש נמוכה כ-{simmer_minutes} דקות עד שהמרכיב רך.",
+                "טועמים ומתבלים לפי הצורך.",
+                "מגישים חם בקערות.",
+            ]
+        return [
+            "מחממים סיר על אש בינונית עם מעט שמן.",
+            f"מוסיפים את {list_phrase} ומטגנים 3–4 דקות.",
+            "מוסיפים מים או ציר לכיסוי המרכיבים ומרתיחים.",
+            f"מנמיכים את האש ומבשלים כ-{simmer_minutes} דקות עד שהמרכיבים רכים והטעמים מתמזגים.",
+            "טועמים, מתבלים ומגישים חם.",
+        ]
+
     if language == "en":
         if len(names) == 1:
             return [

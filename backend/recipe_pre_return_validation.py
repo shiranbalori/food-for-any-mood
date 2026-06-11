@@ -242,7 +242,7 @@ def assess_ingredient_feasibility(
                 "missing_ingredients": missing,
             }
 
-    if recipe_type == "meal" and not profile["has_savory_main"]:
+    if (recipe_type == "meal" or recipe_type == "soup_stew") and not profile["has_savory_main"]:
         if len(canons) <= 2 and not profile["has_sweet"]:
             missing = (
                 ["חלבון", "פחמימה", "או ירק מרכזי"]

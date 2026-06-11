@@ -295,6 +295,46 @@ export function buildGroundedChefTitle(
   return language === 'he' ? 'מנה ביתית מהמטבח' : 'Homestyle dish'
 }
 
+/**
+ * Build a soup/stew title using user-provided ingredients.
+ */
+export function buildGroundedSoupStewTitle(
+  userIngredients = [],
+  recipeIngredients = [],
+  language = 'he',
+  { excludeTitles = [] } = {},
+) {
+  const mains = getGroundedMainLabels(userIngredients, recipeIngredients, language)
+  const candidates = []
+
+  if (mains.length >= 2) {
+    const [first, second] = mains
+    candidates.push(
+      language === 'he' ? `מרק ${first} ו${second}` : `${first} and ${second} soup`,
+      language === 'he' ? `תבשיל ${first} ו${second}` : `${first} and ${second} stew`,
+      language === 'he' ? `נזיד ${first}` : `${first} stew`,
+    )
+  } else if (mains.length === 1) {
+    const first = mains[0]
+    candidates.push(
+      language === 'he' ? `מרק ${first}` : `${first} soup`,
+      language === 'he' ? `תבשיל ${first}` : `${first} stew`,
+      language === 'he' ? `נזיד ${first}` : `${first} one-pot`,
+    )
+  } else {
+    candidates.push(
+      language === 'he' ? 'מרק ירקות' : 'Vegetable soup',
+      language === 'he' ? 'תבשיל קטניות' : 'Lentil stew',
+      language === 'he' ? 'נזיד ירקות' : 'Hearty vegetable pot',
+    )
+  }
+
+  const picked = pickFirstAllowedTitle(candidates, recipeIngredients, userIngredients, language, excludeTitles)
+  if (picked) return picked
+
+  return language === 'he' ? 'מרק ביתי מנחם' : 'Homestyle comfort soup'
+}
+
 export function repairRecipeGrounding(recipe, userIngredientsRaw, language = 'he', options = {}) {
   const userIngredients = parseUserIngredients(userIngredientsRaw)
   if (!userIngredients.length) return recipe

@@ -29,7 +29,7 @@ export const RECIPE_TAGS = {
   highProtein: { minProtein: 25 },
   healthy: { minHealthScore: 80 },
   quick: { maxTime: 25 },
-  vegetarian: { categories: ['dairy', 'parve'] },
+  vegetarian: { categories: ['dairy', 'parve', 'vegan'] },
   comfortFood: { styles: ['comfort'] },
 }
 

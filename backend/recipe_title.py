@@ -174,6 +174,16 @@ def build_title_from_ingredients(
 
         return build_dessert_dish_title(ingredients, language=language)["name"]
 
+    if recipe_type == "soup_stew":
+        main_names = list(
+            dict.fromkeys(_display_ingredient(item) for item in _filter_main_ingredients(ingredients))
+        )[:1]
+        main_names = [name for name in main_names if name]
+        if main_names:
+            main = main_names[0]
+            return f"{main} soup" if language == "en" else f"מרק {main}"
+        return "Vegetable soup" if language == "en" else "מרק ירקות"
+
     main_names = list(
         dict.fromkeys(_display_ingredient(item) for item in _filter_main_ingredients(ingredients))
     )[:2]

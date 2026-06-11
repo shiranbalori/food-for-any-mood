@@ -9,6 +9,7 @@ KOSHER_CATEGORY_DEFINITIONS_HE = """
 - בשרי: מכיל בשר, עוף, הודו, דג או מוצרי בשר. אסור: חלב, גבינה, יוגורט, שמנת, חמאה.
 - פרווה: ללא חלב וללא בשר. אסור במפורש: חלב, גבינה, יוגורט, שמנת, חמאה, בשר, עוף, הודו, דג.
   דוגמאות למנות פרווה: ירקות, אורז, קטניות, סלטים, מנות על בסיס פירות.
+- טבעוני: ללא בשר, חלב, ביצים, דבש או מוצרים מן החי (כולל ג'לטין). מותרים: ירקות, קטניות, אורז, פירות, קטניות, שמנים צמחיים.
 """
 
 KOSHER_CATEGORY_ANY_HE = """
@@ -24,6 +25,7 @@ Category definitions (mandatory):
 - Meat: contains meat, chicken, turkey, fish, or other meat products. No milk, cheese, yogurt, cream, or butter.
 - Parve: contains neither dairy nor meat. Must NOT include: milk, cheese, yogurt, cream, butter, meat, chicken, turkey, fish.
   Examples: vegetable dishes, rice, legumes, salads, fruit-based recipes.
+- Vegan: no meat, dairy, eggs, honey, or animal products (including gelatin). Allowed: vegetables, legumes, rice, fruits, plant oils.
 """
 
 KOSHER_CATEGORY_ANY_EN = """

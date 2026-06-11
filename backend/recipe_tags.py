@@ -62,7 +62,7 @@ def derive_recipe_tags(
     has_gluten = bool(canon_set & GLUTEN_CANON)
     has_spicy = bool(canon_set & SPICY_CANON)
 
-    if category in ("dairy", "parve") and not has_meat_fish:
+    if category in ("dairy", "parve", "vegan") and not has_meat_fish:
         tags.add("vegetarian")
     if not has_meat_fish and not has_dairy_egg:
         tags.add("vegan")

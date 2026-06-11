@@ -27,6 +27,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, File, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from google import genai
+from ingredient_safety_validation import assess_ingredient_safety
 from ingredient_relevance import (
     MIN_INGREDIENT_MATCH_RATIO,
     build_ingredient_fallback_recipe,
@@ -239,11 +240,11 @@ async def log_incoming_requests(request, call_next):
 # Request / response models (match frontend GeneratedRecipe contract)
 # ---------------------------------------------------------------------------
 KosherCategory = Literal["dairy", "meat", "parve"]
-Category = Literal["dairy", "meat", "parve", "any"]
+Category = Literal["dairy", "meat", "parve", "vegan", "any"]
 MusicPlatform = Literal["spotify", "youtube"]
 Mood = Literal["happy", "cozy", "energetic", "relaxed", "adventurous", "comfort"]
 ServingsCount = Literal[1, 2, 4, 6, 8]
-RecipeType = Literal["meal", "dessert"]
+RecipeType = Literal["meal", "dessert", "soup_stew"]
 Language = Literal["he", "en"]
 
 
@@ -465,12 +466,15 @@ CATEGORY_LABELS: dict[Category, str] = {
     "dairy": "חלבי",
     "meat": "בשרי",
     "parve": "פרווה",
+    "vegan": "טבעוני",
     "any": "ללא העדפה",
 }
 
 
 def _template_category(payload: GenerateRecipeRequest) -> KosherCategory:
     """Map user selection to a kosher template key (dairy/meat/parve)."""
+    if payload.category == "vegan":
+        return "parve"
     if payload.category != "any":
         return payload.category  # type: ignore[return-value]
     user_ingredients = parse_user_ingredients(payload.ingredients)
@@ -506,6 +510,7 @@ MOOD_DESCRIPTIONS: dict[Mood, str] = {
 RECIPE_TYPE_LABELS: dict[RecipeType, str] = {
     "meal": "ארוחה",
     "dessert": "קינוח",
+    "soup_stew": "מרק/תבשיל",
 }
 
 PLAYLIST_PRESETS: dict[MusicPlatform, dict] = {
@@ -649,6 +654,17 @@ def _build_gemini_prompt_he(payload: GenerateRecipeRequest, *, strict: bool = Fa
 - אל תמציא מנה גנרית שלא קשורה למרכיבים, למצב הרוח, לקטגוריה או לזמן.
 """
 
+    soup_stew_rules = ""
+    if payload.recipeType == "soup_stew":
+        soup_stew_rules = """
+כללי מרק/תבשיל (חובה — סוג מתכון: מרק/תבשיל):
+- המתכון חייב להיות מרק, תבשיל, נזיד, סיר אחד, תבשיל בתבנית או מנה מבושלת מנחמת.
+- שם המנה חייב לכלול מרק, תבשיל, נזיד, סיר, צ'ולנט או מנה דומה.
+- אסור: קינוח, עוגה, סלט קר בלבד, מנה מהירה במחבת ללא נוזל/רוטב מבושל.
+- שלבי ההכנה: חימום, התבשלות, רתיחה, בישול לאט, ערבוב — אופייני למרק/תבשיל.
+- אם המשתמש ציין מרכיבים — בנה מרק/תבשיל סביבם, לא ארוחה יבשה ולא קינוח.
+"""
+
     dessert_rules = ""
     if payload.recipeType == "dessert":
         if user_ingredients:
@@ -745,7 +761,7 @@ def _build_gemini_prompt_he(payload: GenerateRecipeRequest, *, strict: bool = Fa
 - מרכיבים זמינים (בסיס המנה): {ingredients_note}
 - מספר מנות: {payload.servings}
 - פלטפורמת מוזיקה לפלייליסט: {payload.musicPlatform}
-{ingredient_rules}{title_rules}{description_rules}{quantity_rules}{meal_rules}{dessert_rules}{kosher_rules}{mood_time_rules}
+{ingredient_rules}{title_rules}{description_rules}{quantity_rules}{meal_rules}{soup_stew_rules}{dessert_rules}{kosher_rules}{mood_time_rules}
 כללי תוכן:
 - כל טקסט המתכון חייב להיות בעברית.
 - שמות המרכיבים בשלבים וברשימה — בעברית בלבד, ללא מילים באנגלית.
@@ -764,7 +780,13 @@ def _build_gemini_prompt_he(payload: GenerateRecipeRequest, *, strict: bool = Fa
 
 
 def _build_gemini_prompt_en(payload: GenerateRecipeRequest, *, strict: bool = False) -> str:
-    category_labels = {"dairy": "Dairy", "meat": "Meat", "parve": "Parve", "any": "No preference"}
+    category_labels = {
+        "dairy": "Dairy",
+        "meat": "Meat",
+        "parve": "Parve",
+        "vegan": "Vegan",
+        "any": "No preference",
+    }
     mood_labels = {
         "happy": "Happy",
         "cozy": "Cozy",
@@ -775,7 +797,12 @@ def _build_gemini_prompt_en(payload: GenerateRecipeRequest, *, strict: bool = Fa
     }
     category_label = category_labels[payload.category]
     mood_label = mood_labels[payload.mood]
-    recipe_type_label = "Dessert" if payload.recipeType == "dessert" else "Meal"
+    recipe_type_labels = {
+        "meal": "Meal",
+        "dessert": "Dessert",
+        "soup_stew": "Soup/Stew",
+    }
+    recipe_type_label = recipe_type_labels.get(payload.recipeType, "Meal")
     gluten_note = "Yes — recipe must be gluten-free" if payload.isGlutenFree else "No"
     user_ingredients = parse_user_ingredients(payload.ingredients)
     ingredients_note = payload.ingredients.strip() or "Not specified — suggest suitable ingredients"
@@ -1566,6 +1593,19 @@ async def generate_recipe(payload: GenerateRecipeRequest):
                 f"recipeTypeMatches={detection['recipeTypeMatches']} "
                 f"canons={detection['canonicalIngredients']}"
             )
+    safety = assess_ingredient_safety(payload.ingredients, language=payload.language or "he")
+    timer.mark("assessIngredientSafety", "Success" if safety["ok"] else "Failed")
+    if not safety["ok"]:
+        print(f"[FOOD FOR ANY MOOD] Ingredient safety rejected: {safety.get('invalid_ingredients', [])}")
+        timer.print_table()
+        return GenerateRecipeResponse(
+            recipe=None,
+            recipePossible=False,
+            impossibleReason=safety["reason"],
+            missingIngredients=safety.get("invalid_ingredients", []),
+            source="none",
+        )
+
     feasibility = assess_ingredient_feasibility(
         payload.ingredients,
         recipe_type=payload.recipeType,

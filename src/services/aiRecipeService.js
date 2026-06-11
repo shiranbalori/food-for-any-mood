@@ -22,6 +22,7 @@ import {
   buildValidationFailureMessage,
   validateRecipeBeforeReturn,
 } from '../utils/recipePreReturnValidation'
+import { assessIngredientSafety } from '../utils/ingredientSafetyValidation'
 import { assessCategoryFit } from '../utils/recipeCategoryFit'
 import { validateRecipeDiversity } from '../utils/recipeDiversity'
 import { createRecipeGenerationTimer } from '../utils/recipeGenerationTiming'
@@ -619,6 +620,19 @@ async function generateAIRecipeCore(userInput) {
 
   console.log('[aiRecipeService] selectedLanguage:', normalized.language)
   console.log('[aiRecipeService] category received:', normalized.category)
+
+  const safety = assessIngredientSafety(normalized.ingredients, { language: normalized.language })
+  timer.mark('assessIngredientSafety', safety.ok ? 'Success' : 'Failed')
+  if (!safety.ok) {
+    timer.printTable()
+    return {
+      recipe: null,
+      recipePossible: false,
+      impossibleReason: safety.reason,
+      missingIngredients: safety.invalidIngredients ?? [],
+      fallbackReason: null,
+    }
+  }
 
   const feasibility = assessIngredientFeasibility(normalized.ingredients, {
     recipeType: normalized.recipeType,
