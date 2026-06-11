@@ -8,6 +8,12 @@ from google import genai
 from kosher_category_definitions import build_kosher_rules_he
 from pydantic import BaseModel, Field, ValidationError
 from hebrew_display_text import normalize_themed_meal_content
+from themed_meal_quality import (
+    REGENERATION_PROMPT_SUFFIX,
+    THEMED_MEAL_PROMPT_RULES,
+    build_fallback_themed_meal,
+    is_valid_themed_meal,
+)
 from upgrade_content_quality import (
     CONCRETE_PROMPT_RULES,
     build_concrete_themed_meal_upgrade,
@@ -131,6 +137,8 @@ def _build_generate_prompt(payload: GenerateThemedMealRequest) -> str:
 - servingIdeas: רעיונות הגשה (2–4)
 - hostingTips: טיפים לאירוח (2–4)
 
+{THEMED_MEAL_PROMPT_RULES.strip()}
+
 חובה: תפריט שלם ומגובש לנושא, מתאים לקטגוריה ולכללי הכשרות."""
 
 
@@ -173,47 +181,32 @@ def _build_upgrade_prompt(payload: UpgradeThemedMealRequest) -> str:
 
 def _fallback_meal(theme: str, custom_theme: str, category: Category, is_gluten_free: bool) -> ThemedMealOutput:
     theme_label = resolve_theme_label(theme, custom_theme)
-    gf = " ללא גלוטן" if is_gluten_free else ""
-    cat = CATEGORY_LABELS[category]
+    data = build_fallback_themed_meal(theme_label, category, is_gluten_free)
+    return ThemedMealOutput(**data)
 
-    if category == "meat":
-        starter = f"סלט ירקות טרי עם עשבי תיבול{gf}"
-        main_dish = f"מנה עיקרית בשרית מיוחדת ל{theme_label}{gf}"
-        dessert = f"פרי עונה או קינוח קל{gf}"
-    elif category == "dairy":
-        starter = f"מארז גבינות וירקות{gf}"
-        main_dish = f"מנה חלבית עשירה ל{theme_label}{gf}"
-        dessert = f"קינוח חלבי מפנק{gf}"
-    else:
-        starter = f"סלט ירקות צבעוני{gf}"
-        main_dish = f"מנה פרווה מרכזית ל{theme_label}{gf}"
-        dessert = f"קינוח פרווה מתוק{gf}"
 
-    sides = [
-        f"תוספת ירקות/פחמימה מתאימה ({cat})",
-        f"לחם או מנה לצד לפי הנושא{gf}",
-    ]
-    drinks = ["מים מינרליים", "משקה קל או תה"]
-    serving = [
-        "הגישו כל מנה בקערות נפרדות על השולחן",
-        f"הוסיפו אלמנט דקורטיבי שמתאים ל{theme_label}",
-    ]
-    tips = [
-        "הכינו מראש את המנות שלא דורשות חום ישיר",
-        "שלבו צבעים ומרקמים שונים בכל מנה",
-    ]
+def _finalize_generated_meal(meal: ThemedMealOutput, language: str) -> ThemedMealOutput:
+    normalized = normalize_themed_meal_content(meal.model_dump(), language or "he")
+    return ThemedMealOutput(**normalized)
 
-    return ThemedMealOutput(
-        mealTitle=f"ארוחת {theme_label}",
-        description=f"תפריט {cat}{gf} מלא ומגובש ל{theme_label}, עם מנות מגוונות שמתאימות לאירוח נעים.",
-        starter=starter,
-        main=main_dish,
-        sides=sides,
-        dessert=dessert,
-        drinks=drinks,
-        servingIdeas=serving,
-        hostingTips=tips,
+
+def _call_gemini_meal(
+    client: genai.Client,
+    model: str,
+    prompt: str,
+) -> ThemedMealOutput:
+    schema = ThemedMealOutput.model_json_schema()
+    response = client.models.generate_content(
+        model=model,
+        contents=prompt,
+        config={
+            "response_mime_type": "application/json",
+            "response_json_schema": schema,
+        },
     )
+    if not response.text:
+        raise RuntimeError("Empty Gemini response")
+    return ThemedMealOutput.model_validate_json(response.text)
 
 
 def _fallback_upgrade(
@@ -230,44 +223,43 @@ def generate_themed_meal_with_fallback(
     model: str,
     payload: GenerateThemedMealRequest,
 ) -> GenerateThemedMealResponse:
-    fallback = _fallback_meal(
-        payload.theme,
-        payload.customTheme,
-        payload.category,
-        payload.isGlutenFree,
+    language = payload.language or "he"
+    fallback = _finalize_generated_meal(
+        _fallback_meal(
+            payload.theme,
+            payload.customTheme,
+            payload.category,
+            payload.isGlutenFree,
+        ),
+        language,
     )
 
     if client is None:
-        normalized = normalize_themed_meal_content(fallback.model_dump(), payload.language or "he")
-        return GenerateThemedMealResponse(meal=ThemedMealOutput(**normalized), source="fallback")
+        return GenerateThemedMealResponse(meal=fallback, source="fallback")
 
-    try:
-        prompt = _build_generate_prompt(payload)
-        schema = ThemedMealOutput.model_json_schema()
-        response = client.models.generate_content(
-            model=model,
-            contents=prompt,
-            config={
-                "response_mime_type": "application/json",
-                "response_json_schema": schema,
-            },
-        )
-        if not response.text:
-            raise RuntimeError("Empty Gemini response")
-        meal = ThemedMealOutput.model_validate_json(response.text)
-        normalized = normalize_themed_meal_content(meal.model_dump(), payload.language or "he")
-        meal = ThemedMealOutput(**normalized)
-        return GenerateThemedMealResponse(meal=meal, source="gemini")
-    except (ValidationError, RuntimeError, Exception) as exc:
-        print(f"[FOOD FOR ANY MOOD] Themed meal generation failed: {exc}")
-        return GenerateThemedMealResponse(
-            meal=ThemedMealOutput(
-                **normalize_themed_meal_content(fallback.model_dump(), payload.language or "he")
-            ),
-            source="fallback",
-            ok=True,
-            error=str(exc),
-        )
+    prompt = _build_generate_prompt(payload)
+    last_error: str | None = None
+
+    for attempt in range(2):
+        try:
+            current_prompt = prompt if attempt == 0 else f"{prompt}\n\n{REGENERATION_PROMPT_SUFFIX.strip()}"
+            meal = _call_gemini_meal(client, model, current_prompt)
+            meal = _finalize_generated_meal(meal, language)
+            if is_valid_themed_meal(meal):
+                return GenerateThemedMealResponse(meal=meal, source="gemini")
+            last_error = "Generated themed meal contained placeholder dishes"
+            print(f"[FOOD FOR ANY MOOD] Themed meal validation failed (attempt {attempt + 1})")
+        except (ValidationError, RuntimeError, Exception) as exc:
+            last_error = str(exc)
+            print(f"[FOOD FOR ANY MOOD] Themed meal generation failed (attempt {attempt + 1}): {exc}")
+
+    print(f"[FOOD FOR ANY MOOD] Themed meal using fallback after validation/API failure: {last_error}")
+    return GenerateThemedMealResponse(
+        meal=fallback,
+        source="fallback",
+        ok=True,
+        error=last_error,
+    )
 
 
 def _finalize_themed_meal_upgrade(
