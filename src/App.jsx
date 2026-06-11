@@ -63,6 +63,11 @@ import {
   pushNavigationRoute,
   writeNavigationRoute,
 } from './utils/navigationRoute'
+import {
+  clearInitialFocus,
+  disableBrowserScrollRestoration,
+  resetScrollToTop,
+} from './utils/resetInitialScroll'
 import './App.css'
 import './HomeDesktopLayout.css'
 
@@ -215,6 +220,12 @@ export default function App() {
       cancelled = true
     }
   }, [isAuthenticated, user?.id])
+
+  useLayoutEffect(() => {
+    disableBrowserScrollRestoration()
+    resetScrollToTop()
+    clearInitialFocus()
+  }, [])
 
   useLayoutEffect(() => {
     applyNavigationRoute(getStartupNavigationRoute(), {

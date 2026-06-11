@@ -13,17 +13,12 @@
     <script>
       ;(function () {
         try {
-          var stored = localStorage.getItem('ffam-nav-hash')
-          if (stored && stored !== '#/' && stored !== '#') {
-            var hash = window.location.hash
-            if (!hash || hash === '#' || hash === '#/') {
-              window.history.replaceState(
-                null,
-                '',
-                window.location.pathname + window.location.search + stored,
-              )
-            }
+          if ('scrollRestoration' in window.history) {
+            window.history.scrollRestoration = 'manual'
           }
+          window.scrollTo(0, 0)
+          document.documentElement.scrollTop = 0
+          document.body.scrollTop = 0
         } catch (e) {}
       })()
     </script>

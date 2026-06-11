@@ -1,3 +1,4 @@
+import './utils/resetInitialScroll.js'
 import './pwa/installPromptCapture.js'
 import { initPwaUpdateRegistration } from './pwa/pwaUpdateRegistration'
 import { StrictMode } from 'react'
