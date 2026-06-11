@@ -63,9 +63,9 @@
   position: absolute;
   inset: 0;
   border: none;
-  background: rgba(59, 130, 246, 0.14);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  background: rgba(15, 23, 42, 0.62);
+  backdrop-filter: blur(10px) saturate(0.85);
+  -webkit-backdrop-filter: blur(10px) saturate(0.85);
   cursor: pointer;
 }
 
@@ -76,13 +76,12 @@
   max-height: min(88vh, 680px);
   display: flex;
   flex-direction: column;
-  background: var(--surface);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  background: #ffffff;
   border-radius: var(--radius);
   border: 1px solid var(--glass-border);
-  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.18);
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.28);
   animation: fadeInUp 0.35s var(--ease-spring) both;
+  isolation: isolate;
 }
 
 .quiz-overlay__header {

@@ -1,5 +1,6 @@
 import { DAILY_QUIZ_QUESTIONS } from '../../data/dailyQuizQuestions'
 import { getChallengeDateKey } from '../dailyChallenge/generateDailyChallenge'
+import { validateQuizQuestion } from './validateQuizQuestion'
 
 function hashString(value) {
   let hash = 2166136261
@@ -31,10 +32,27 @@ export function localizeQuizQuestion(question, language = 'he') {
  * @param {string} [language]
  */
 export function generateDailyQuiz(dateKey = getChallengeDateKey(), language = 'he') {
-  const index = hashString(`${dateKey}:daily-quiz`) % DAILY_QUIZ_QUESTIONS.length
-  const question = DAILY_QUIZ_QUESTIONS[index]
+  const baseIndex = hashString(`${dateKey}:daily-quiz`) % DAILY_QUIZ_QUESTIONS.length
+
+  for (let offset = 0; offset < DAILY_QUIZ_QUESTIONS.length; offset += 1) {
+    const question = DAILY_QUIZ_QUESTIONS[(baseIndex + offset) % DAILY_QUIZ_QUESTIONS.length]
+    if (!validateQuizQuestion(question)) {
+      console.warn('[dailyQuiz] Skipping invalid question:', question.id)
+      continue
+    }
+    return {
+      ...localizeQuizQuestion(question, language),
+      quizDate: dateKey,
+    }
+  }
+
+  const fallback = DAILY_QUIZ_QUESTIONS.find((question) => validateQuizQuestion(question))
+  if (!fallback) {
+    throw new Error('No valid daily quiz questions configured')
+  }
+
   return {
-    ...localizeQuizQuestion(question, language),
+    ...localizeQuizQuestion(fallback, language),
     quizDate: dateKey,
   }
 }

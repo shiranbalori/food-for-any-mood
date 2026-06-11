@@ -137,10 +137,20 @@ export const DAILY_QUIZ_QUESTIONS = [
       en: 'What happens when olive oil is heated past its smoke point?',
     },
     options: {
-      he: ['הוא מתוקן', 'הוא עלול להתפרק ולהתמרר', 'הוא הופך למתוק', 'הוא מקבל יותר ויטמינים'],
-      en: ['It improves', 'It can break down and turn bitter', 'It becomes sweeter', 'It gains more vitamins'],
+      he: [
+        'הוא עלול להתפרק ולהתמרר',
+        'הוא נשרף ומעלה עשן חזק',
+        'הוא הופך לבהיר ומתאים לטיגון עמוק',
+        'חום גבוה מעלה את נקודת העישון שלו',
+      ],
+      en: [
+        'It can break down and turn bitter',
+        'It burns and produces heavy smoke',
+        'It becomes lighter and ideal for deep frying',
+        'High heat raises its smoke point',
+      ],
     },
-    correctIndex: 1,
+    correctIndex: 0,
     explanation: {
       he: 'חימום יתר עלול לשבור חומצות שומן וליצור טעם מר ועשן לא נעים.',
       en: 'Excessive heat can break down fats and produce bitter, unpleasant flavors.',
