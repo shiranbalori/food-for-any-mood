@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useAuth } from '../../context/AuthContext'
 import { useLanguage } from '../../i18n/useLanguage'
+import { translateChallengeCategoryHint } from '../../i18n/challengeLabels'
 import {
   fetchAllChallengeSubmissions,
   fetchChallengeSubmissions,
@@ -68,10 +69,7 @@ export default function DailyChallengePage() {
     refresh()
   }, [refresh])
 
-  const categoryLabel =
-    challenge.categoryHint === 'none'
-      ? t('challengeCategoryNone')
-      : t(`challengeCategory.${challenge.categoryHint}`)
+  const categoryLabel = translateChallengeCategoryHint(t, challenge.categoryHint)
 
   const handleParticipate = () => {
     if (!isAuthenticated) {

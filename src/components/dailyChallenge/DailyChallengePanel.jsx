@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useLanguage } from '../../i18n/useLanguage'
+import { translateChallengeCategoryHint } from '../../i18n/challengeLabels'
 import { fetchUserGamification, getTodayChallenge } from '../../services/dailyChallengeService'
 import ChallengeCountdown from './ChallengeCountdown'
 import ChallengeStatus from './ChallengeStatus'
@@ -45,10 +46,7 @@ export default function DailyChallengePanel({
     }
   }, [userId])
 
-  const categoryLabel =
-    challenge.categoryHint === 'none'
-      ? t('challengeCategoryNone')
-      : t(`challengeCategory.${challenge.categoryHint}`)
+  const categoryLabel = translateChallengeCategoryHint(t, challenge.categoryHint)
 
   return (
     <div className="challenge-panel">

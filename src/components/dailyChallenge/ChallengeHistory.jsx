@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useAuth } from '../../context/AuthContext'
 import { useLanguage } from '../../i18n/useLanguage'
+import { translateChallengeCategoryHint } from '../../i18n/challengeLabels'
 import { fetchChallengeHistory } from '../../services/dailyChallengeService'
 import ChallengeSubmissionCard from './ChallengeSubmissionCard'
 import './DailyChallenge.css'
@@ -52,10 +53,7 @@ export default function ChallengeHistory() {
         <ul className="challenge-history__list">
           {entries.map((entry) => {
             const isExpanded = expandedDate === entry.challengeDate
-            const categoryLabel =
-              entry.challenge.categoryHint === 'none'
-                ? t('challengeCategoryNone')
-                : t(`challengeCategory.${entry.challenge.categoryHint}`)
+            const categoryLabel = translateChallengeCategoryHint(t, entry.challenge.categoryHint)
 
             return (
               <li key={entry.challengeDate} className="challenge-history__item">
