@@ -265,9 +265,10 @@ function isVeganMealValid(recipe) {
 }
 
 function isSoupStewValid(recipe) {
-  if (titleHasDessertKeyword(recipe?.name)) return false
+  const hasSoupSignal = titleHasSoupStewKeyword(recipe?.name) || textHasSoupStewSignal(recipe)
+  if (titleHasDessertKeyword(recipe?.name) && !titleHasSoupStewKeyword(recipe?.name)) return false
   if (recipeHasMeat(recipe) && recipeHasDairy(recipe)) return false
-  return titleHasSoupStewKeyword(recipe?.name) || textHasSoupStewSignal(recipe)
+  return hasSoupSignal
 }
 
 function validateCategoryRules(recipeType, effectiveCategory, selectedCategory, recipe) {

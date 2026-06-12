@@ -166,6 +166,245 @@ function getDessertMockTemplate(category, language = 'he') {
   return source[category] ?? source.parve
 }
 
+const SOUP_STEW_MOCK_BY_CATEGORY = {
+  dairy: {
+    name: 'מרק ירקות עם שמנת',
+    ingredients: [
+      '2 גזר',
+      '2 גזרי סלרי',
+      '1 בצל',
+      '2 תפוחי אדמה',
+      '200 מ"ל שמנת מתוקה',
+      '1 ליטר מרק ירקות',
+      '2 כפות שמן זית',
+      'מלח',
+      'פלפל שחור',
+    ],
+    steps: [
+      'חותכים גזר, סלרי, בצל ותפוחי אדמה לקוביות בינוניות.',
+      'מחממים סיר עם שמן זית ומטגנים את הירקות 5 דקות עד שמזהיבים קלות.',
+      'מוסיפים מרק ירקות, מביאים לרתיחה ומנמיכים את האש.',
+      'מבשלים על אש נמוכה כ-25 דקות עד שהירקות רכות.',
+      'מוסיפים שמנת מתוקה, מתבלים במלח ובפלפל שחור ומגישים חם.',
+    ],
+    calories: 320,
+    protein: 8,
+    carbs: 34,
+    fat: 16,
+    spiceLevel: 0,
+    healthScore: 72,
+    tags: ['comfortFood'],
+  },
+  meat: {
+    name: 'מרק עוף ביתי',
+    ingredients: [
+      '4 חתיכות עוף',
+      '2 גזר',
+      '2 גזרי סלרי',
+      '1 בצל',
+      '2 תפוחי אדמה',
+      '1.5 ליטר מרק עוף',
+      '2 כפות שמן זית',
+      'מלח',
+      'פלפל שחור',
+    ],
+    steps: [
+      'חותכים גזר, סלרי, בצל ותפוחי אדמה לקוביות.',
+      'מחממים סיר עם שמן זית, צורבים את חתיכות העוף מכל הצדדים.',
+      'מוסיפים את הירקות ומטגנים 3 דקות.',
+      'יוצקים מרק עוף, מרתיחים ואז מבשלים על אש נמוכה כ-35 דקות.',
+      'מתבלים במלח ובפלפל שחור ומגישים חם עם עשבי תיבול.',
+    ],
+    calories: 390,
+    protein: 28,
+    carbs: 26,
+    fat: 18,
+    spiceLevel: 0,
+    healthScore: 78,
+    tags: ['comfortFood', 'highProtein'],
+  },
+  parve: {
+    name: 'מרק עדשים',
+    ingredients: [
+      '1 כוס עדשים',
+      '2 גזר',
+      '1 בצל',
+      '3 שיני שום',
+      '1 כפית כמון',
+      '6 כוסות מים',
+      '2 כפות שמן זית',
+      'מלח',
+      'פלפל שחור',
+    ],
+    steps: [
+      'שוטפים את העדשים וחותכים גזר, בצל ושום.',
+      'מחממים סיר עם שמן זית ומטגנים בצל ושום עד שמזהיבים.',
+      'מוסיפים עדשים, גזר, כמון ומים ומביאים לרתיחה.',
+      'מנמיכים את האש ומבשלים כ-30 דקות עד שהעדשים רכות.',
+      'מתבלים במלח ובפלפל שחור ומגישים חם.',
+    ],
+    calories: 280,
+    protein: 16,
+    carbs: 42,
+    fat: 6,
+    spiceLevel: 1,
+    healthScore: 86,
+    tags: ['healthy', 'vegetarian'],
+  },
+  vegan: {
+    name: 'תבשיל קטניות וירקות',
+    ingredients: [
+      '1 כוס עדשים',
+      '1 כוס שעועית לבנה',
+      '2 גזר',
+      '1 בצל',
+      '2 תפוחי אדמה',
+      '3 שיני שום',
+      '6 כוסות מים',
+      '2 כפות שמן זית',
+      'מלח',
+      'פלפל שחור',
+    ],
+    steps: [
+      'שוטפים קטניות, חותכים ירקות לקוביות וקוצצים שום.',
+      'מחממים סיר עם שמן זית ומטגנים בצל, שום וגזר עד שמזהיבים.',
+      'מוסיפים עדשים, שעועית, תפוחי אדמה ומים ומביאים לרתיחה.',
+      'מבשלים על אש נמוכה כ-35 דקות עד שהקטניות רכות והתבשיל מסמיך.',
+      'מתבלים במלח ובפלפל שחור ומגישים חם.',
+    ],
+    calories: 310,
+    protein: 18,
+    carbs: 48,
+    fat: 7,
+    spiceLevel: 1,
+    healthScore: 88,
+    tags: ['healthy', 'vegan'],
+  },
+}
+
+const SOUP_STEW_MOCK_BY_CATEGORY_EN = {
+  dairy: {
+    name: 'Creamy Vegetable Soup',
+    ingredients: [
+      '2 carrots',
+      '2 celery stalks',
+      '1 onion',
+      '2 potatoes',
+      '200 ml heavy cream',
+      '1 L vegetable broth',
+      '2 tbsp olive oil',
+      'salt',
+      'black pepper',
+    ],
+    steps: [
+      'Dice the carrots, celery, onion, and potatoes.',
+      'Heat olive oil in a pot and sauté the vegetables for 5 minutes until lightly golden.',
+      'Add vegetable broth, bring to a boil, then reduce the heat.',
+      'Simmer for about 25 minutes until the vegetables are tender.',
+      'Stir in heavy cream, season with salt and pepper, and serve hot.',
+    ],
+    calories: 320,
+    protein: 8,
+    carbs: 34,
+    fat: 16,
+    spiceLevel: 0,
+    healthScore: 72,
+    tags: ['comfortFood'],
+  },
+  meat: {
+    name: 'Homestyle Chicken Soup',
+    ingredients: [
+      '4 chicken pieces',
+      '2 carrots',
+      '2 celery stalks',
+      '1 onion',
+      '2 potatoes',
+      '1.5 L chicken broth',
+      '2 tbsp olive oil',
+      'salt',
+      'black pepper',
+    ],
+    steps: [
+      'Dice the carrots, celery, onion, and potatoes.',
+      'Heat olive oil in a pot and sear the chicken pieces on both sides.',
+      'Add the vegetables and sauté for 3 minutes.',
+      'Pour in chicken broth, bring to a boil, then simmer for about 35 minutes.',
+      'Season with salt and pepper and serve hot with fresh herbs.',
+    ],
+    calories: 390,
+    protein: 28,
+    carbs: 26,
+    fat: 18,
+    spiceLevel: 0,
+    healthScore: 78,
+    tags: ['comfortFood', 'highProtein'],
+  },
+  parve: {
+    name: 'Lentil Soup',
+    ingredients: [
+      '1 cup lentils',
+      '2 carrots',
+      '1 onion',
+      '3 garlic cloves',
+      '1 tsp cumin',
+      '6 cups water',
+      '2 tbsp olive oil',
+      'salt',
+      'black pepper',
+    ],
+    steps: [
+      'Rinse the lentils and dice the carrots, onion, and garlic.',
+      'Heat olive oil in a pot and sauté the onion and garlic until golden.',
+      'Add lentils, carrots, cumin, and water; bring to a boil.',
+      'Reduce heat and simmer for about 30 minutes until the lentils are tender.',
+      'Season with salt and pepper and serve hot.',
+    ],
+    calories: 280,
+    protein: 16,
+    carbs: 42,
+    fat: 6,
+    spiceLevel: 1,
+    healthScore: 86,
+    tags: ['healthy', 'vegetarian'],
+  },
+  vegan: {
+    name: 'Hearty Bean and Vegetable Stew',
+    ingredients: [
+      '1 cup lentils',
+      '1 cup white beans',
+      '2 carrots',
+      '1 onion',
+      '2 potatoes',
+      '3 garlic cloves',
+      '6 cups water',
+      '2 tbsp olive oil',
+      'salt',
+      'black pepper',
+    ],
+    steps: [
+      'Rinse the legumes and dice the vegetables; mince the garlic.',
+      'Heat olive oil in a pot and sauté onion, garlic, and carrots until golden.',
+      'Add lentils, beans, potatoes, and water; bring to a boil.',
+      'Simmer for about 35 minutes until the stew is thick and the legumes are tender.',
+      'Season with salt and pepper and serve hot.',
+    ],
+    calories: 310,
+    protein: 18,
+    carbs: 48,
+    fat: 7,
+    spiceLevel: 1,
+    healthScore: 88,
+    tags: ['healthy', 'vegan'],
+  },
+}
+
+function getSoupStewMockTemplate(category, language = 'he') {
+  const source = language === 'en' ? SOUP_STEW_MOCK_BY_CATEGORY_EN : SOUP_STEW_MOCK_BY_CATEGORY
+  if (source[category]) return source[category]
+  if (category === 'vegan') return source.vegan ?? source.parve
+  return source.parve
+}
+
 function parseIngredients(input) {
   return input
     .split(/[,;\n]+/)
@@ -1265,6 +1504,123 @@ function buildDessertMockRecipe(
   }
 }
 
+function buildSoupStewMockRecipe(
+  {
+    category,
+    ingredients,
+    cookingTime,
+    mood,
+    isGlutenFree = false,
+    musicPlatform = 'spotify',
+    servings = 4,
+  },
+  {
+    language = 'he',
+    pantrySuffix = '(from your pantry)',
+    validation = null,
+    excludeTitles = [],
+    excludeCookingMethods = [],
+    excludeDessertCategories = [],
+  } = {},
+) {
+  const rawUserList = parseUserIngredients(ingredients)
+  if (rawUserList.length > 0) {
+    return buildIngredientFirstFallbackRecipe(
+      {
+        category,
+        ingredients,
+        cookingTime,
+        mood,
+        isGlutenFree,
+        musicPlatform,
+        servings,
+        recipeType: 'soup_stew',
+      },
+      {
+        language,
+        pantrySuffix,
+        validation,
+        excludeTitles,
+        excludeCookingMethods,
+        excludeDessertCategories,
+      },
+    )
+  }
+
+  const templateCategory = category === 'vegan' ? 'vegan' : resolveTemplateCategory(category, ingredients)
+  const template = getSoupStewMockTemplate(templateCategory, language)
+  const cookTime = Math.min(cookingTime, 60)
+  const copy = getRecipeCopy(language)
+  const moodPhrase = copy.moodFlavor[mood] ?? copy.defaultMood
+  const description =
+    language === 'en'
+      ? `A comforting soup or stew tailored with${copy.descriptionJoiner}${moodPhrase}${copy.descriptionMiddle}${cookTime}${copy.descriptionMinutes}`
+      : `מרק/תבשיל מנחם${copy.descriptionJoiner}${moodPhrase}${copy.descriptionMiddle}${cookTime}${copy.descriptionMinutes}`
+
+  const playlist = recommendPlaylist(
+    { mood, category, style: 'comfort', cookTime, spiceLevel: template.spiceLevel ?? 0, recipeName: template.name },
+    musicPlatform,
+    language,
+  )
+
+  const recipeIngredients = isGlutenFree
+    ? applyGlutenFreeToIngredientList(template.ingredients, language)
+    : template.ingredients
+
+  const recipe = {
+    name: template.name,
+    description,
+    ingredients: recipeIngredients,
+    steps: template.steps,
+    matchPercentage: Math.min(94, Math.max(72, Math.round(72 + Math.random() * 22))),
+    spiceLevel: template.spiceLevel ?? 0,
+    nutrition: {
+      calories: template.calories,
+      protein: template.protein,
+      carbs: template.carbs,
+      fat: template.fat,
+      servings,
+    },
+    healthScore: calculateHealthScoreFromRecipe({
+      ingredients: recipeIngredients ?? [],
+      calories: template.calories,
+      protein: template.protein,
+      carbs: template.carbs,
+      fat: template.fat,
+      servings,
+      recipeType: 'soup_stew',
+      name: template.name,
+    }),
+    tags: template.tags,
+    playlist,
+  }
+
+  const meta = {
+    id: `soup-stew-mock-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+    templateKey: `soup-stew-mock-${templateCategory}`,
+    category,
+    mood,
+    cookingTime,
+    isGlutenFree,
+    musicPlatform,
+    language,
+    style: 'comfort',
+    cookTime,
+  }
+
+  return {
+    recipe: finalizeRecipe(recipe, ingredients, language, {
+      cookingTime,
+      style: 'comfort',
+      servings,
+      recipeType: 'soup_stew',
+      category,
+      isGlutenFree,
+    }),
+    meta,
+  }
+}
+
 /**
  * Mock recipe provider — template-based generation for local MVP.
  * Replace the caller in recipeService when wiring a real AI backend.
@@ -1294,6 +1650,19 @@ export function buildMockRecipe(
 
   if (effectiveRecipeType === 'dessert') {
     return buildDessertMockRecipe(
+      { category: templateCategory, ingredients, cookingTime, mood, isGlutenFree, musicPlatform, servings },
+      {
+        language,
+        pantrySuffix,
+        excludeTitles,
+        excludeCookingMethods,
+        excludeDessertCategories,
+      },
+    )
+  }
+
+  if (effectiveRecipeType === 'soup_stew') {
+    return buildSoupStewMockRecipe(
       { category: templateCategory, ingredients, cookingTime, mood, isGlutenFree, musicPlatform, servings },
       {
         language,
@@ -1451,7 +1820,7 @@ export function buildMockRecipe(
       cookingTime: time,
       style: primaryStyle,
       servings,
-      recipeType: 'meal',
+      recipeType: effectiveRecipeType,
       category,
       isGlutenFree: glutenFree,
     }),

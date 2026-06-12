@@ -297,11 +297,12 @@ def validate_recipe_type(recipe_type: RecipeType, recipe: dict) -> bool:
                 return False
         return True
     if recipe_type == "soup_stew":
-        if title_has_dessert_keyword(name):
+        has_soup_signal = title_has_soup_stew_keyword(name) or text_has_soup_stew_signal(recipe)
+        if title_has_dessert_keyword(name) and not title_has_soup_stew_keyword(name):
             return False
-        if is_likely_dessert(recipe):
+        if is_likely_dessert(recipe) and not has_soup_signal:
             return False
-        return title_has_soup_stew_keyword(name) or text_has_soup_stew_signal(recipe)
+        return has_soup_signal
     if recipe_type == "meal":
         lower_name = name.lower()
         if any(keyword in lower_name for keyword in MEAL_DESSERT_BLOCKED_IN_TITLE):

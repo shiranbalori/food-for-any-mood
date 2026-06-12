@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Literal
 
 Category = Literal["dairy", "meat", "parve"]
-RecipeType = Literal["meal", "dessert"]
+RecipeType = Literal["meal", "dessert", "soup_stew"]
 Language = Literal["he", "en"]
 
 CATEGORY_RECIPES_HE: dict[Category, dict] = {
@@ -236,6 +236,180 @@ DESSERT_RECIPES_EN: dict[Category, dict] = {
     },
 }
 
+SOUP_STEW_RECIPES_HE: dict[Category, dict] = {
+    "dairy": {
+        "name": "מרק ירקות עם שמנת",
+        "base_ingredients": [
+            "2 גזר",
+            "2 גזרי סלרי",
+            "1 בצל",
+            "2 תפוחי אדמה",
+            "200 מ\"ל שמנת מתוקה",
+            "1 ליטר מרק ירקות",
+            "2 כפות שמן זית",
+            "מלח",
+            "פלפל שחור",
+        ],
+        "steps": [
+            "חותכים גזר, סלרי, בצל ותפוחי אדמה לקוביות בינוניות.",
+            "מחממים סיר עם שמן זית ומטגנים את הירקות 5 דקות עד שמזהיבים קלות.",
+            "מוסיפים מרק ירקות, מביאים לרתיחה ומנמיכים את האש.",
+            "מבשלים על אש נמוכה כ-25 דקות עד שהירקות רכות.",
+            "מוסיפים שמנת מתוקה, מתבלים במלח ובפלפל שחור ומגישים חם.",
+        ],
+        "calories": 320,
+        "protein": 8,
+        "carbs": 34,
+        "fat": 16,
+        "spiceLevel": 0,
+        "healthScore": 72,
+        "tags": ["comfortFood"],
+    },
+    "meat": {
+        "name": "מרק עוף ביתי",
+        "base_ingredients": [
+            "4 חתיכות עוף",
+            "2 גזר",
+            "2 גזרי סלרי",
+            "1 בצל",
+            "2 תפוחי אדמה",
+            "1.5 ליטר מרק עוף",
+            "2 כפות שמן זית",
+            "מלח",
+            "פלפל שחור",
+        ],
+        "steps": [
+            "חותכים גזר, סלרי, בצל ותפוחי אדמה לקוביות.",
+            "מחממים סיר עם שמן זית, צורבים את חתיכות העוף מכל הצדדים.",
+            "מוסיפים את הירקות ומטגנים 3 דקות.",
+            "יוצקים מרק עוף, מרתיחים ואז מבשלים על אש נמוכה כ-35 דקות.",
+            "מתבלים במלח ובפלפל שחור ומגישים חם עם עשבי תיבול.",
+        ],
+        "calories": 390,
+        "protein": 28,
+        "carbs": 26,
+        "fat": 18,
+        "spiceLevel": 0,
+        "healthScore": 78,
+        "tags": ["comfortFood", "highProtein"],
+    },
+    "parve": {
+        "name": "מרק עדשים",
+        "base_ingredients": [
+            "1 כוס עדשים",
+            "2 גזר",
+            "1 בצל",
+            "3 שיני שום",
+            "1 כפית כמון",
+            "6 כוסות מים",
+            "2 כפות שמן זית",
+            "מלח",
+            "פלפל שחור",
+        ],
+        "steps": [
+            "שוטפים את העדשים וחותכים גזר, בצל ושום.",
+            "מחממים סיר עם שמן זית ומטגנים בצל ושום עד שמזהיבים.",
+            "מוסיפים עדשים, גזר, כמון ומים ומביאים לרתיחה.",
+            "מנמיכים את האש ומבשלים כ-30 דקות עד שהעדשים רכות.",
+            "מתבלים במלח ובפלפל שחור ומגישים חם.",
+        ],
+        "calories": 280,
+        "protein": 16,
+        "carbs": 42,
+        "fat": 6,
+        "spiceLevel": 1,
+        "healthScore": 86,
+        "tags": ["healthy", "vegetarian"],
+    },
+}
+
+SOUP_STEW_RECIPES_EN: dict[Category, dict] = {
+    "dairy": {
+        "name": "Creamy Vegetable Soup",
+        "base_ingredients": [
+            "2 carrots",
+            "2 celery stalks",
+            "1 onion",
+            "2 potatoes",
+            "200 ml heavy cream",
+            "1 L vegetable broth",
+            "2 tbsp olive oil",
+            "salt",
+            "black pepper",
+        ],
+        "steps": [
+            "Dice the carrots, celery, onion, and potatoes.",
+            "Heat olive oil in a pot and sauté the vegetables for 5 minutes until lightly golden.",
+            "Add vegetable broth, bring to a boil, then reduce the heat.",
+            "Simmer for about 25 minutes until the vegetables are tender.",
+            "Stir in heavy cream, season with salt and pepper, and serve hot.",
+        ],
+        "calories": 320,
+        "protein": 8,
+        "carbs": 34,
+        "fat": 16,
+        "spiceLevel": 0,
+        "healthScore": 72,
+        "tags": ["comfortFood"],
+    },
+    "meat": {
+        "name": "Homestyle Chicken Soup",
+        "base_ingredients": [
+            "4 chicken pieces",
+            "2 carrots",
+            "2 celery stalks",
+            "1 onion",
+            "2 potatoes",
+            "1.5 L chicken broth",
+            "2 tbsp olive oil",
+            "salt",
+            "black pepper",
+        ],
+        "steps": [
+            "Dice the carrots, celery, onion, and potatoes.",
+            "Heat olive oil in a pot and sear the chicken pieces on both sides.",
+            "Add the vegetables and sauté for 3 minutes.",
+            "Pour in chicken broth, bring to a boil, then simmer for about 35 minutes.",
+            "Season with salt and pepper and serve hot with fresh herbs.",
+        ],
+        "calories": 390,
+        "protein": 28,
+        "carbs": 26,
+        "fat": 18,
+        "spiceLevel": 0,
+        "healthScore": 78,
+        "tags": ["comfortFood", "highProtein"],
+    },
+    "parve": {
+        "name": "Lentil Soup",
+        "base_ingredients": [
+            "1 cup lentils",
+            "2 carrots",
+            "1 onion",
+            "3 garlic cloves",
+            "1 tsp cumin",
+            "6 cups water",
+            "2 tbsp olive oil",
+            "salt",
+            "black pepper",
+        ],
+        "steps": [
+            "Rinse the lentils and dice the carrots, onion, and garlic.",
+            "Heat olive oil in a pot and sauté the onion and garlic until golden.",
+            "Add lentils, carrots, cumin, and water; bring to a boil.",
+            "Reduce heat and simmer for about 30 minutes until the lentils are tender.",
+            "Season with salt and pepper and serve hot.",
+        ],
+        "calories": 280,
+        "protein": 16,
+        "carbs": 42,
+        "fat": 6,
+        "spiceLevel": 1,
+        "healthScore": 86,
+        "tags": ["healthy", "vegetarian"],
+    },
+}
+
 PLAYLIST_PRESETS_HE = {
     "spotify": {
         "id": "soft-jazz-kitchen",
@@ -274,6 +448,8 @@ PLAYLIST_PRESETS_EN = {
 def get_category_templates(language: Language, recipe_type: RecipeType) -> dict[Category, dict]:
     if recipe_type == "dessert":
         return DESSERT_RECIPES_EN if language == "en" else DESSERT_RECIPES_HE
+    if recipe_type == "soup_stew":
+        return SOUP_STEW_RECIPES_EN if language == "en" else SOUP_STEW_RECIPES_HE
     return CATEGORY_RECIPES_EN if language == "en" else CATEGORY_RECIPES_HE
 
 
