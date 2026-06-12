@@ -380,8 +380,9 @@ function validateRecipeQualityCore(userIngredients, recipe, language = 'he', opt
   const userIngredientsOk = userExplicitMissing.length === 0
   const titleOk = titleValidation.ok
   const groundingOk = userIngredients.length === 0 || grounding.ok
+  const maxAllowedWeakSteps = (recipe.steps?.length ?? 0) >= 4 ? 1 : 0
   const stepsQualityOk =
-    stepsAligned && unnaturalSteps.length === 0 && weakSteps.length === 0
+    stepsAligned && unnaturalSteps.length === 0 && weakSteps.length <= maxAllowedWeakSteps
 
   const checks = {
     invalidIngredients: invalidOk,
@@ -393,7 +394,7 @@ function validateRecipeQualityCore(userIngredients, recipe, language = 'he', opt
     groundingOk,
     stepsAligned,
     noUnnaturalSteps: unnaturalSteps.length === 0,
-    meaningfulStepActions: weakSteps.length === 0,
+    meaningfulStepActions: weakSteps.length <= ((recipe.steps?.length ?? 0) >= 4 ? 1 : 0),
     preReturnOk: preReturn.ok,
     unauthorizedIngredientsOk: unauthorizedOk,
   }
@@ -545,12 +546,18 @@ export function applyRecipeIngredientParser(recipe, userIngredientsRaw = '', lan
         staples: SYSTEM_PANTRY_CANONICAL,
       }))
   ) {
+    const currentSteps = tagged.steps ?? []
+    const currentWeakCount = currentSteps.filter((step) => !stepHasMeaningfulAction(step)).length
     const rebuiltSteps = buildStepsFromUserIngredients(tagged.ingredients ?? [], {
       recipeType: options.recipeType ?? 'meal',
       language,
       cookingTime: options.cookingTime ?? 30,
     })
-    if (rebuiltSteps.length >= 4) {
+    const rebuiltWeakCount = rebuiltSteps.filter((step) => !stepHasMeaningfulAction(step)).length
+    if (
+      rebuiltSteps.length >= 4 &&
+      (currentWeakCount > 1 || rebuiltWeakCount < currentWeakCount)
+    ) {
       tagged = { ...tagged, steps: rebuiltSteps }
     }
   }

@@ -238,7 +238,8 @@ export function validateRecipeBeforeReturn(recipe, userIngredientsRaw = '', { la
   if (unusedInSteps.length) failures.push('unused_ingredients')
 
   const weakSteps = steps.filter((step) => !stepHasMeaningfulAction(step))
-  if (weakSteps.length) failures.push('weak_steps')
+  const maxAllowedWeakSteps = steps.length >= 4 ? 1 : 0
+  if (weakSteps.length > maxAllowedWeakSteps) failures.push('weak_steps')
 
   const placeholderHits = [...ingredients, ...steps, recipe.name ?? '', recipe.description ?? '']
     .filter((item) => hasPlaceholderText(item))

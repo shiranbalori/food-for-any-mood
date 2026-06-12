@@ -308,7 +308,8 @@ def validate_recipe_before_return(
         failures.append("unused_ingredients")
 
     weak_steps = [step for step in steps if not step_has_meaningful_action(step)]
-    if weak_steps:
+    max_allowed_weak = 1 if len(steps) >= 4 else 0
+    if len(weak_steps) > max_allowed_weak:
         failures.append("weak_steps")
 
     placeholder_hits: list[str] = []

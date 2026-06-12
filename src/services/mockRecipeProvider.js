@@ -36,7 +36,7 @@ import {
   toStepIngredientReference,
 } from '../utils/recipeStepWording'
 import { buildOptionalUpgrades } from '../utils/optionalUpgrades'
-import { pickAlternateDessertVariant, pickAlternateMealVariant } from '../utils/recipeDiversity'
+import { pickAlternateDessertVariant, pickAlternateMealVariant, isDuplicateTitle } from '../utils/recipeDiversity'
 import { calculateHealthScoreFromRecipe } from '../utils/nutritionScore'
 import { assessCategoryFit } from '../utils/recipeCategoryFit'
 import { getEffectiveRecipeType, isAnyCategory, isInvalidRecipeSelection } from '../utils/recipeCategoryGuard'
@@ -161,9 +161,387 @@ const DESSERT_MOCK_BY_CATEGORY_EN = {
   },
 }
 
-function getDessertMockTemplate(category, language = 'he') {
-  const source = language === 'en' ? DESSERT_MOCK_BY_CATEGORY_EN : DESSERT_MOCK_BY_CATEGORY
-  return source[category] ?? source.parve
+function getDessertMockTemplate(category, language = 'he', options = {}) {
+  const templates = getDessertMockTemplates(category, language)
+  return pickPreferenceMockTemplate(templates, {
+    excludeTitles: options.excludeTitles ?? [],
+    excludeTemplateKeys: options.excludeTemplateKeys ?? [],
+    keyPrefix: `dessert-mock-${category}`,
+  })
+}
+
+const SOUP_STEW_MOCK_ALTERNATES = {
+  dairy: {
+    name: 'מרק פטריות שמנת',
+    ingredients: [
+      '500 גרם פטריות',
+      '1 בצל',
+      '2 שיני שום',
+      '200 מ"ל שמנת מתוקה',
+      '1 ליטר מרק ירקות',
+      '2 כפות שמן זית',
+      'מלח',
+      'פלפל שחור',
+    ],
+    steps: [
+      'פורסים פטריות, בצל ושום.',
+      'מחממים סיר עם שמן זית ומטגנים בצל ושום עד שקופים.',
+      'מוסיפים פטריות ומטגנים 5 דקות עד שהן מתחילות להשחיר.',
+      'יוצקים מרק ירקות, מרתיחים ומבשלים 20 דקות.',
+      'מוסיפים שמנת מתוקה, מתבלים במלח ובפלפל שחור ומגישים חם.',
+    ],
+    calories: 290,
+    protein: 7,
+    carbs: 22,
+    fat: 18,
+    spiceLevel: 0,
+    healthScore: 74,
+    tags: ['comfortFood'],
+  },
+  vegan: {
+    name: 'תבשיל חומוס וירקות',
+    ingredients: [
+      '2 גביעי חומוס',
+      '2 גזר',
+      '1 בצל',
+      '2 גזרי סלרי',
+      '3 שיני שום',
+      '4 כוסות מים',
+      '2 כפות שמן זית',
+      'כוסברה',
+      'מלח',
+      'פלפל שחור',
+    ],
+    steps: [
+      'חותכים גזר, בצל, סלרי ושום.',
+      'מחממים סיר עם שמן זית ומטגנים בצל, שום וגזר עד שמזהיבים.',
+      'מוסיפים חומוס, סלרי ומים ומביאים לרתיחה.',
+      'מבשלים על אש נמוכה כ-25 דקות עד שהתבשיל מסמיך.',
+      'מתבלים במלח, בפלפל שחור ובכוסברה ומגישים חם.',
+    ],
+    calories: 295,
+    protein: 14,
+    carbs: 36,
+    fat: 9,
+    spiceLevel: 1,
+    healthScore: 87,
+    tags: ['healthy', 'vegan'],
+  },
+  parve: {
+    name: 'מרק עדשים אדומות',
+    ingredients: [
+      '1 כוס עדשים אדומות',
+      '2 גזר',
+      '1 בצל',
+      '2 שיני שום',
+      '1 כפית כמון',
+      '6 כוסות מים',
+      '2 כפות שמן זית',
+      'מלח',
+      'פלפל שחור',
+    ],
+    steps: [
+      'שוטפים עדשים אדומות וחותכים גזר, בצל ושום.',
+      'מחממים סיר עם שמן זית ומטגנים בצל ושום עד שמזהיבים.',
+      'מוסיפים עדשים, גזר, כמון ומים ומביאים לרתיחה.',
+      'מנמיכים את האש ומבשלים כ-25 דקות עד שהעדשים מתפרקות.',
+      'מתבלים במלח ובפלפל שחור ומגישים חם.',
+    ],
+    calories: 265,
+    protein: 15,
+    carbs: 40,
+    fat: 5,
+    spiceLevel: 1,
+    healthScore: 85,
+    tags: ['healthy', 'vegetarian'],
+  },
+  meat: {
+    name: 'מרק עוף עם אורז',
+    ingredients: [
+      '4 חתיכות עוף',
+      '1/2 כוס אורז',
+      '2 גזר',
+      '1 בצל',
+      '1.5 ליטר מרק עוף',
+      '2 כפות שמן זית',
+      'מלח',
+      'פלפל שחור',
+    ],
+    steps: [
+      'חותכים גזר ובצל לקוביות.',
+      'מחממים סיר עם שמן זית וצורבים את חתיכות העוף מכל הצדדים.',
+      'מוסיפים ירקות, אורז ומרק עוף ומביאים לרתיחה.',
+      'מבשלים על אש נמוכה כ-30 דקות עד שהעוף והאורז רכים.',
+      'מתבלים במלח ובפלפל שחור ומגישים חם.',
+    ],
+    calories: 410,
+    protein: 30,
+    carbs: 32,
+    fat: 16,
+    spiceLevel: 0,
+    healthScore: 76,
+    tags: ['comfortFood', 'highProtein'],
+  },
+}
+
+const SOUP_STEW_MOCK_ALTERNATES_EN = {
+  dairy: {
+    name: 'Creamy Mushroom Soup',
+    ingredients: [
+      '500 g mushrooms',
+      '1 onion',
+      '2 garlic cloves',
+      '200 ml heavy cream',
+      '1 L vegetable broth',
+      '2 tbsp olive oil',
+      'salt',
+      'black pepper',
+    ],
+    steps: [
+      'Slice the mushrooms, onion, and garlic.',
+      'Heat olive oil in a pot and sauté the onion and garlic until translucent.',
+      'Add mushrooms and cook for 5 minutes until they begin to brown.',
+      'Pour in vegetable broth, bring to a boil, and simmer for 20 minutes.',
+      'Stir in heavy cream, season with salt and pepper, and serve hot.',
+    ],
+    calories: 290,
+    protein: 7,
+    carbs: 22,
+    fat: 18,
+    spiceLevel: 0,
+    healthScore: 74,
+    tags: ['comfortFood'],
+  },
+  vegan: {
+    name: 'Chickpea and Vegetable Stew',
+    ingredients: [
+      '2 cups chickpeas',
+      '2 carrots',
+      '1 onion',
+      '2 celery stalks',
+      '3 garlic cloves',
+      '4 cups water',
+      '2 tbsp olive oil',
+      'cilantro',
+      'salt',
+      'black pepper',
+    ],
+    steps: [
+      'Dice the carrots, onion, celery, and garlic.',
+      'Heat olive oil in a pot and sauté the onion, garlic, and carrots until golden.',
+      'Add chickpeas, celery, and water; bring to a boil.',
+      'Simmer for about 25 minutes until the stew thickens.',
+      'Season with salt, pepper, and cilantro; serve hot.',
+    ],
+    calories: 295,
+    protein: 14,
+    carbs: 36,
+    fat: 9,
+    spiceLevel: 1,
+    healthScore: 87,
+    tags: ['healthy', 'vegan'],
+  },
+  parve: {
+    name: 'Red Lentil Soup',
+    ingredients: [
+      '1 cup red lentils',
+      '2 carrots',
+      '1 onion',
+      '2 garlic cloves',
+      '1 tsp cumin',
+      '6 cups water',
+      '2 tbsp olive oil',
+      'salt',
+      'black pepper',
+    ],
+    steps: [
+      'Rinse the red lentils and dice the carrots, onion, and garlic.',
+      'Heat olive oil in a pot and sauté the onion and garlic until golden.',
+      'Add lentils, carrots, cumin, and water; bring to a boil.',
+      'Reduce heat and simmer for about 25 minutes until the lentils break down.',
+      'Season with salt and pepper and serve hot.',
+    ],
+    calories: 265,
+    protein: 15,
+    carbs: 40,
+    fat: 5,
+    spiceLevel: 1,
+    healthScore: 85,
+    tags: ['healthy', 'vegetarian'],
+  },
+  meat: {
+    name: 'Chicken and Rice Soup',
+    ingredients: [
+      '4 chicken pieces',
+      '1/2 cup rice',
+      '2 carrots',
+      '1 onion',
+      '1.5 L chicken broth',
+      '2 tbsp olive oil',
+      'salt',
+      'black pepper',
+    ],
+    steps: [
+      'Dice the carrots and onion.',
+      'Heat olive oil in a pot and sear the chicken pieces on both sides.',
+      'Add vegetables, rice, and chicken broth; bring to a boil.',
+      'Simmer for about 30 minutes until the chicken and rice are tender.',
+      'Season with salt and pepper and serve hot.',
+    ],
+    calories: 410,
+    protein: 30,
+    carbs: 32,
+    fat: 16,
+    spiceLevel: 0,
+    healthScore: 76,
+    tags: ['comfortFood', 'highProtein'],
+  },
+}
+
+const DESSERT_MOCK_ALTERNATES = {
+  dairy: {
+    name: 'מוס שוקולד',
+    ingredients: ['שוקולד מריר', 'שמנת מתוקה', 'סוכר', 'ביצים', 'וניל', 'מלח'],
+    steps: [
+      'ממיסים שוקולד מריר עם מעט שמנת על אש נמוכה.',
+      'מקציפים שמנת מתוקה עם סוכר ווניל עד קצפת יציבה.',
+      'מערבבים בזהירות את השוקולד המומס לתוך הקצפת.',
+      'מעבירים לכוסות ומקררים לפחות 3 שעות.',
+      'מגישים קר עם פירורי שוקולד.',
+    ],
+    calories: 380,
+    protein: 6,
+    carbs: 32,
+    fat: 24,
+    spiceLevel: 0,
+    healthScore: 52,
+    tags: ['comfortFood'],
+  },
+  meat: {
+    name: 'אגסים אפויים בדבש',
+    ingredients: ['אגסים', 'דבש', 'קינמון', 'לימון', 'מים', 'וניל'],
+    steps: [
+      'חוצים אגסים לחצאים ומסירים גרעינים.',
+      'מערבבים דבש, קינמון, מיץ לימון ומעט מים.',
+      'מסדרים את האגסים בתבנית ומוזקים את התערובת.',
+      'אופים בתנור ב-180°C כ-22 דקות עד רכות.',
+      'מגישים חמים כקינוח פרווה.',
+    ],
+    calories: 260,
+    protein: 2,
+    carbs: 48,
+    fat: 6,
+    spiceLevel: 0,
+    healthScore: 68,
+    tags: ['healthy'],
+  },
+  parve: {
+    name: 'עוגיות שוקולד',
+    ingredients: ['קמח', 'סוכר', 'אבקת קקאו', 'שמן', 'חלב סויה', 'אבקת אפייה', 'וניל'],
+    steps: [
+      'מערבבים קמח, סוכר, קקאו ואבקת אפייה.',
+      'מוסיפים שמן, חלב סויה ווניל עד לבצק אחיד.',
+      'יוצרים כדורים קטנים ומסדרים על תבנית.',
+      'אופים בתנור ב-175°C כ-14 דקות.',
+      'מקררים מעט ומגישים.',
+    ],
+    calories: 210,
+    protein: 3,
+    carbs: 30,
+    fat: 9,
+    spiceLevel: 0,
+    healthScore: 54,
+    tags: ['comfortFood', 'vegetarian'],
+  },
+}
+
+const DESSERT_MOCK_ALTERNATES_EN = {
+  dairy: {
+    name: 'Chocolate Mousse',
+    ingredients: ['dark chocolate', 'heavy cream', 'sugar', 'eggs', 'vanilla', 'salt'],
+    steps: [
+      'Melt dark chocolate with a little cream over low heat.',
+      'Whip heavy cream with sugar and vanilla until stiff.',
+      'Gently fold the melted chocolate into the whipped cream.',
+      'Spoon into cups and chill for at least 3 hours.',
+      'Serve cold with chocolate shavings.',
+    ],
+    calories: 380,
+    protein: 6,
+    carbs: 32,
+    fat: 24,
+    spiceLevel: 0,
+    healthScore: 52,
+    tags: ['comfortFood'],
+  },
+  meat: {
+    name: 'Honey Baked Pears',
+    ingredients: ['pears', 'honey', 'cinnamon', 'lemon', 'water', 'vanilla'],
+    steps: [
+      'Halve pears and remove cores.',
+      'Mix honey, cinnamon, lemon juice, and a little water.',
+      'Arrange pears in a baking dish and pour the mixture over.',
+      'Bake at 350°F (180°C) for about 22 minutes until tender.',
+      'Serve warm as a parve dessert.',
+    ],
+    calories: 260,
+    protein: 2,
+    carbs: 48,
+    fat: 6,
+    spiceLevel: 0,
+    healthScore: 68,
+    tags: ['healthy'],
+  },
+  parve: {
+    name: 'Chocolate Cookies',
+    ingredients: ['flour', 'sugar', 'cocoa powder', 'oil', 'soy milk', 'baking powder', 'vanilla'],
+    steps: [
+      'Whisk flour, sugar, cocoa, and baking powder.',
+      'Add oil, soy milk, and vanilla until a uniform dough forms.',
+      'Roll small balls and place on a baking sheet.',
+      'Bake at 350°F (175°C) for about 14 minutes.',
+      'Cool slightly and serve.',
+    ],
+    calories: 210,
+    protein: 3,
+    carbs: 30,
+    fat: 9,
+    spiceLevel: 0,
+    healthScore: 54,
+    tags: ['comfortFood', 'vegetarian'],
+  },
+}
+
+function getDessertMockTemplates(category, language = 'he') {
+  const primary = language === 'en' ? DESSERT_MOCK_BY_CATEGORY_EN : DESSERT_MOCK_BY_CATEGORY
+  const alternates = language === 'en' ? DESSERT_MOCK_ALTERNATES_EN : DESSERT_MOCK_ALTERNATES
+  const resolvedCategory = primary[category] ? category : 'parve'
+  const templates = [primary[resolvedCategory]]
+  if (alternates[resolvedCategory]) templates.push(alternates[resolvedCategory])
+  return templates
+}
+
+function pickPreferenceMockTemplate(templates, { excludeTitles = [], excludeTemplateKeys = [], keyPrefix = 'mock' } = {}) {
+  const list = Array.isArray(templates) ? templates : [templates]
+  const indexed = list.map((template, index) => ({
+    template,
+    templateKey: `${keyPrefix}-${index}`,
+  }))
+
+  const eligible = indexed.filter(
+    ({ template, templateKey }) =>
+      !excludeTemplateKeys.includes(templateKey) && !isDuplicateTitle(template.name, excludeTitles),
+  )
+
+  if (eligible.length) {
+    const picked = eligible[Math.floor(Math.random() * eligible.length)]
+    return picked
+  }
+
+  const byTitle = indexed.find(({ template }) => !isDuplicateTitle(template.name, excludeTitles))
+  if (byTitle) return byTitle
+
+  return indexed[0]
 }
 
 const SOUP_STEW_MOCK_BY_CATEGORY = {
@@ -398,11 +776,26 @@ const SOUP_STEW_MOCK_BY_CATEGORY_EN = {
   },
 }
 
-function getSoupStewMockTemplate(category, language = 'he') {
-  const source = language === 'en' ? SOUP_STEW_MOCK_BY_CATEGORY_EN : SOUP_STEW_MOCK_BY_CATEGORY
-  if (source[category]) return source[category]
-  if (category === 'vegan') return source.vegan ?? source.parve
-  return source.parve
+function getSoupStewMockTemplate(category, language = 'he', options = {}) {
+  const templates = getSoupStewMockTemplates(category, language)
+  const resolvedCategory = category === 'vegan' ? 'vegan' : category
+  return pickPreferenceMockTemplate(templates, {
+    excludeTitles: options.excludeTitles ?? [],
+    excludeTemplateKeys: options.excludeTemplateKeys ?? [],
+    keyPrefix: `soup-stew-mock-${resolvedCategory}`,
+  })
+}
+
+function getSoupStewMockTemplates(category, language = 'he') {
+  const primary = language === 'en' ? SOUP_STEW_MOCK_BY_CATEGORY_EN : SOUP_STEW_MOCK_BY_CATEGORY
+  const alternates = language === 'en' ? SOUP_STEW_MOCK_ALTERNATES_EN : SOUP_STEW_MOCK_ALTERNATES
+  let resolvedCategory = category
+  if (!primary[resolvedCategory]) {
+    resolvedCategory = category === 'vegan' ? 'vegan' : 'parve'
+  }
+  const templates = [primary[resolvedCategory]]
+  if (alternates[resolvedCategory]) templates.push(alternates[resolvedCategory])
+  return templates
 }
 
 function parseIngredients(input) {
@@ -1393,7 +1786,7 @@ function buildDessertMockRecipe(
     musicPlatform = 'spotify',
     servings = 4,
   },
-  { language = 'he', pantrySuffix = '(from your pantry)', validation = null, excludeTitles = [], excludeCookingMethods = [], excludeDessertCategories = [] } = {},
+  { language = 'he', pantrySuffix = '(from your pantry)', validation = null, excludeTitles = [], excludeCookingMethods = [], excludeDessertCategories = [], excludeTemplateKeys = [] } = {},
 ) {
   if (isInvalidRecipeSelection('dessert', category)) {
     return buildMockRecipe(
@@ -1435,7 +1828,10 @@ function buildDessertMockRecipe(
     )
   }
 
-  const template = getDessertMockTemplate(category, language)
+  const { template, templateKey } = getDessertMockTemplate(category, language, {
+    excludeTitles,
+    excludeTemplateKeys,
+  })
   const cookTime = Math.min(cookingTime, 45)
   const copy = getRecipeCopy(language)
   const moodPhrase = copy.moodFlavor[mood] ?? copy.defaultMood
@@ -1480,7 +1876,7 @@ function buildDessertMockRecipe(
 
   const meta = {
     id: `dessert-mock-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-    templateKey: `dessert-mock-${category}`,
+    templateKey,
     category,
     mood,
     cookingTime,
@@ -1521,6 +1917,7 @@ function buildSoupStewMockRecipe(
     excludeTitles = [],
     excludeCookingMethods = [],
     excludeDessertCategories = [],
+    excludeTemplateKeys = [],
   } = {},
 ) {
   const rawUserList = parseUserIngredients(ingredients)
@@ -1548,7 +1945,10 @@ function buildSoupStewMockRecipe(
   }
 
   const templateCategory = category === 'vegan' ? 'vegan' : resolveTemplateCategory(category, ingredients)
-  const template = getSoupStewMockTemplate(templateCategory, language)
+  const { template, templateKey } = getSoupStewMockTemplate(templateCategory, language, {
+    excludeTitles,
+    excludeTemplateKeys,
+  })
   const cookTime = Math.min(cookingTime, 60)
   const copy = getRecipeCopy(language)
   const moodPhrase = copy.moodFlavor[mood] ?? copy.defaultMood
@@ -1597,7 +1997,7 @@ function buildSoupStewMockRecipe(
 
   const meta = {
     id: `soup-stew-mock-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-    templateKey: `soup-stew-mock-${templateCategory}`,
+    templateKey,
     category,
     mood,
     cookingTime,
@@ -1657,19 +2057,21 @@ export function buildMockRecipe(
         excludeTitles,
         excludeCookingMethods,
         excludeDessertCategories,
+        excludeTemplateKeys,
       },
     )
   }
 
   if (effectiveRecipeType === 'soup_stew') {
     return buildSoupStewMockRecipe(
-      { category: templateCategory, ingredients, cookingTime, mood, isGlutenFree, musicPlatform, servings },
+      { category, ingredients, cookingTime, mood, isGlutenFree, musicPlatform, servings },
       {
         language,
         pantrySuffix,
         excludeTitles,
         excludeCookingMethods,
         excludeDessertCategories,
+        excludeTemplateKeys,
       },
     )
   }

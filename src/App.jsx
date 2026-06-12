@@ -36,6 +36,7 @@ import { regenerateRecipeSteps } from './services/regenerateStepsService'
 import { upgradeRecipe } from './services/recipeUpgradeService'
 import { fetchMoreRecipeIdeas } from './services/recipeIdeasService'
 import { detectCookingMethod, detectDessertCategory } from './utils/recipeDiversity'
+import { stripQuantityPrefix } from './utils/measurementUnits'
 // Recipe source: FastAPI backend (default) — see .env.example
 import {
   getSavedRecipes,
@@ -510,10 +511,13 @@ export default function App() {
   }, [recipe, upgradeLoading, category, recipeType, form, language, t])
 
   const handleRegenerate = () => {
+    const avoidIngredientLabels = (recipe?.ingredients ?? [])
+      .map((line) => stripQuantityPrefix(String(line)).trim())
+      .filter(Boolean)
     setRecipeIdeas(null)
     handleGenerate({
       excludeKeys: usedTemplateKeys,
-      excludeTitles: regenerationHistory.titles,
+      excludeTitles: [...regenerationHistory.titles, ...avoidIngredientLabels],
       excludeCookingMethods: regenerationHistory.cookingMethods,
       excludeDessertCategories: regenerationHistory.dessertCategories,
       regenerate: true,
