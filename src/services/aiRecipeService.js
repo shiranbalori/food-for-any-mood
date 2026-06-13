@@ -629,13 +629,18 @@ function fetchMockFallbackRecipe(userInput, timer = null) {
   return recipe
 }
 
-function tryPreferenceBasedFallback(userInput, timer = null) {
-  if (!isPreferenceBasedGeneration(userInput)) return null
+function tryValidatedMockFallback(userInput, timer = null, reason = 'unknown') {
+  console.warn('[aiRecipeService] Trying validated local mock fallback', {
+    reason,
+    category: userInput.category,
+    recipeType: userInput.recipeType,
+    ingredientCount: parseUserIngredients(userInput.ingredients ?? '').length,
+  })
   return fetchMockFallbackRecipe(userInput, timer)
 }
 
-function buildPreferenceBasedSuccessResult(recipe, timer = null) {
-  timer?.mark('preferenceBasedFallback:complete', 'Success')
+function buildMockFallbackSuccessResult(recipe, timer = null) {
+  timer?.mark('mockFallback:complete', 'Success')
   timer?.printTable()
   return {
     recipe,
@@ -699,9 +704,9 @@ async function generateAIRecipeCore(userInput) {
         'backend:recipePossibleFalse',
       )
       if (cinnamonEmergency) return cinnamonEmergency
-      const preferenceFallback = tryPreferenceBasedFallback(normalized, timer)
-      if (preferenceFallback) {
-        return buildPreferenceBasedSuccessResult(preferenceFallback, timer)
+      const mockFallback = tryValidatedMockFallback(normalized, timer, 'backend:recipePossibleFalse')
+      if (mockFallback) {
+        return buildMockFallbackSuccessResult(mockFallback, timer)
       }
       timer.printTable()
       return {
@@ -741,9 +746,9 @@ async function generateAIRecipeCore(userInput) {
         'processGeneratedRecipe:reject',
       )
       if (cinnamonEmergency) return cinnamonEmergency
-      const preferenceFallback = tryPreferenceBasedFallback(normalized, timer)
-      if (preferenceFallback) {
-        return buildPreferenceBasedSuccessResult(preferenceFallback, timer)
+      const mockFallback = tryValidatedMockFallback(normalized, timer, 'processGeneratedRecipe:reject')
+      if (mockFallback) {
+        return buildMockFallbackSuccessResult(mockFallback, timer)
       }
       timer.mark('processGeneratedRecipe:reject', 'Failed')
       timer.printTable()
@@ -783,9 +788,9 @@ async function generateAIRecipeCore(userInput) {
         'preReturnValidation:reject',
       )
       if (cinnamonEmergency) return cinnamonEmergency
-      const preferenceFallback = tryPreferenceBasedFallback(normalized, timer)
-      if (preferenceFallback) {
-        return buildPreferenceBasedSuccessResult(preferenceFallback, timer)
+      const mockFallback = tryValidatedMockFallback(normalized, timer, 'preReturnValidation:reject')
+      if (mockFallback) {
+        return buildMockFallbackSuccessResult(mockFallback, timer)
       }
       console.warn('[aiRecipeService] Recipe failed pre-return validation:', preReturn.failures)
       timer.mark('preReturnValidation:reject', 'Failed')
