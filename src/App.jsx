@@ -837,7 +837,7 @@ export default function App() {
                 onFavoritesChanged={handleCommunityDataChanged}
               />
             </div>
-          </div>
+        </div>
         )}
 
         {loading && <LoadingAnimation theme={theme} />}
@@ -863,7 +863,7 @@ export default function App() {
                 {impossibleRecipe.missingIngredients.join(', ')}
               </p>
             )}
-          </div>
+        </div>
         )}
 
         {recipe && !loading && (
@@ -901,7 +901,7 @@ export default function App() {
             onMealPlanUpdated={handleMealPlanUpdated}
             onBackToEdit={!showRecipeForm ? handleBackToEdit : undefined}
           />
-          </div>
+        </div>
         )}
           </>
         )}

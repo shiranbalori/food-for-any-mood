@@ -211,7 +211,8 @@ export function isVeganValid(recipe) {
 
 function titleHasDessertKeyword(title) {
   const text = String(title ?? '').toLowerCase()
-  return DESSERT_TITLE_KEYWORDS.some((keyword) => text.includes(keyword))
+  const normalized = text.includes('חומוס') ? text.replace(/חומוס/g, '') : text
+  return DESSERT_TITLE_KEYWORDS.some((keyword) => normalized.includes(keyword))
 }
 
 function titleHasSoupStewKeyword(title) {
@@ -310,10 +311,17 @@ function validateCategoryRules(recipeType, effectiveCategory, selectedCategory, 
   return true
 }
 
+function validateRecipeTypeForAny(recipeType, recipe) {
+  if (recipeType === 'soup_stew') return isSoupStewValid(recipe)
+  if (recipeType === 'dessert') return !recipeHasMeat(recipe)
+  if (recipeType === 'meal') return !titleHasDessertKeyword(recipe?.name)
+  return true
+}
+
 export function validateRecipeCategory(recipeType, category, recipe) {
   if (isInvalidRecipeSelection(recipeType, category)) return false
-  const effectiveCategory = resolveKosherCategory(category, recipe)
-  return validateCategoryRules(recipeType, effectiveCategory, category, recipe)
+  if (isAnyCategory(category)) return validateRecipeTypeForAny(recipeType, recipe)
+  return validateCategoryRules(recipeType, category, category, recipe)
 }
 
 export function logRecipeValidation({

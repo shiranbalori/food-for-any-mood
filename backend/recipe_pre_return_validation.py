@@ -189,6 +189,20 @@ def assess_ingredient_feasibility(
             "missing_ingredients": [],
         }
 
+    category_check = assess_category_fit(
+        user_ingredients_raw,
+        category=category,
+        is_gluten_free=is_gluten_free,
+        language=language,
+    )
+    if not category_check.get("category_ok", True):
+        return {
+            "recipe_possible": False,
+            "reason": category_check.get("reason", ""),
+            "missing_ingredients": list(category_check.get("missing_ingredients") or []),
+            "suggested_category": category_check.get("suggested_category"),
+        }
+
     canons = [
         canonical_ingredient(item) or normalize_ingredient(item)
         for item in user_ingredients
@@ -258,20 +272,6 @@ def assess_ingredient_feasibility(
                 ),
                 "missing_ingredients": missing,
             }
-
-    category_check = assess_category_fit(
-        user_ingredients_raw,
-        category=category,
-        is_gluten_free=is_gluten_free,
-        language=language,
-    )
-    if not category_check.get("category_ok", True):
-        return {
-            "recipe_possible": False,
-            "reason": category_check.get("reason", ""),
-            "missing_ingredients": list(category_check.get("missing_ingredients") or []),
-            "suggested_category": category_check.get("suggested_category"),
-        }
 
     return {"recipe_possible": True, "reason": "", "missing_ingredients": []}
 

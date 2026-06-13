@@ -666,6 +666,11 @@ def apply_descriptive_dish_title(
             ),
         }
 
+    if recipe_type == "soup_stew":
+        name = (recipe.get("name") or "").strip()
+        if name and re.search(r"מרק|תבשיל|נזיד|stew|soup|broth|chowder|bisque", name, re.I):
+            return {**recipe, "name": name}
+
     name = ensure_descriptive_dish_title(
         recipe.get("name", ""),
         recipe.get("ingredients") or [],

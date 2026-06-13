@@ -400,6 +400,13 @@ export function applyDescriptiveDishTitle(recipe, options = {}) {
     return enforceRecipeTypeTitle(recipe, 'dessert', category, language)
   }
 
+  if (recipeType === 'soup_stew') {
+    const name = String(recipe.name ?? '').trim()
+    if (name && /מרק|תבשיל|נזיד|stew|soup|broth|chowder|bisque/i.test(name)) {
+      return { ...recipe, name }
+    }
+  }
+
   const name = ensureDescriptiveDishTitle(recipe.name, recipe.ingredients ?? [], {
     cookingTime: options.cookingTime,
     steps: recipe.steps ?? [],

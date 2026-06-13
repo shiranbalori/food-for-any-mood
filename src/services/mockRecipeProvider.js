@@ -1343,8 +1343,8 @@ const STAPLE_DEDUP_CANONS = {
 
 /** Quantity/unit prefix used when a user ingredient line must be rebuilt. */
 const USER_QTY_PREFIX = {
-  he: { pasta: '400 גרם', cream: '200 מ"ל', mushroom: '250 גרם', cheese: '200 גרם', tomato: '3', egg: '4', potato: '3', chicken: '500 גרם', beef: '500 גרם', rice: '1 כוס', tuna: '1 קופסת', corn: '1 קופסת', onion: '1' },
-  en: { pasta: '400 g', cream: '200 ml', mushroom: '250 g', cheese: '200 g', tomato: '3', egg: '4', potato: '3', chicken: '500 g', beef: '500 g', rice: '1 cup', tuna: '1 can', corn: '1 can', onion: '1' },
+  he: { pasta: '400 גרם', cream: '200 מ"ל', mushroom: '250 גרם', cheese: '200 גרם', tomato: '3', egg: '4', potato: '3', chicken: '500 גרם', beef: '500 גרם', rice: '1 כוס', tuna: '1 קופסת', corn: '1 קופסת', onion: '1', lentils: '1 כוס', lentil: '1 כוס', chickpeas: '2 גביעים', carrot: '2' },
+  en: { pasta: '400 g', cream: '200 ml', mushroom: '250 g', cheese: '200 g', tomato: '3', egg: '4', potato: '3', chicken: '500 g', beef: '500 g', rice: '1 cup', tuna: '1 can', corn: '1 can', onion: '1', lentils: '1 cup', lentil: '1 cup', chickpeas: '2 cups', carrot: '2' },
 }
 
 /** Short, clean ingredient nouns for building grounded dish titles. */
@@ -1371,6 +1371,7 @@ function detectFallbackConcept(canonSet) {
   if (canonSet.has('pasta')) return 'pasta'
   if (canonSet.has('tuna')) return 'tuna'
   if (canonSet.has('egg')) return 'egg'
+  if (canonSet.has('lentils') || canonSet.has('lentil') || canonSet.has('chickpeas') || canonSet.has('chickpea') || canonSet.has('beans') || canonSet.has('bean')) return 'legume'
   return 'generic'
 }
 
@@ -1512,6 +1513,25 @@ function buildFallbackSteps(concept, { canonSet, allPhrase, otherPhrase, cookMin
     steps.push('Season with salt and black pepper, drizzle with olive oil, and mix.')
     steps.push('Chill the salad for 10 minutes and serve on slices of fresh bread.')
     return steps
+  }
+
+  if (concept === 'legume') {
+    if (he) {
+      return [
+        'שוטפים את העדשים, חותכים גזר ובצל לקוביות.',
+        'מחממים סיר עם שמן זית, מטגנים בצל ושום עד שמזהיבים.',
+        'יוצקים מים, מכניסים עדשים, גזר ובצל ומרתיחים.',
+        `מנמיכים את האש ומבשלים כ-${cookMinutes} דקות עד שהקטניות רכות והתבשיל מסמיך.`,
+        'מעבירים לקערות הגשה, מתאימים תיבול של מלח ופלפל שחור ומגישים חם.',
+      ]
+    }
+    return [
+      'Rinse the legumes, then dice the carrots and onion.',
+      'Heat olive oil in a pot and sauté the onion and garlic until golden.',
+      'Add water, lentils, carrots, and onion; bring to a boil.',
+      `Reduce heat and simmer for about ${cookMinutes} minutes until tender and thick.`,
+      'Season with salt and black pepper and serve hot.',
+    ]
   }
 
   void has

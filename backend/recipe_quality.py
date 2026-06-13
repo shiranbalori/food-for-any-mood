@@ -235,9 +235,10 @@ def recipe_text_blob(recipe: dict) -> str:
 
 def title_has_dessert_keyword(title: str) -> bool:
     text = (title or "").lower()
-    if any(keyword in text for keyword in DESSERT_TITLE_REQUIRED):
+    normalized = text.replace("חומוס", "") if "חומוס" in text else text
+    if any(keyword in normalized for keyword in DESSERT_TITLE_REQUIRED):
         return True
-    return "עוג" in text
+    return "עוג" in normalized
 
 
 def title_has_savory_block(title: str) -> bool:
@@ -467,7 +468,16 @@ def validate_recipe_category(
     if is_invalid_recipe_selection(recipe_type, category):
         return False
 
-    effective = resolve_kosher_category(category, recipe)
+    if category == "any":
+        if recipe_type == "soup_stew":
+            return is_soup_stew_valid(recipe)
+        if recipe_type == "dessert":
+            return not recipe_has_meat(recipe)
+        if recipe_type == "meal":
+            return not title_has_dessert_keyword(recipe.get("name", ""))
+        return True
+
+    rules_category = category
 
     tags = [str(tag).lower() for tag in (recipe.get("tags") or [])]
     if "vegetarian" in tags and recipe_has_meat(recipe):
@@ -478,15 +488,15 @@ def validate_recipe_category(
     if category == "vegan" and not is_vegan_valid(recipe):
         return False
 
-    if violates_kosher_category(effective, recipe):
+    if violates_kosher_category(rules_category, recipe):
         return False
 
     if recipe_type == "dessert":
         if category == "vegan":
             return is_vegan_dessert_valid(recipe)
-        if effective == "dairy":
+        if rules_category == "dairy":
             return is_dairy_dessert_valid(recipe)
-        if effective == "parve":
+        if rules_category == "parve":
             return is_parve_dessert_valid(recipe)
         return False
 
@@ -495,22 +505,22 @@ def validate_recipe_category(
             return False
         if category == "vegan":
             return is_vegan_meal_valid(recipe)
-        if effective == "meat":
+        if rules_category == "meat":
             return is_meat_meal_valid(recipe)
-        if effective == "dairy":
+        if rules_category == "dairy":
             return is_dairy_meal_valid(recipe)
-        if effective == "parve":
+        if rules_category == "parve":
             return is_parve_meal_valid(recipe)
         return False
 
     if recipe_type == "meal":
         if category == "vegan":
             return is_vegan_meal_valid(recipe)
-        if effective == "meat":
+        if rules_category == "meat":
             return is_meat_meal_valid(recipe)
-        if effective == "dairy":
+        if rules_category == "dairy":
             return is_dairy_meal_valid(recipe)
-        if effective == "parve":
+        if rules_category == "parve":
             return is_parve_meal_valid(recipe)
 
     return True

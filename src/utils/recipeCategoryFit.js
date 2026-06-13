@@ -6,7 +6,15 @@
 
 import { canonicalIngredient } from '../data/ingredientKnowledge'
 import { parseUserIngredients } from './ingredientRelevance'
-import { buildCategoryMismatchNote } from './categoryMismatchNote'
+
+export const CATEGORY_MISMATCH_MESSAGE = {
+  he: 'המרכיבים לא תואמים לקטגוריה שבחרת',
+  en: 'Your ingredients do not match the category you selected',
+}
+
+function categoryMismatchReason(language = 'he') {
+  return language === 'he' ? CATEGORY_MISMATCH_MESSAGE.he : CATEGORY_MISMATCH_MESSAGE.en
+}
 
 const DAIRY_CANON = new Set([
   'milk', 'cheese', 'cream', 'butter', 'yogurt', 'ricotta', 'parmesan', 'feta', 'cottage cheese', 'mozzarella',
@@ -64,8 +72,21 @@ export function assessCategoryFit(userIngredientsRaw, { category = 'dairy', isGl
   const profile = ingredientProfile(userIngredients)
   const isHe = language === 'he'
   const suggested = suggestCategory(profile)
-  const selectedLabel = category === 'any' ? (isHe ? 'ללא העדפה' : 'no preference') : categoryLabel(category, language)
-  const suggestedLabel = categoryLabel(suggested, language)
+
+  if (category === 'any') {
+    if (isGlutenFree && profile.hasGluten) {
+      const glutenItems = userIngredients.filter((item) => GLUTEN_CANON.has(canonicalIngredient(item)))
+      return {
+        categoryOk: false,
+        reason: isHe
+          ? 'בחרתם «ללא גלוטן» אבל יש במרכיבים מוצרים עם גלוטן (למשל קמח, פסטה או לחם). הסירו אותם או בטלו את סימון ללא גלוטן.'
+          : 'Gluten-free is selected but your ingredients include gluten. Remove them or turn off gluten-free.',
+        suggestedCategory: suggested,
+        missingIngredients: glutenItems.slice(0, 4),
+      }
+    }
+    return { categoryOk: true, reason: '', suggestedCategory: suggested, missingIngredients: [] }
+  }
 
   if (isGlutenFree && profile.hasGluten) {
     const glutenItems = userIngredients.filter((item) => GLUTEN_CANON.has(canonicalIngredient(item)))
@@ -90,16 +111,10 @@ export function assessCategoryFit(userIngredientsRaw, { category = 'dairy', isGl
     }
   }
 
-  if (category === 'any') {
-    return { categoryOk: true, reason: '', suggestedCategory: suggested, missingIngredients: [] }
-  }
-
   if (category === 'dairy' && !profile.hasDairy) {
     return {
-      categoryOk: true,
-      categoryMismatch: true,
-      categoryNote: buildCategoryMismatchNote('dairy', suggested, language),
-      reason: '',
+      categoryOk: false,
+      reason: categoryMismatchReason(language),
       suggestedCategory: suggested,
       missingIngredients: [],
     }
@@ -107,10 +122,8 @@ export function assessCategoryFit(userIngredientsRaw, { category = 'dairy', isGl
 
   if (category === 'meat' && !profile.hasMeat) {
     return {
-      categoryOk: true,
-      categoryMismatch: true,
-      categoryNote: buildCategoryMismatchNote('meat', suggested, language),
-      reason: '',
+      categoryOk: false,
+      reason: categoryMismatchReason(language),
       suggestedCategory: suggested,
       missingIngredients: [],
     }
@@ -118,10 +131,8 @@ export function assessCategoryFit(userIngredientsRaw, { category = 'dairy', isGl
 
   if (category === 'parve' && (profile.hasMeat || profile.hasDairy)) {
     return {
-      categoryOk: true,
-      categoryMismatch: true,
-      categoryNote: buildCategoryMismatchNote('parve', suggested, language),
-      reason: '',
+      categoryOk: false,
+      reason: categoryMismatchReason(language),
       suggestedCategory: suggested,
       missingIngredients: [],
     }
@@ -143,13 +154,11 @@ export function assessCategoryFit(userIngredientsRaw, { category = 'dairy', isGl
     })
     return {
       categoryOk: false,
-      reason: isHe
-        ? 'בחרתם «טבעוני» אבל יש במרכיבים בשר, חלב, ביצים, דבש או מוצרים מן החי. הסירו אותם או בחרו קטגוריה אחרת.'
-        : 'Vegan is selected but your ingredients include meat, dairy, eggs, honey, or animal products. Remove them or choose another category.',
+      reason: categoryMismatchReason(language),
       suggestedCategory: 'parve',
       missingIngredients: veganConflicts.slice(0, 4),
     }
   }
 
-  return { categoryOk: true, reason: '', suggestedCategory: category, missingIngredients: [], categoryNote: '' }
+  return { categoryOk: true, reason: '', suggestedCategory: category, missingIngredients: [] }
 }

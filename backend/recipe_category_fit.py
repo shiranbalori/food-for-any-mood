@@ -11,8 +11,16 @@ from __future__ import annotations
 
 import re
 
-from category_mismatch_note import build_category_mismatch_note
 from ingredient_relevance import canonical_ingredient, normalize_ingredient, parse_user_ingredients
+
+CATEGORY_MISMATCH_MESSAGE = {
+    "he": "המרכיבים לא תואמים לקטגוריה שבחרת",
+    "en": "Your ingredients do not match the category you selected",
+}
+
+
+def _category_mismatch_reason(*, language: str) -> str:
+    return CATEGORY_MISMATCH_MESSAGE["he"] if language == "he" else CATEGORY_MISMATCH_MESSAGE["en"]
 
 DAIRY_CANON = frozenset(
     {
@@ -121,10 +129,23 @@ def assess_category_fit(
     profile = _ingredient_profile(user_ingredients)
     is_he = language == "he"
     suggested = _suggest_category(profile)
-    selected_label = "ללא העדפה" if category == "any" and is_he else (
-        "no preference" if category == "any" else _category_label(category, language=language)
-    )
-    suggested_label = _category_label(suggested, language=language)
+
+    if category == "any":
+        if is_gluten_free and profile["has_gluten"]:
+            gluten_items = [item for item in user_ingredients if canonical_ingredient(item) in GLUTEN_CANON]
+            return {
+                "category_ok": False,
+                "reason": (
+                    "בחרתם «ללא גלוטן» אבל יש במרכיבים מוצרים עם גלוטן (למשל קמח, פסטה או לחם). "
+                    "הסירו אותם או בטלו את סימון ללא גלוטן."
+                    if is_he
+                    else "Gluten-free is selected but your ingredients include gluten (e.g. flour, pasta, or bread). "
+                    "Remove them or turn off gluten-free."
+                ),
+                "suggested_category": suggested,
+                "missing_ingredients": gluten_items[:4],
+            }
+        return {"category_ok": True, "reason": "", "suggested_category": suggested, "missing_ingredients": []}
 
     if is_gluten_free and profile["has_gluten"]:
         gluten_items = [item for item in user_ingredients if canonical_ingredient(item) in GLUTEN_CANON]
@@ -154,35 +175,26 @@ def assess_category_fit(
             "missing_ingredients": [],
         }
 
-    if category == "any":
-        return {"category_ok": True, "reason": "", "suggested_category": suggested, "missing_ingredients": []}
-
     if category == "dairy" and not profile["has_dairy"]:
         return {
-            "category_ok": True,
-            "category_mismatch": True,
-            "category_note": build_category_mismatch_note("dairy", suggested, language=language),
-            "reason": "",
+            "category_ok": False,
+            "reason": _category_mismatch_reason(language=language),
             "suggested_category": suggested,
             "missing_ingredients": [],
         }
 
     if category == "meat" and not profile["has_meat"]:
         return {
-            "category_ok": True,
-            "category_mismatch": True,
-            "category_note": build_category_mismatch_note("meat", suggested, language=language),
-            "reason": "",
+            "category_ok": False,
+            "reason": _category_mismatch_reason(language=language),
             "suggested_category": suggested,
             "missing_ingredients": [],
         }
 
     if category == "parve" and (profile["has_meat"] or profile["has_dairy"]):
         return {
-            "category_ok": True,
-            "category_mismatch": True,
-            "category_note": build_category_mismatch_note("parve", suggested, language=language),
-            "reason": "",
+            "category_ok": False,
+            "reason": _category_mismatch_reason(language=language),
             "suggested_category": suggested,
             "missing_ingredients": [],
         }
@@ -206,13 +218,7 @@ def assess_category_fit(
         ]
         return {
             "category_ok": False,
-            "reason": (
-                "בחרתם «טבעוני» אבל יש במרכיבים בשר, חלב, ביצים, דבש או מוצרים מן החי. "
-                "הסירו אותם או בחרו קטגוריה אחרת."
-                if is_he
-                else "Vegan is selected but your ingredients include meat, dairy, eggs, honey, or animal products. "
-                "Remove them or choose another category."
-            ),
+            "reason": _category_mismatch_reason(language=language),
             "suggested_category": "parve",
             "missing_ingredients": vegan_conflicts[:4],
         }
@@ -222,5 +228,4 @@ def assess_category_fit(
         "reason": "",
         "suggested_category": category,
         "missing_ingredients": [],
-        "category_note": "",
     }

@@ -153,6 +153,16 @@ export function assessIngredientFeasibility(
     }
   }
 
+  const categoryCheck = assessCategoryFit(userIngredientsRaw, { category, isGlutenFree, language })
+  if (!categoryCheck.categoryOk) {
+    return {
+      recipePossible: false,
+      reason: categoryCheck.reason,
+      missingIngredients: categoryCheck.missingIngredients ?? [],
+      suggestedCategory: categoryCheck.suggestedCategory,
+    }
+  }
+
   const canons = userIngredients.map((item) => canonicalIngredient(item) || item.toLowerCase())
   const profile = classifyCanons(canons)
 
@@ -200,16 +210,6 @@ export function assessIngredientFeasibility(
           : 'These ingredients cannot make a full meal — main components are missing.',
         missingIngredients: isHe ? ['חלבון', 'פחמימה', 'או ירק מרכזי'] : ['protein', 'starch, or a main vegetable'],
       }
-    }
-  }
-
-  const categoryCheck = assessCategoryFit(userIngredientsRaw, { category, isGlutenFree, language })
-  if (!categoryCheck.categoryOk) {
-    return {
-      recipePossible: false,
-      reason: categoryCheck.reason,
-      missingIngredients: categoryCheck.missingIngredients ?? [],
-      suggestedCategory: categoryCheck.suggestedCategory,
     }
   }
 
