@@ -928,12 +928,19 @@ function weightedRandomPick(items) {
   return items[items.length - 1]
 }
 
-function pickTemplate(category, userIngredients, time, mood, excludeKeys, glutenFree) {
+function templateMatchesCategory(template, selectedCategory) {
+  if (selectedCategory === 'any') return true
+  const ingredientText = (template.baseIngredients ?? []).join(', ')
+  return assessCategoryFit(ingredientText, { category: selectedCategory, language: 'he' }).categoryOk
+}
+
+function pickTemplate(category, userIngredients, time, mood, excludeKeys, glutenFree, selectedCategory = category) {
   const templates = recipeTemplates[category] ?? recipeTemplates.parve
   const preferredStyles = inferPreferredStyles(mood, time)
-  const eligible = glutenFree
-    ? templates.filter(isTemplateGlutenFreeCompatible)
-    : templates
+  const categoryFilter = selectedCategory === 'any' ? category : selectedCategory
+  const eligible = (glutenFree ? templates.filter(isTemplateGlutenFreeCompatible) : templates).filter((template) =>
+    templateMatchesCategory(template, categoryFilter),
+  )
 
   const scored = eligible
     .map((template, index) => ({
@@ -968,7 +975,7 @@ function pickTemplate(category, userIngredients, time, mood, excludeKeys, gluten
     }))
     .filter(({ templateKey }) => !excludeKeys.includes(templateKey))
 
-  const pool = (
+  const fullPool = (
     poolSource.length
       ? poolSource
       : fallbackSource.length
@@ -980,14 +987,25 @@ function pickTemplate(category, userIngredients, time, mood, excludeKeys, gluten
             score: 0.4,
             preferredStyles,
           }))
-  ).slice(0, 5)
-
-  const picked = weightedRandomPick(
-    pool.map((item) => ({
-      ...item,
-      weight: item.score ** 2 + 0.08 + Math.random() * 0.12,
-    })),
   )
+
+  const pool = userIngredients.length === 0 ? fullPool : fullPool.slice(0, 5)
+
+  if (!pool.length) {
+    return null
+  }
+
+  const picked =
+    userIngredients.length === 0
+      ? pool[0]
+      : weightedRandomPick(
+          pool.map((item) => ({
+            ...item,
+            weight: item.score ** 2 + 0.08 + Math.random() * 0.12,
+          })),
+        )
+
+  if (!picked) return null
 
   const primaryStyle =
     picked.template.styles.find((style) => picked.preferredStyles.includes(style)) ??
@@ -2135,7 +2153,30 @@ export function buildMockRecipe(
     mood,
     excludeKeys,
     glutenFree,
+    category,
   )
+
+  if (!template || !templateKey) {
+    return buildIngredientFirstFallbackRecipe(
+      {
+        category,
+        ingredients,
+        cookingTime: time,
+        mood,
+        isGlutenFree: glutenFree,
+        musicPlatform,
+        servings,
+        recipeType,
+      },
+      {
+        language,
+        pantrySuffix,
+        excludeTitles,
+        excludeCookingMethods,
+        excludeDessertCategories,
+      },
+    )
+  }
 
   const localizedTemplate = localizeTemplate(template, language)
   const workingTemplate = glutenFree ? adaptTemplateForGlutenFree(template) : template

@@ -2,7 +2,9 @@ import { stripQuantityPrefix } from '../utils/measurementUnits'
 
 export const INGREDIENT_SYNONYMS = {
   chicken: ['עוף', 'chicken breast', 'chicken thigh', 'פilet עוף', 'חזה עוף'],
-  beef: ['בקר', 'steak', 'ground beef', 'בשר בקר', 'אנטריקוט'],
+  beef: ['בקר', 'steak', 'ground beef', 'בשר בקר', 'בשר טחון', 'בשר', 'אנטריקוט'],
+  meat: ['קציצות', 'נקניק', 'meatballs'],
+  turkey: ['הודו', 'turkey breast'],
   lamb: ['כבש', 'lamb mince', 'ground lamb'],
   steak: ['סטייק', 'beef steak', 'אנטריקוט'],
   pasta: ['פסטה', 'spaghetti', 'fettuccine', 'penne', 'noodles'],

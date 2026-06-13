@@ -487,43 +487,65 @@ function finalizeRecipeForUser(userInput, recipe, meta = {}) {
   }
 }
 
+const MAX_PREFERENCE_MOCK_ATTEMPTS = 24
+
 function buildCategoryFallbackRecipe(userInput) {
   const effectiveRecipeType = getEffectiveRecipeType(userInput.recipeType, userInput.category)
-  const { recipe } = buildMockRecipe(
-    {
-      category: userInput.category,
-      ingredients: userInput.ingredients,
-      cookingTime: userInput.cookingTime,
-      mood: userInput.mood,
-      isGlutenFree: userInput.isGlutenFree,
-      musicPlatform: userInput.musicPlatform,
-      servings: userInput.servings,
-      recipeType: effectiveRecipeType,
-    },
-    {
-      language: userInput.language,
-      pantrySuffix: userInput.pantrySuffix,
-      excludeTemplateKeys: userInput.excludeTemplateKeys,
-      excludeTitles: userInput.excludeTitles,
-      excludeCookingMethods: userInput.excludeCookingMethods,
-      excludeDessertCategories: userInput.excludeDessertCategories,
-    },
-  )
-  console.warn('[aiRecipeService] Using frontend mock fallback recipe')
-  const { recipe: fallbackRecipe, passed, validation } = finalizeRecipeForUser(userInput, recipe, {
-    fallbackUsed: true,
-    skipReparse: true,
-    recipeSource: 'frontend-mock',
-  })
-  if (!passed) {
-    console.warn('[aiRecipeService] Frontend mock fallback failed validation — not returning invalid recipe', {
+  const triedTemplateKeys = [...(userInput.excludeTemplateKeys ?? [])]
+
+  for (let attempt = 0; attempt < MAX_PREFERENCE_MOCK_ATTEMPTS; attempt += 1) {
+    const { recipe, meta } = buildMockRecipe(
+      {
+        category: userInput.category,
+        ingredients: userInput.ingredients,
+        cookingTime: userInput.cookingTime,
+        mood: userInput.mood,
+        isGlutenFree: userInput.isGlutenFree,
+        musicPlatform: userInput.musicPlatform,
+        servings: userInput.servings,
+        recipeType: effectiveRecipeType,
+      },
+      {
+        language: userInput.language,
+        pantrySuffix: userInput.pantrySuffix,
+        excludeTemplateKeys: triedTemplateKeys,
+        excludeTitles: userInput.excludeTitles,
+        excludeCookingMethods: userInput.excludeCookingMethods,
+        excludeDessertCategories: userInput.excludeDessertCategories,
+      },
+    )
+
+    const templateKey = meta?.templateKey
+    if (templateKey && !triedTemplateKeys.includes(templateKey)) {
+      triedTemplateKeys.push(templateKey)
+    }
+
+    console.warn('[aiRecipeService] Using frontend mock fallback recipe', {
+      attempt: attempt + 1,
+      templateKey: templateKey ?? 'unknown',
+    })
+
+    const { recipe: fallbackRecipe, passed, validation } = finalizeRecipeForUser(userInput, recipe, {
+      fallbackUsed: true,
+      skipReparse: true,
+      recipeSource: 'frontend-mock',
+    })
+
+    if (passed) {
+      return { ...fallbackRecipe, templateKey: templateKey ?? fallbackRecipe.templateKey }
+    }
+
+    console.warn('[aiRecipeService] Mock fallback attempt failed validation — trying next template', {
+      attempt: attempt + 1,
+      templateKey,
       failedChecks: Object.entries(validation?.checks ?? {})
         .filter(([, ok]) => !ok)
         .map(([name]) => name),
     })
-    return null
   }
-  return fallbackRecipe
+
+  console.warn('[aiRecipeService] Frontend mock fallback exhausted all template attempts')
+  return null
 }
 
 /** Result returned when no valid recipe (AI, backend, or fallback) could be produced. */
@@ -538,6 +560,19 @@ function buildFallbackUnavailableResult(language) {
     missingIngredients: [],
     fallbackReason: null,
   }
+}
+
+/**
+ * Build a validated mock recipe — tries templates sequentially until validation passes.
+ * Works for empty-ingredient (preference) and user-ingredient generation.
+ */
+export function buildValidatedMockRecipe(userInput) {
+  return buildCategoryFallbackRecipe(normalizeUserInput(userInput))
+}
+
+/** @deprecated Use buildValidatedMockRecipe */
+export function buildPreferenceCategoryRecipe(userInput) {
+  return buildValidatedMockRecipe(userInput)
 }
 
 /**
@@ -580,7 +615,7 @@ function processGeneratedRecipe(userInput, recipe, { source = 'unknown', timer =
     return { recipe: result, ok: true }
   }
 
-  return { recipe: null, ok: false, validation }
+  return { recipe: null, ok: false, validation, categoryPassed, languagePassed }
 }
 
 /**

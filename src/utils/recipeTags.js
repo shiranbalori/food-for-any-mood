@@ -2,7 +2,7 @@ import { canonicalIngredient } from '../data/ingredientKnowledge'
 import { RECIPE_TAGS } from '../data/recipeStyles'
 
 const MEAT_FISH_CANON = new Set([
-  'chicken', 'beef', 'fish', 'salmon', 'tuna', 'turkey', 'lamb', 'pork', 'meat', 'steak',
+  'chicken', 'beef', 'meat', 'fish', 'salmon', 'tuna', 'turkey', 'lamb', 'pork', 'steak', 'ground beef',
 ])
 
 const DAIRY_EGG_CANON = new Set([

@@ -167,7 +167,7 @@ ANIMAL_PRODUCT_PATTERNS = (
     r"casein",
 )
 
-MEAT_PATTERNS = (
+LAND_MEAT_PATTERNS = (
     r"עוף",
     r"חזה\s*עוף",
     r"כרע(?:יים)?",
@@ -175,15 +175,10 @@ MEAT_PATTERNS = (
     r"בקר",
     r"כבש",
     r"הודו",
-    r"דג(?:ים)?",
-    r"סלמון",
-    r"טונה",
     r"נקניק",
     r"קבב",
     r"סטייק",
-    r"כבד",
-    r"מרג(?:ז|ע)",
-    r"צלי(?:ה|ת)?",
+    r"קציצ",
     r"chicken",
     r"beef",
     r"\bmeat\b",
@@ -191,11 +186,19 @@ MEAT_PATTERNS = (
     r"turkey",
     r"lamb",
     r"pork",
+    r"ground beef",
+)
+
+FISH_PATTERNS = (
+    r"דג(?:ים)?",
+    r"סלמון",
+    r"טונה",
     r"\bfish\b",
     r"salmon",
     r"tuna",
-    r"ground beef",
 )
+
+MEAT_PATTERNS = LAND_MEAT_PATTERNS + FISH_PATTERNS
 
 DAIRY_PATTERNS = (
     r"חלב",
@@ -321,6 +324,16 @@ def recipe_has_meat(recipe: dict) -> bool:
     return any(re.search(pattern, text) for pattern in MEAT_PATTERNS)
 
 
+def recipe_has_land_meat(recipe: dict) -> bool:
+    text = recipe_text_blob(recipe)
+    return any(re.search(pattern, text) for pattern in LAND_MEAT_PATTERNS)
+
+
+def recipe_has_fish(recipe: dict) -> bool:
+    text = recipe_text_blob(recipe)
+    return any(re.search(pattern, text) for pattern in FISH_PATTERNS)
+
+
 def recipe_has_dairy(recipe: dict) -> bool:
     text = recipe_text_blob(recipe)
     return any(re.search(pattern, text) for pattern in DAIRY_PATTERNS)
@@ -358,11 +371,11 @@ def is_invalid_recipe_selection(recipe_type: RecipeType, category: str) -> bool:
 
 def infer_recipe_category(recipe: dict) -> Category:
     """Classify recipe as dairy, meat, or parve from ingredients (for «ללא העדפה»)."""
-    has_meat = recipe_has_meat(recipe)
+    has_land_meat = recipe_has_land_meat(recipe)
     has_dairy = recipe_has_dairy(recipe)
-    if has_meat and not has_dairy:
+    if has_land_meat and not has_dairy:
         return "meat"
-    if has_dairy and not has_meat:
+    if has_dairy and not has_land_meat:
         return "dairy"
     return "parve"
 
@@ -373,11 +386,11 @@ def resolve_kosher_category(selected_category: str, recipe: dict) -> Category:
     if selected_category == "vegan":
         return "parve" if is_vegan_valid(recipe) else infer_recipe_category(recipe)
     inferred = infer_recipe_category(recipe)
-    if selected_category == "dairy" and recipe_has_dairy(recipe) and not recipe_has_meat(recipe):
+    if selected_category == "dairy" and recipe_has_dairy(recipe) and not recipe_has_land_meat(recipe):
         return "dairy"
     if selected_category == "meat" and recipe_has_meat(recipe) and not recipe_has_dairy(recipe):
         return "meat"
-    if selected_category == "parve" and not recipe_has_meat(recipe) and not recipe_has_dairy(recipe):
+    if selected_category == "parve" and not recipe_has_land_meat(recipe) and not recipe_has_dairy(recipe):
         return "parve"
     return inferred
 
@@ -385,7 +398,7 @@ def resolve_kosher_category(selected_category: str, recipe: dict) -> Category:
 def is_dairy_dessert_valid(recipe: dict) -> bool:
     if not validate_recipe_type("dessert", recipe):
         return False
-    if recipe_has_meat(recipe):
+    if recipe_has_land_meat(recipe):
         return False
     if not recipe_has_dairy(recipe):
         return False
@@ -400,7 +413,7 @@ def is_dairy_dessert_valid(recipe: dict) -> bool:
 def is_parve_dessert_valid(recipe: dict) -> bool:
     if not validate_recipe_type("dessert", recipe):
         return False
-    if recipe_has_meat(recipe) or recipe_has_dairy(recipe):
+    if recipe_has_land_meat(recipe) or recipe_has_dairy(recipe):
         return False
     return True
 
@@ -419,7 +432,7 @@ def is_meat_meal_valid(recipe: dict) -> bool:
 def is_dairy_meal_valid(recipe: dict) -> bool:
     if not validate_recipe_type("meal", recipe):
         return False
-    if recipe_has_meat(recipe):
+    if recipe_has_land_meat(recipe):
         return False
     if not recipe_has_dairy(recipe):
         return False
@@ -430,7 +443,7 @@ def is_dairy_meal_valid(recipe: dict) -> bool:
 def is_parve_meal_valid(recipe: dict) -> bool:
     if not validate_recipe_type("meal", recipe):
         return False
-    if recipe_has_meat(recipe) or recipe_has_dairy(recipe):
+    if recipe_has_land_meat(recipe) or recipe_has_dairy(recipe):
         return False
     return True
 
@@ -446,7 +459,7 @@ def is_vegan_dessert_valid(recipe: dict) -> bool:
 def is_soup_stew_valid(recipe: dict) -> bool:
     if not validate_recipe_type("soup_stew", recipe):
         return False
-    if recipe_has_meat(recipe) and recipe_has_dairy(recipe):
+    if recipe_has_land_meat(recipe) and recipe_has_dairy(recipe):
         return False
     return True
 
@@ -480,9 +493,9 @@ def validate_recipe_category(
     rules_category = category
 
     tags = [str(tag).lower() for tag in (recipe.get("tags") or [])]
-    if "vegetarian" in tags and recipe_has_meat(recipe):
+    if "vegetarian" in tags and recipe_has_land_meat(recipe):
         return False
-    if "vegan" in tags and not is_vegan_valid(recipe):
+    if "vegan" in tags and category == "vegan" and not is_vegan_valid(recipe):
         return False
 
     if category == "vegan" and not is_vegan_valid(recipe):
@@ -569,15 +582,15 @@ def violates_kosher_category(category: str, recipe: dict) -> bool:
     if category == "any":
         return False
     text = recipe_text_blob(recipe)
-    has_meat = any(re.search(pattern, text) for pattern in MEAT_PATTERNS)
+    has_land_meat = any(re.search(pattern, text) for pattern in LAND_MEAT_PATTERNS)
     has_dairy = any(re.search(pattern, text) for pattern in DAIRY_PATTERNS)
 
     if category == "meat":
         return has_dairy
     if category == "dairy":
-        return has_meat
+        return has_land_meat
     if category == "parve":
-        return has_meat or has_dairy
+        return has_land_meat or has_dairy
     if category == "vegan":
         return not is_vegan_valid(recipe)
     return False

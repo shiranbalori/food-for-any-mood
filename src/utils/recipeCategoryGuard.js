@@ -8,19 +8,17 @@
  * Any: inferred from recipe after generation.
  */
 
-const MEAT_PATTERNS = [
+const LAND_MEAT_PATTERNS = [
   /עוף/,
   /חזה\s*עוף/,
   /בשר/,
   /בקר/,
   /כבש/,
   /הודו/,
-  /דג(?:ים)?/,
-  /סלמון/,
-  /טונה/,
   /נקניק/,
   /קבב/,
   /סטייק/,
+  /קציצ/,
   /chicken/i,
   /beef/i,
   /\bmeat\b/i,
@@ -28,11 +26,19 @@ const MEAT_PATTERNS = [
   /turkey/i,
   /lamb/i,
   /pork/i,
+  /ground beef/i,
+]
+
+const FISH_PATTERNS = [
+  /דג(?:ים)?/,
+  /סלמון/,
+  /טונה/,
   /\bfish\b/i,
   /salmon/i,
   /tuna/i,
-  /ground beef/i,
 ]
+
+const MEAT_PATTERNS = [...LAND_MEAT_PATTERNS, ...FISH_PATTERNS]
 
 const DAIRY_PATTERNS = [
   /חלב/,
@@ -137,10 +143,10 @@ export function isInvalidRecipeSelection(recipeType, category) {
 }
 
 export function inferRecipeCategory(recipe) {
-  const hasMeat = recipeHasMeat(recipe)
+  const hasLandMeat = recipeHasLandMeat(recipe)
   const hasDairy = recipeHasDairy(recipe)
-  if (hasMeat && !hasDairy) return 'meat'
-  if (hasDairy && !hasMeat) return 'dairy'
+  if (hasLandMeat && !hasDairy) return 'meat'
+  if (hasDairy && !hasLandMeat) return 'dairy'
   return 'parve'
 }
 
@@ -151,13 +157,13 @@ export function resolveKosherCategory(selectedCategory, recipe) {
   }
 
   const inferred = inferRecipeCategory(recipe)
-  if (selectedCategory === 'dairy' && recipeHasDairy(recipe) && !recipeHasMeat(recipe)) {
+  if (selectedCategory === 'dairy' && recipeHasDairy(recipe) && !recipeHasLandMeat(recipe)) {
     return 'dairy'
   }
   if (selectedCategory === 'meat' && recipeHasMeat(recipe) && !recipeHasDairy(recipe)) {
     return 'meat'
   }
-  if (selectedCategory === 'parve' && !recipeHasMeat(recipe) && !recipeHasDairy(recipe)) {
+  if (selectedCategory === 'parve' && !recipeHasLandMeat(recipe) && !recipeHasDairy(recipe)) {
     return 'parve'
   }
   return inferred
@@ -177,6 +183,16 @@ function recipeTextBlob(recipe) {
 export function recipeHasMeat(recipe) {
   const text = recipeTextBlob(recipe)
   return MEAT_PATTERNS.some((pattern) => pattern.test(text))
+}
+
+export function recipeHasLandMeat(recipe) {
+  const text = recipeTextBlob(recipe)
+  return LAND_MEAT_PATTERNS.some((pattern) => pattern.test(text))
+}
+
+export function recipeHasFish(recipe) {
+  const text = recipeTextBlob(recipe)
+  return FISH_PATTERNS.some((pattern) => pattern.test(text))
 }
 
 export function recipeHasDairy(recipe) {
@@ -226,7 +242,7 @@ function textHasSoupStewSignal(recipe) {
 }
 
 function isDairyDessertValid(recipe) {
-  if (recipeHasMeat(recipe)) return false
+  if (recipeHasLandMeat(recipe)) return false
   if (!recipeHasDairy(recipe)) return false
   if (!titleHasDessertKeyword(recipe?.name)) return false
   const text = recipeTextBlob(recipe)
@@ -234,7 +250,7 @@ function isDairyDessertValid(recipe) {
 }
 
 function isParveDessertValid(recipe) {
-  if (recipeHasMeat(recipe) || recipeHasDairy(recipe)) return false
+  if (recipeHasLandMeat(recipe) || recipeHasDairy(recipe)) return false
   return titleHasDessertKeyword(recipe?.name)
 }
 
@@ -250,13 +266,13 @@ function isMeatMealValid(recipe) {
 }
 
 function isDairyMealValid(recipe) {
-  if (recipeHasMeat(recipe)) return false
+  if (recipeHasLandMeat(recipe)) return false
   if (!recipeHasDairy(recipe)) return false
   return !titleHasDessertKeyword(recipe?.name)
 }
 
 function isParveMealValid(recipe) {
-  if (recipeHasMeat(recipe) || recipeHasDairy(recipe)) return false
+  if (recipeHasLandMeat(recipe) || recipeHasDairy(recipe)) return false
   return !titleHasDessertKeyword(recipe?.name)
 }
 
@@ -268,7 +284,7 @@ function isVeganMealValid(recipe) {
 function isSoupStewValid(recipe) {
   const hasSoupSignal = titleHasSoupStewKeyword(recipe?.name) || textHasSoupStewSignal(recipe)
   if (titleHasDessertKeyword(recipe?.name) && !titleHasSoupStewKeyword(recipe?.name)) return false
-  if (recipeHasMeat(recipe) && recipeHasDairy(recipe)) return false
+  if (recipeHasLandMeat(recipe) && recipeHasDairy(recipe)) return false
   return hasSoupSignal
 }
 
@@ -276,12 +292,12 @@ function validateCategoryRules(recipeType, effectiveCategory, selectedCategory, 
   if (selectedCategory === 'vegan' && !isVeganValid(recipe)) return false
 
   const tags = (recipe?.tags ?? []).map((tag) => String(tag).toLowerCase())
-  if (tags.includes('vegetarian') && recipeHasMeat(recipe)) return false
-  if (tags.includes('vegan') && !isVeganValid(recipe)) return false
+  if (tags.includes('vegetarian') && recipeHasLandMeat(recipe)) return false
+  if (tags.includes('vegan') && selectedCategory === 'vegan' && !isVeganValid(recipe)) return false
 
   if (effectiveCategory === 'meat' && recipeHasDairy(recipe)) return false
-  if (effectiveCategory === 'dairy' && recipeHasMeat(recipe)) return false
-  if (effectiveCategory === 'parve' && (recipeHasMeat(recipe) || recipeHasDairy(recipe))) {
+  if (effectiveCategory === 'dairy' && recipeHasLandMeat(recipe)) return false
+  if (effectiveCategory === 'parve' && (recipeHasLandMeat(recipe) || recipeHasDairy(recipe))) {
     if (selectedCategory !== 'vegan') return false
   }
 
