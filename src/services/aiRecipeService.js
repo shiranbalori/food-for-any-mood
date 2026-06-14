@@ -489,6 +489,40 @@ function finalizeRecipeForUser(userInput, recipe, meta = {}) {
 
 const MAX_PREFERENCE_MOCK_ATTEMPTS = 24
 
+function getFailedValidationChecks(validation) {
+  return Object.entries(validation?.checks ?? {})
+    .filter(([, ok]) => !ok)
+    .map(([name]) => name)
+}
+
+const ADVISORY_VALIDATION_CHECKS = new Set(['meaningfulStepActions', 'preReturnOk'])
+
+const HARD_VALIDATION_CHECKS = new Set([
+  'invalidIngredients',
+  'languageOk',
+  'relevanceOk',
+  'unusedInStepsOk',
+  'userIngredientsInList',
+  'titleOk',
+  'groundingOk',
+  'stepsAligned',
+  'noUnnaturalSteps',
+  'unauthorizedIngredientsOk',
+])
+
+/** Displayable recipes may fail advisory checks while still being category-correct. */
+function canUseAdvisoryValidationBypass(userInput, recipe, passed, validation, categoryPassed = true) {
+  if (passed) return true
+  if (!categoryPassed) return false
+  if (!isValidGeneratedRecipe(recipe)) return false
+
+  const failedChecks = getFailedValidationChecks(validation)
+  if (!failedChecks.length) return false
+  if (failedChecks.some((name) => HARD_VALIDATION_CHECKS.has(name))) return false
+
+  return failedChecks.every((name) => ADVISORY_VALIDATION_CHECKS.has(name))
+}
+
 function buildCategoryFallbackRecipe(userInput) {
   const effectiveRecipeType = getEffectiveRecipeType(userInput.recipeType, userInput.category)
   const triedTemplateKeys = [...(userInput.excludeTemplateKeys ?? [])]
@@ -525,22 +559,28 @@ function buildCategoryFallbackRecipe(userInput) {
       templateKey: templateKey ?? 'unknown',
     })
 
-    const { recipe: fallbackRecipe, passed, validation } = finalizeRecipeForUser(userInput, recipe, {
+    const { recipe: fallbackRecipe, passed, validation, categoryPassed } = finalizeRecipeForUser(userInput, recipe, {
       fallbackUsed: true,
       skipReparse: true,
       recipeSource: 'frontend-mock',
     })
 
-    if (passed) {
+    if (canUseAdvisoryValidationBypass(userInput, fallbackRecipe, passed, validation, categoryPassed)) {
+      if (!passed) {
+        console.warn('[aiRecipeService] Using mock fallback despite advisory validation failures', {
+          attempt: attempt + 1,
+          templateKey,
+          recipeType: effectiveRecipeType,
+          failedChecks: getFailedValidationChecks(validation),
+        })
+      }
       return { ...fallbackRecipe, templateKey: templateKey ?? fallbackRecipe.templateKey }
     }
 
     console.warn('[aiRecipeService] Mock fallback attempt failed validation — trying next template', {
       attempt: attempt + 1,
       templateKey,
-      failedChecks: Object.entries(validation?.checks ?? {})
-        .filter(([, ok]) => !ok)
-        .map(([name]) => name),
+      failedChecks: getFailedValidationChecks(validation),
     })
   }
 
@@ -597,7 +637,13 @@ function processGeneratedRecipe(userInput, recipe, { source = 'unknown', timer =
     `category=${categoryPassed} language=${languagePassed} ingredients=${validation?.ok !== false}`,
   )
 
-  if (passed) {
+  if (passed || canUseAdvisoryValidationBypass(userInput, result, passed, validation, categoryPassed)) {
+    if (!passed) {
+      console.warn('[aiRecipeService] Accepting processed recipe despite advisory validation failures', {
+        source,
+        failedChecks: getFailedValidationChecks(validation),
+      })
+    }
     return { recipe: result, ok: true }
   }
 
@@ -645,8 +691,30 @@ function buildMockFallbackSuccessResult(recipe, timer = null) {
   return {
     recipe,
     recipePossible: true,
+    impossibleReason: undefined,
+    missingIngredients: [],
     fallbackReason: 'fallback',
   }
+}
+
+function reconcileAIRecipeResult(result) {
+  if (!result || typeof result !== 'object') return result
+  if (isValidGeneratedRecipe(result.recipe)) {
+    return {
+      ...result,
+      recipe: result.recipe,
+      recipePossible: true,
+      impossibleReason: undefined,
+      missingIngredients: [],
+    }
+  }
+  if (result.recipePossible === false) {
+    return {
+      ...result,
+      recipe: null,
+    }
+  }
+  return result
 }
 
 async function generateAIRecipeCore(userInput) {
@@ -782,29 +850,39 @@ async function generateAIRecipeCore(userInput) {
     })
     timer.mark('validateRecipeDiversity', diversity.ok ? 'Success' : 'Failed', diversity.failures?.join(', '))
     if (!preReturn.ok) {
-      const cinnamonEmergency = attemptCinnamonEmergencyResult(
-        normalized,
-        timer,
-        'preReturnValidation:reject',
-      )
-      if (cinnamonEmergency) return cinnamonEmergency
-      const mockFallback = tryValidatedMockFallback(normalized, timer, 'preReturnValidation:reject')
-      if (mockFallback) {
-        return buildMockFallbackSuccessResult(mockFallback, timer)
+      const preReturnFailures = preReturn.failures ?? []
+      const onlyAdvisoryPreReturn =
+        preReturnFailures.length > 0 &&
+        preReturnFailures.every((failure) => failure === 'weak_steps')
+      if (!(onlyAdvisoryPreReturn && isValidGeneratedRecipe(recipe))) {
+        const cinnamonEmergency = attemptCinnamonEmergencyResult(
+          normalized,
+          timer,
+          'preReturnValidation:reject',
+        )
+        if (cinnamonEmergency) return cinnamonEmergency
+        const mockFallback = tryValidatedMockFallback(normalized, timer, 'preReturnValidation:reject')
+        if (mockFallback) {
+          return buildMockFallbackSuccessResult(mockFallback, timer)
+        }
+        console.warn('[aiRecipeService] Recipe failed pre-return validation:', preReturn.failures)
+        timer.mark('preReturnValidation:reject', 'Failed')
+        timer.printTable()
+        const { reason, missingIngredients } = buildValidationFailureMessage(preReturn, null, {
+          language: normalized.language,
+        })
+        return {
+          recipe: null,
+          recipePossible: false,
+          impossibleReason: reason,
+          missingIngredients,
+          fallbackReason: null,
+        }
       }
-      console.warn('[aiRecipeService] Recipe failed pre-return validation:', preReturn.failures)
-      timer.mark('preReturnValidation:reject', 'Failed')
-      timer.printTable()
-      const { reason, missingIngredients } = buildValidationFailureMessage(preReturn, null, {
-        language: normalized.language,
+      console.warn('[aiRecipeService] Continuing despite advisory pre-return failures', {
+        failures: preReturnFailures,
+        title: recipe.name,
       })
-      return {
-        recipe: null,
-        recipePossible: false,
-        impossibleReason: reason,
-        missingIngredients,
-        fallbackReason: null,
-      }
     }
     if (!diversity.ok) {
       const hasRegenerationConstraints =
@@ -916,7 +994,7 @@ export async function generateAIRecipe(userInput) {
         nextStep: 'recipeService.generateAppRecipe → validateGeneratedRecipe',
       })
     }
-    return result
+    return reconcileAIRecipeResult(result)
   } catch (error) {
     outerTimer.fail('generateAIRecipeCore (15s outer timeout)', error)
     logFetchError('Recipe generation exceeded 15s limit', error)
@@ -930,12 +1008,13 @@ export async function generateAIRecipe(userInput) {
         outerTimer,
         'outerTimeout:mockFallbackFailed',
       )
-      if (cinnamonEmergency) return cinnamonEmergency
+      if (cinnamonEmergency) return reconcileAIRecipeResult(cinnamonEmergency)
       return buildFallbackUnavailableResult(normalized.language)
     }
-    return {
+    return reconcileAIRecipeResult({
       recipe,
+      recipePossible: true,
       fallbackReason: 'fallback',
-    }
+    })
   }
 }

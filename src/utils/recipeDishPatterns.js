@@ -11,6 +11,12 @@ import {
   buildRealisticDessertFromPattern,
   getBestDessertPattern,
 } from './dessertRecipeBuilder'
+import {
+  REALISTIC_MEAL_PATTERNS,
+  buildMealIngredientList,
+  buildRealisticMealFromPattern,
+  getBestMealPattern,
+} from './mealRecipeBuilder'
 
 const MEAL_DISH_PATTERNS = [
   {
@@ -114,6 +120,14 @@ export function getBestDishPattern(
     })
   }
 
+  const mealPattern = getBestMealPattern(userIngredientsRaw, {
+    category,
+    language,
+    excludeTitles,
+    excludeTemplateKeys,
+  })
+  if (mealPattern) return mealPattern
+
   const userIngredients = Array.isArray(userIngredientsRaw)
     ? userIngredientsRaw
     : parseUserIngredients(userIngredientsRaw)
@@ -157,6 +171,12 @@ export function buildPatternIngredients(
 ) {
   if (!pattern) return []
   if (pattern.userQuantities) {
+    if (pattern.recipeType === 'meal' || REALISTIC_MEAL_PATTERNS.some((item) => item.id === pattern.id)) {
+      return buildMealIngredientList(pattern, filteredUserIngredients, displayNames, {
+        language,
+        pantryLabel,
+      })
+    }
     return buildDessertIngredientList(pattern, filteredUserIngredients, displayNames, {
       language,
       pantryLabel,
@@ -172,3 +192,4 @@ export function buildPatternIngredients(
 }
 
 export { buildRealisticDessertFromPattern } from './dessertRecipeBuilder'
+export { buildRealisticMealFromPattern, getBestMealPattern } from './mealRecipeBuilder'

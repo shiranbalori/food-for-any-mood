@@ -36,7 +36,6 @@ import { regenerateRecipeSteps } from './services/regenerateStepsService'
 import { upgradeRecipe } from './services/recipeUpgradeService'
 import { fetchMoreRecipeIdeas } from './services/recipeIdeasService'
 import { detectCookingMethod, detectDessertCategory } from './utils/recipeDiversity'
-import { stripQuantityPrefix } from './utils/measurementUnits'
 // Recipe source: FastAPI backend (default) — see .env.example
 import {
   getSavedRecipes,
@@ -134,6 +133,7 @@ export default function App() {
   const pendingRecipeScrollRef = useRef(false)
   const prevRecipeResultOpenRef = useRef(false)
   const recipeRef = useRef(null)
+  const generationRequestRef = useRef(0)
 
   useEffect(() => {
     recipeRef.current = recipe
@@ -355,6 +355,8 @@ export default function App() {
         setRegenerationHistory({ titles: [], cookingMethods: [], dessertCategories: [] })
       }
 
+      const requestId = ++generationRequestRef.current
+
       try {
         const keysToExclude = regenerate ? excludeKeys : []
         const {
@@ -384,7 +386,11 @@ export default function App() {
           },
         )
 
-        if (recipePossible === false) {
+        if (requestId !== generationRequestRef.current) {
+          return
+        }
+
+        if (recipePossible === false || !newRecipe) {
           setRecipe(null)
           setShowRecipeForm(true)
           setImpossibleRecipe({
@@ -394,6 +400,7 @@ export default function App() {
           return
         }
 
+        setImpossibleRecipe(null)
         setRecipe(newRecipe)
         openRecipeResultView()
         pendingRecipeScrollRef.current = true
@@ -418,11 +425,16 @@ export default function App() {
           }
         })
       } catch (error) {
+        if (requestId !== generationRequestRef.current) {
+          return
+        }
         console.error('[App] Recipe generation failed:', error)
         setBackendNotice('error')
         setShowRecipeForm(true)
       } finally {
-        setLoading(false)
+        if (requestId === generationRequestRef.current) {
+          setLoading(false)
+        }
       }
     },
     [category, form, t, language, recipeType, openRecipeResultView],
@@ -511,13 +523,10 @@ export default function App() {
   }, [recipe, upgradeLoading, category, recipeType, form, language, t])
 
   const handleRegenerate = () => {
-    const avoidIngredientLabels = (recipe?.ingredients ?? [])
-      .map((line) => stripQuantityPrefix(String(line)).trim())
-      .filter(Boolean)
     setRecipeIdeas(null)
     handleGenerate({
       excludeKeys: usedTemplateKeys,
-      excludeTitles: [...regenerationHistory.titles, ...avoidIngredientLabels],
+      excludeTitles: regenerationHistory.titles,
       excludeCookingMethods: regenerationHistory.cookingMethods,
       excludeDessertCategories: regenerationHistory.dessertCategories,
       regenerate: true,
@@ -854,7 +863,7 @@ export default function App() {
           </p>
         )}
 
-        {impossibleRecipe && !loading && (
+        {impossibleRecipe && !recipe && !loading && (
           <div className="app__backend-notice app__backend-notice--error" role="alert">
             <p>{impossibleRecipe.reason}</p>
             {impossibleRecipe.missingIngredients?.length > 0 && (

@@ -25,6 +25,7 @@ import { isLiteralIngredientTitle } from '../utils/recipeTitle'
 import { buildDessertDishTitle } from '../utils/dessertDishTitle'
 import {
   buildRealisticDessertFromPattern,
+  buildRealisticMealFromPattern,
   getBestDishPattern,
 } from '../utils/recipeDishPatterns'
 import { buildChefIntro } from '../utils/chefIntro'
@@ -1693,18 +1694,8 @@ export function buildIngredientFirstFallbackRecipe(
   let dishPattern = null
   let precomputedNutrition = null
   let precomputedHealthScore = null
-  if (effectiveRecipeType === 'dessert' && hasRegenerationConstraints) {
-    const variant = pickAlternateDessertVariant({
-      ingredients: finalIngredients,
-      language,
-      cookingTime,
-      excludeTitles,
-      excludeCookingMethods,
-      excludeDessertCategories,
-    })
-    name = variant.name
-    recipeSteps = variant.steps
-  } else if (effectiveRecipeType === 'dessert') {
+
+  if (effectiveRecipeType === 'dessert') {
     dishPattern = getBestDishPattern(filteredUserIngredients, {
       recipeType: 'dessert',
       category: kosherCategory,
@@ -1725,23 +1716,58 @@ export function buildIngredientFirstFallbackRecipe(
       finalIngredients = built.ingredients
       precomputedNutrition = built.nutrition
       precomputedHealthScore = built.healthScore
+    } else if (hasRegenerationConstraints) {
+      const variant = pickAlternateDessertVariant({
+        ingredients: finalIngredients,
+        language,
+        cookingTime,
+        excludeTitles,
+        excludeCookingMethods,
+        excludeDessertCategories,
+      })
+      name = variant.name
+      recipeSteps = variant.steps
     } else {
       name = buildDessertDishTitle(finalIngredients, { language }).name
     }
   } else if (effectiveRecipeType === 'soup_stew') {
     name = buildGroundedSoupStewTitle(filteredUserIngredients, finalIngredients, language, { excludeTitles })
-  } else if (hasRegenerationConstraints) {
-    const variant = pickAlternateMealVariant({
-      ingredients: finalIngredients,
+  } else if (effectiveRecipeType === 'meal') {
+    dishPattern = getBestDishPattern(filteredUserIngredients, {
+      recipeType: 'meal',
+      category: kosherCategory,
       language,
-      cookingTime,
       excludeTitles,
-      excludeCookingMethods,
+      excludeTemplateKeys,
     })
-    name = variant.name
-    recipeSteps = variant.steps
-  } else if (kosherCategory === 'meat') {
-    name = buildGroundedChefTitle(filteredUserIngredients, finalIngredients, language, { excludeTitles })
+    if (dishPattern?.userQuantities) {
+      const built = buildRealisticMealFromPattern(dishPattern, {
+        filteredUserIngredients,
+        displayNames,
+        language,
+        cookingTime,
+        servings,
+      })
+      name = built.name
+      recipeSteps = built.steps
+      finalIngredients = built.ingredients
+      precomputedNutrition = built.nutrition
+      precomputedHealthScore = built.healthScore
+    } else if (hasRegenerationConstraints) {
+      const variant = pickAlternateMealVariant({
+        ingredients: finalIngredients,
+        language,
+        cookingTime,
+        excludeTitles,
+        excludeCookingMethods,
+      })
+      name = variant.name
+      recipeSteps = variant.steps
+    } else if (kosherCategory === 'meat') {
+      name = buildGroundedChefTitle(filteredUserIngredients, finalIngredients, language, { excludeTitles })
+    } else {
+      name = buildGroundedChefTitle(filteredUserIngredients, finalIngredients, language, { excludeTitles })
+    }
   } else {
     name = buildGroundedChefTitle(filteredUserIngredients, finalIngredients, language, { excludeTitles })
   }
@@ -1816,12 +1842,20 @@ export function buildIngredientFirstFallbackRecipe(
     recipeType: effectiveRecipeType,
     category,
     isGlutenFree,
-    preserveOriginalSteps: effectiveRecipeType === 'dessert' && Boolean(dishPattern),
-    skipRequantify: effectiveRecipeType === 'dessert' && Boolean(precomputedNutrition),
+    preserveOriginalSteps:
+      Boolean(dishPattern) &&
+      (effectiveRecipeType === 'dessert' || effectiveRecipeType === 'meal'),
+    skipRequantify:
+      Boolean(dishPattern) &&
+      Boolean(precomputedNutrition) &&
+      (effectiveRecipeType === 'dessert' || effectiveRecipeType === 'meal'),
   })
 
   const shouldEnrich =
-    effectiveRecipeType !== 'dessert' && filteredUserIngredients.length > 0
+    effectiveRecipeType !== 'dessert' &&
+    effectiveRecipeType !== 'meal' &&
+    filteredUserIngredients.length > 0 &&
+    !dishPattern
 
   return {
     recipe: shouldEnrich

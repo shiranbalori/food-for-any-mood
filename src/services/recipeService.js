@@ -109,13 +109,37 @@ async function generateWithMockProvider(params, options) {
   return buildMockRecipe(params, options)
 }
 
+/** Ensures a valid recipe never returns alongside recipePossible=false. */
+function reconcileGenerationResult(result) {
+  if (!result || typeof result !== 'object') return result
+  if (validateGeneratedRecipe(result.recipe)) {
+    return {
+      ...result,
+      recipe: result.recipe,
+      recipePossible: true,
+      impossibleReason: undefined,
+      missingIngredients: [],
+    }
+  }
+  if (result.recipePossible === false) {
+    return {
+      ...result,
+      recipe: null,
+    }
+  }
+  return result
+}
+
 /** @param {GenerateRecipeParams} params @param {GenerateRecipeOptions} options */
 async function generateWithAiProvider(params, options) {
-  const result = await generateAIRecipe({ ...params, ...options })
+  const result = reconcileGenerationResult(await generateAIRecipe({ ...params, ...options }))
   if (result.recipePossible === false) {
     return result
   }
   const meta = buildAiRecipeMeta(params, options)
+  if (result.recipe?.templateKey) {
+    meta.templateKey = result.recipe.templateKey
+  }
   return { recipe: result.recipe, meta, fallbackReason: result.fallbackReason, recipePossible: true }
 }
 
@@ -171,7 +195,7 @@ export async function generateRecipe(params, options = {}) {
 function toAppRecipe(recipe, meta) {
   return {
     id: meta.id,
-    templateKey: meta.templateKey,
+    templateKey: recipe.templateKey ?? meta.templateKey,
     category: meta.category,
     resolvedCategory: recipe.resolvedCategory ?? recipe.category ?? meta.category,
     mood: meta.mood,
@@ -213,9 +237,9 @@ function toAppRecipe(recipe, meta) {
 export async function generateAppRecipe(params, options = {}) {
   const normalized = normalizeGenerateParams(params)
   const mergedOptions = { ...DEFAULT_OPTIONS, ...options }
-  const result = await generateWithActiveProvider(normalized, mergedOptions)
+  const result = reconcileGenerationResult(await generateWithActiveProvider(normalized, mergedOptions))
 
-  if (result.recipePossible === false) {
+  if (result.recipePossible === false || !validateGeneratedRecipe(result.recipe)) {
     return {
       recipe: null,
       recipePossible: false,
