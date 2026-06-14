@@ -98,7 +98,7 @@ export default function App() {
   const { user, isAuthenticated, getPublicDisplayName } = useAuth()
   const publicDisplayName = usePublicDisplayName()
   const [myRecipesCount, setMyRecipesCount] = useState(0)
-  const [category, setCategory] = useState('dairy')
+  const [category, setCategory] = useState('any')
   const [recipeType, setRecipeType] = useState('meal')
   const [form, setForm] = useState(() => createInitialForm(isMobileLayout))
   const [recipe, setRecipe] = useState(null)
@@ -762,7 +762,7 @@ export default function App() {
     setOpenRecipeId(null)
     setActiveGlobalPage(null)
     setQuizModalOpen(false)
-    setCategory(saved.category ?? 'dairy')
+    setCategory(saved.category ?? 'any')
     setForm({
       ingredients: '',
       time: saved.time ?? 30,
@@ -827,8 +827,9 @@ export default function App() {
           }}
         />
 
+        <div className="app__home-stack">
         {showRecipeForm && (
-          <div className="app__home-recipe">
+          <div className="app__home-recipe-form">
             <div className="app__home-options">
               <CategorySelector
                 selected={category}
@@ -863,80 +864,94 @@ export default function App() {
                 showMoodSection={showMoodSection}
               />
             </div>
-
-            <div className="app__home-community">
-              <CommunityTop5
-                onRecipeClick={openCommunityRecipe}
-                onSavedChanged={handleCommunityDataChanged}
-                onFavoritesChanged={handleCommunityDataChanged}
-              />
-            </div>
-        </div>
+          </div>
         )}
 
-        {loading && <LoadingAnimation theme={theme} />}
+        {(loading ||
+          recipe ||
+          impossibleRecipe ||
+          (backendNotice === 'error' && !recipe)) && (
+          <section
+            className="app__generation-result"
+            aria-live="polite"
+            aria-label={t('generationResultTitle')}
+          >
+            {loading && <LoadingAnimation theme={theme} />}
 
-        {backendNotice === 'fallback' && recipe && !loading && (
-          <p className="app__backend-notice app__backend-notice--info" role="status">
-            {t('backendFallbackNotice')}
-          </p>
-        )}
+            {!loading && impossibleRecipe && !recipe && (
+              <div className="app__backend-notice app__backend-notice--error" role="alert">
+                <p>{impossibleRecipe.reason}</p>
+                {impossibleRecipe.missingIngredients?.length > 0 && (
+                  <p>
+                    {t('recipeMissingIngredients')}{' '}
+                    {impossibleRecipe.missingIngredients.join(', ')}
+                  </p>
+                )}
+              </div>
+            )}
 
-        {backendNotice === 'error' && !recipe && !loading && (
-          <p className="app__backend-notice app__backend-notice--error" role="alert">
-            {t('backendUnreachable')}
-          </p>
-        )}
-
-        {impossibleRecipe && !recipe && !loading && (
-          <div className="app__backend-notice app__backend-notice--error" role="alert">
-            <p>{impossibleRecipe.reason}</p>
-            {impossibleRecipe.missingIngredients?.length > 0 && (
-              <p>
-                {t('recipeMissingIngredients')}{' '}
-                {impossibleRecipe.missingIngredients.join(', ')}
+            {!loading && backendNotice === 'error' && !recipe && !impossibleRecipe && (
+              <p className="app__backend-notice app__backend-notice--error" role="alert">
+                {t('backendUnreachable')}
               </p>
             )}
-        </div>
+
+            {!loading && recipe && (
+              <>
+                <h2 className="app__generation-result-title">{t('generationResultTitle')}</h2>
+                {backendNotice === 'fallback' && (
+                  <p className="app__backend-notice app__backend-notice--info" role="status">
+                    {t('backendFallbackNotice')}
+                  </p>
+                )}
+                <div ref={recipeResultRef}>
+                  <RecipeCard
+                    key={recipe.id}
+                    recipe={recipe}
+                    musicPlatform={form.musicPlatform}
+                    theme={theme}
+                    themeCategory={category}
+                    isSaved={isSaved}
+                    isFavorite={isFavorite}
+                    saveError={saveError}
+                    onSave={handleSave}
+                    onAddFavorite={handleAddFavorite}
+                    onRegenerate={handleRegenerate}
+                    onRegenerateSteps={handleRegenerateSteps}
+                    stepsRegenerating={stepsRegenerating}
+                    stepsRegenerateError={stepsRegenerateError}
+                    stepsGenerationKey={stepsGenerationKey}
+                    onUpgradeRecipe={handleUpgradeRecipe}
+                    upgradeLoading={upgradeLoading}
+                    upgradeError={upgradeError}
+                    upgradedRecipe={upgradedRecipe}
+                    upgradeRecipeContext={{
+                      name: recipe.name,
+                      category:
+                        category === 'any' && recipe.resolvedCategory ? recipe.resolvedCategory : category,
+                      recipeType,
+                      isGlutenFree: form.glutenFree,
+                    }}
+                    recipeIdeas={recipeIdeas}
+                    ideasLoading={ideasLoading}
+                    onLoadMoreIdeas={handleLoadMoreIdeas}
+                    onMealPlanUpdated={handleMealPlanUpdated}
+                    onBackToEdit={!showRecipeForm ? handleBackToEdit : undefined}
+                  />
+                </div>
+              </>
+            )}
+          </section>
         )}
 
-        {recipe && !loading && (
-          <div ref={recipeResultRef}>
-          <RecipeCard
-            key={recipe.id}
-            recipe={recipe}
-            musicPlatform={form.musicPlatform}
-            theme={theme}
-            themeCategory={category}
-            isSaved={isSaved}
-            isFavorite={isFavorite}
-            saveError={saveError}
-            onSave={handleSave}
-            onAddFavorite={handleAddFavorite}
-            onRegenerate={handleRegenerate}
-            onRegenerateSteps={handleRegenerateSteps}
-            stepsRegenerating={stepsRegenerating}
-            stepsRegenerateError={stepsRegenerateError}
-            stepsGenerationKey={stepsGenerationKey}
-            onUpgradeRecipe={handleUpgradeRecipe}
-            upgradeLoading={upgradeLoading}
-            upgradeError={upgradeError}
-            upgradedRecipe={upgradedRecipe}
-            upgradeRecipeContext={{
-              name: recipe.name,
-              category:
-                category === 'any' && recipe.resolvedCategory ? recipe.resolvedCategory : category,
-              recipeType,
-              isGlutenFree: form.glutenFree,
-            }}
-            recipeIdeas={recipeIdeas}
-            ideasLoading={ideasLoading}
-            onLoadMoreIdeas={handleLoadMoreIdeas}
-            onMealPlanUpdated={handleMealPlanUpdated}
-            onBackToEdit={!showRecipeForm ? handleBackToEdit : undefined}
+        <div className="app__home-community">
+          <CommunityTop5
+            onRecipeClick={openCommunityRecipe}
+            onSavedChanged={handleCommunityDataChanged}
+            onFavoritesChanged={handleCommunityDataChanged}
           />
         </div>
-        )}
+        </div>
           </>
         )}
 

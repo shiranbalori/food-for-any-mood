@@ -5,6 +5,39 @@ import { ingredientAppearsInText } from './ingredientRelevance'
 const QTY_PREFIX =
   /^[\d./]+\s*(?:כפ(?:ית|ות)|כ(?:ף|פות)|גרם|מ"ל|כוס(?:ות)?|tsp|tbsp|gram|grams|g|ml|cup|cups)?\s*/i
 
+/** Real dish-name markers — titles containing these name a dish, not an ingredient list. */
+const DISH_NAME_MARKERS = [
+  'שקשוקה',
+  'מקושקש',
+  'חבית',
+  'פסטה',
+  'סלט',
+  'מרק',
+  'תבשיל',
+  'קארי',
+  'אורז',
+  'טאקו',
+  'ריזוטו',
+  'מוקפץ',
+  'פנקייק',
+  'קרפ',
+  'לביב',
+  'כדורי',
+  'עוג',
+  'קינוח',
+  'stew',
+  'soup',
+  'curry',
+  'pasta',
+  'omelet',
+  'frittata',
+  'crepe',
+]
+
+function titleNamesKnownDish(text) {
+  return DISH_NAME_MARKERS.some((marker) => text.includes(marker))
+}
+
 const DESSERT_STAPLE_CANONICAL = new Set([
   'salt',
   'pepper',
@@ -254,6 +287,8 @@ export function pickAlternateDessertVariant(options = {}) {
 export function isIngredientListTitle(title, ingredients = [], language = 'he') {
   const text = String(title ?? '').trim()
   if (!text) return true
+
+  if (titleNamesKnownDish(text)) return false
 
   if (/^מתכון\s/i.test(text)) return true
   if (countTitleWords(text) > 4) return true

@@ -20,7 +20,27 @@ from measurement_units import (
 
 DEFAULT_SERVINGS = 2
 PANTRY_SUFFIX = re.compile(r"\s*\([^)]*\)\s*$")
+INGREDIENT_SYSTEM_LABELS = (
+    "basic pantry ingredient",
+    "מרכיב מזווה בסיסי",
+    "from your pantry",
+    "מהמצבור שלך",
+    "auto added",
+    "auto-added",
+    "pantry staple",
+    "pantry staples",
+    "default ingredient",
+    "system added",
+)
+INGREDIENT_SYSTEM_LABEL_SUFFIX = re.compile(
+    rf"\s*\((?:{'|'.join(re.escape(label) for label in INGREDIENT_SYSTEM_LABELS)})\)\s*$",
+    re.IGNORECASE,
+)
 QTY_PREFIX = QUANTITY_UNIT_PREFIX
+
+
+def strip_ingredient_system_labels(text: str) -> str:
+    return INGREDIENT_SYSTEM_LABEL_SUFFIX.sub("", (text or "").strip()).strip()
 
 STAPLE_PROFILE_KEYS = {
     "salt": "salt",
@@ -309,8 +329,6 @@ def _format_item(canon: str, name: str, amount: float, profile: dict, language: 
 
 
 def quantify_ingredient(raw: str, servings: int = DEFAULT_SERVINGS, language: str = "he") -> dict:
-    pantry_match = PANTRY_SUFFIX.search(raw or "")
-    pantry_note = pantry_match.group(0).strip() if pantry_match else ""
     trimmed = PANTRY_SUFFIX.sub("", (raw or "").strip()).strip()
     existing = parse_leading_measurement(trimmed)
 
@@ -318,8 +336,6 @@ def quantify_ingredient(raw: str, servings: int = DEFAULT_SERVINGS, language: st
         name, canon, _ = _strip_quantity(raw)
         display_name = HEBREW_LABELS.get(canon or "", name) if canon else name
         display = format_hebrew_measurement(existing["qty"], existing["unit"], display_name)
-        if pantry_note:
-            display = f"{display} {pantry_note}"
         label = HEBREW_LABELS.get(canon or "", name) if canon else name
         step_phrase = to_step_ingredient_reference(display_name, language)
         return {
@@ -335,8 +351,6 @@ def quantify_ingredient(raw: str, servings: int = DEFAULT_SERVINGS, language: st
     profile = _resolve_profile(canon, name)
     amount = _compute_amount(profile, servings)
     display = _format_item(profile["canon"], name, amount, profile, language)
-    if pantry_note:
-        display = f"{display} {pantry_note}"
     label = HEBREW_LABELS.get(profile["canon"], name) if language == "he" else name
     step_phrase = to_step_ingredient_reference(label if language == "he" else name, language)
     return {
@@ -424,7 +438,9 @@ def apply_recipe_quantities(
         else quantify_ingredient(_strip_quantity(item["raw"])[0], current_servings, language)
         for item in quantified_items
     ]
-    next_ingredients = [item["display"] for item in quantified_items]
+    next_ingredients = [
+        strip_ingredient_system_labels(item["display"]) for item in quantified_items
+    ]
     if preserve_original_steps:
         next_steps = light_sanitize_recipe_steps(recipe.get("steps") or [])
     else:

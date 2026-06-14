@@ -15,6 +15,10 @@ export function ingredientAppearsInText(userIng, text) {
   if (!userIng || !text) return false
   if (ingredientsMatch(userIng, text)) return true
 
+  for (const chunk of String(text).split(/[\s,;]+/).filter(Boolean)) {
+    if (ingredientsMatch(userIng, chunk)) return true
+  }
+
   const normalizedText = normalizeIngredient(text)
   const normalizedUser = normalizeIngredient(userIng)
   if (!normalizedUser || !normalizedText) return false

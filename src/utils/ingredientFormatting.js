@@ -8,6 +8,40 @@ const BULLET_PREFIX = /^[\s•·\u2022\u2023\u2043\u2219*\-\u2013\u2014]+/
 
 const NUMBER_ONLY = /^[\d\s./]+$/
 
+/** Internal pantry/system annotations — stripped before any user-facing display. */
+const INGREDIENT_SYSTEM_LABELS = [
+  'basic pantry ingredient',
+  'מרכיב מזווה בסיסי',
+  'from your pantry',
+  'מהמצבור שלך',
+  'auto added',
+  'auto-added',
+  'pantry staple',
+  'pantry staples',
+  'default ingredient',
+  'system added',
+]
+
+const INGREDIENT_SYSTEM_LABEL_SUFFIX = new RegExp(
+  `\\s*\\((?:${INGREDIENT_SYSTEM_LABELS.map((label) =>
+    label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'),
+  ).join('|')})\\)\\s*$`,
+  'i',
+)
+
+/**
+ * Remove trailing system/internal parenthetical labels from ingredient text.
+ */
+export function stripIngredientSystemLabels(text) {
+  return String(text ?? '')
+    .replace(INGREDIENT_SYSTEM_LABEL_SUFFIX, '')
+    .trim()
+}
+
+export function isIngredientSystemLabel(text) {
+  return INGREDIENT_SYSTEM_LABEL_SUFFIX.test(String(text ?? '').trim())
+}
+
 const LEADING_QUANTITY = /^(\d+(?:\s+\d+\/\d+)?)\s+/
 
 /**
@@ -45,7 +79,7 @@ export function isValidIngredientLine(text) {
  * Normalize one ingredient line: strip bullets and fix duplicated leading quantities.
  */
 export function sanitizeIngredientLine(text) {
-  let line = stripIngredientBullets(text)
+  let line = stripIngredientSystemLabels(stripIngredientBullets(text))
   if (!line) return ''
 
   const dupWithName = line.match(/^(\d+(?:\s+\d+\/\d+)?)\s+\1\s+(.+)$/)
@@ -102,7 +136,7 @@ const PLACEHOLDER_PATTERNS = [
  * Remove duplicated quantity artifacts from cooking steps (e.g. "4 4 מרשמלו").
  */
 export function sanitizeStepText(text) {
-  let line = stripIngredientBullets(String(text ?? ''))
+  let line = stripIngredientSystemLabels(stripIngredientBullets(String(text ?? '')))
   line = line.replace(/(\d+(?:\s+\d+\/\d+)?)\s+\1(\s+)(?=[\u0590-\u05FFa-zA-Z])/g, '$1$2')
   line = line.replace(/(\d+(?:\s+\d+\/\d+)?)\s+\1$/g, '$1')
   return line.trim()
@@ -132,7 +166,7 @@ function stripPlaceholderText(text) {
  * Minimal step cleanup for Gemini output — no ingredient injection or rewrites.
  */
 export function lightSanitizeStepText(text) {
-  let line = sanitizeStepText(text)
+  let line = stripIngredientSystemLabels(sanitizeStepText(text))
   line = removeRepeatedParentheses(line)
   line = removeDuplicateWords(line)
   line = stripPlaceholderText(line)

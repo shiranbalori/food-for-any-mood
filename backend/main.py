@@ -562,6 +562,41 @@ def _build_gemini_prompt(payload: GenerateRecipeRequest, *, strict: bool = False
     return _build_gemini_prompt_he(payload, strict=strict)
 
 
+def _gemini_forbidden_unless_user_he(category: str) -> str:
+    base = "פירות/berries, עוגיות, שוקולד, אגוזים"
+    if category not in ("dairy", "meat"):
+        base += ", גבינת שמנת, יוגורט, חלב, חמאה"
+    if category in ("dairy", "parve", "vegan", "any"):
+        base += ", עוף, בשר, דג, טונה"
+    return base
+
+
+def _gemini_forbidden_unless_user_en(category: str) -> str:
+    base = "berries, cookies, chocolate, nuts"
+    if category not in ("dairy", "meat"):
+        base += ", cream cheese, yogurt, milk, butter"
+    if category in ("dairy", "parve", "vegan", "any"):
+        base += ", chicken, beef, fish, tuna"
+    return base
+
+
+def _gemini_category_output_rules_he(category: str, category_label: str) -> str:
+    if category == "dairy":
+        return f"""
+- הקטגוריה ({category_label}) היא דרישת פלט — המתכון חייב להיות חלבי.
+- מותר ולעיתים נדרש להוסיף גבינה, חלב, חמאה או שמנת (מרכיב מזווה בסיסי) גם אם המשתמש לא הזין מוצרי חלב."""
+    if category == "meat":
+        return f"""
+- הקטגוריה ({category_label}) היא דרישת פלט — המתכון חייב להיות בשרי.
+- מותר ולעיתים נדרש להוסיף עוף, בשר או דג (מרכיב מזווה בסיסי) גם אם המשתמש לא הזין בשר/עוף/דג."""
+    if category in ("parve", "vegan"):
+        return f"""
+- הקטגוריה ({category_label}) היא דרישת פלט — המתכון חייב להתאים לקטגוריה.
+- אל תוסיף/י מוצרי חלב או בשר/עוף/דג."""
+    return """
+- ללא העדפת קטגוריה — בנה/י מהמרכיבים; אל תמציא/י חלב, גבינה או בשר אלא אם נדרש למנה מוכרת."""
+
+
 def _build_gemini_prompt_he(payload: GenerateRecipeRequest, *, strict: bool = False) -> str:
     category_label = CATEGORY_LABELS[payload.category]
     mood_label = MOOD_LABELS[payload.mood]
@@ -597,19 +632,20 @@ def _build_gemini_prompt_he(payload: GenerateRecipeRequest, *, strict: bool = Fa
                 "- Base the recipe on familiar real-world dishes. Do not invent unrealistic recipes.\n"
             )
         ingredient_rules = f"""
-{strict_note}כללי מרכיבים (חובה מוחלטת — עדיפות על קטגוריה ומצב רוח):
+{strict_note}כללי מרכיבים (חובה מוחלטת):
 - המשתמש ציין מרכיבים: {ingredient_list}
 - לפחות {threshold}% מהמרכיבים האלה חייבים להופיע ברשימת המרכיבים של המתכון.
-- השתמש אך ורק במרכיבים שהמשתמש הזין, ובמצרכי מזוון בסיסיים בלבד: מים, מלח, פלפל, שמן, תבלינים בסיסיים, אבקת אפייה; תמצית וניל רק אם המשתמש ציין וניל.
+- השתמש/י במרכיבים שהמשתמש הזין, ובמצרכי מזוון בסיסיים: מים, מלח, פלפל, שמן, תבלינים בסיסיים, אבקת אפייה; תמצית וניל רק אם המשתמש ציין וניל.
+{_gemini_category_output_rules_he(payload.category, category_label)}
 - חובה לכלול את כל המרכיבים העיקריים שהמשתמש הזין.
-- אסור בהחלט (אלא אם המשתמש הזין): פירות/berries, עוגיות, שוקולד, אגוזים, גבינת שמנת, יוגורט, חלב, חמאה.
+- אסור בהחלט (אלא אם המשתמש הזין): {_gemini_forbidden_unless_user_he(payload.category)}.
 - שם המנה חייב לכלול לפחות אחד מהמרכיבים שציין המשתמש (בעברית, כפי שהזין או בניסוח קרוב).
-- אל תציע מנה גנרית לפי קטגוריה/מצב רוח בלבד — המרכיבים הם הבסיס למנה.
-- אם השילוב לא מתאים לחלוטין, הסבר בקצרה בתיאור והשתמש ברוב המרכיבים האפשריים.
-- מרכיבים שלא בשימוש — אל תכלול אותם ברשימה; הסבר בתיאור אם נאלצת לוותר על חלקם.
+- המרכיבים שהמשתמש הזין הם בסיס המנה — הקטגוריה שנבחרה קובעת את סוג המנה הסופי.
+- אם השילוב לא מתאים לחלוטין, הסבר בקצרה בתיאור והשתמש/י ברוב המרכיבים האפשריים.
+- מרכיבים שלא בשימוש — אל תכלול/י אותם ברשימה; הסבר בתיאור אם נאלצת/ה לוותר על חלקם.
 - כל שמות המרכיבים חייבים להיות בעברית בלבד (למשל "שמן זית" ולא "Olive" או "Olive oil").
 - כל מרכיב ברשימה חייב להופיע במפורש באחד משלבי ההכנה.
-- הפרד מרכיבים לפריטים נפרדים — אל תמזג כמה מרכיבים לשורה אחת.
+- הפרד/י מרכיבים לפריטים נפרדים — אל תמזג/י כמה מרכיבים לשורה אחת.
 """
     else:
         ingredient_rules = """
@@ -708,9 +744,11 @@ def _build_gemini_prompt_he(payload: GenerateRecipeRequest, *, strict: bool = Fa
         else "- matchPercentage: 0 (נוצר לפי העדפות — לא לחשב התאמת מרכיבים)."
     )
     content_fit_note = (
-        "- התאם את המנה לקטגוריה, למצב הרוח ולזמן ההכנה — אך כשיש מרכיבים, הם קודמים לכל השאר."
+        "- התאם/י את המנה לקטגוריה שנבחרה (דרישת פלט), למצב הרוח ולזמן ההכנה — תוך שימוש במרכיבי המשתמש כבסיס."
+        if user_ingredients and payload.category != "any"
+        else "- התאם/י את המנה לקטגוריה, למצב הרוח ולזמן ההכנה — תוך שימוש במרכיבי המשתמש כבסיס."
         if user_ingredients
-        else "- התאם את המנה לקטגוריה, למצב הרוח, לזמן ההכנה ולמספר המנות."
+        else "- התאם/י את המנה לקטגוריה, למצב הרוח, לזמן ההכנה ולמספר המנות."
     )
     upgrades_note = (
         '- optionalUpgrades: מערך של עד 3 אובייקטים {{"ingredient": "...", "reason": "..."}} — מרכיבים אופציונליים בלבד, לא ברשימת ingredients.'

@@ -11,6 +11,10 @@ import {
   getBasicPantryLabel,
   scoreDessertPattern as scoreMealPattern,
 } from './dessertRecipeBuilder'
+import {
+  getBestRankedPattern,
+  rankRealisticPatterns,
+} from './recipePatternEngine'
 
 function userHasCanon(userCanons, canon) {
   if (userCanons.has(canon)) return true
@@ -98,8 +102,8 @@ export const REALISTIC_MEAL_PATTERNS = [
     category: 'dairy',
     preferred: ['cheese'],
     selectionPriority: 20,
-    nameHe: 'קציצות גבינה מטוגנות',
-    nameEn: 'Fried Cheese Fritters',
+    nameHe: 'כדורי גבינה מטוגנים',
+    nameEn: 'Fried Cheese Balls',
     userQuantities: {
       flour: { he: '120 גרם קמח', en: '120 g flour' },
       cheese: { he: '250 גרם גבינה', en: '250 g cheese' },
@@ -116,7 +120,7 @@ export const REALISTIC_MEAL_PATTERNS = [
       'מגרדים גבינה ומערבבים עם קמח, אבקת אפייה, מלח ופלפל.',
       'מוסיפים חלב וביצים ומערבבים עד לתערובת סמיכה.',
       'מחממים שמן וחמאה במחבת על אש בינונית-גבוהה.',
-      `יוצרים קציצות, מטגנים ${Math.max(8, Math.round(cook / 2))} דקות מכל צד עד פריך וזהוב.`,
+      `מעצבים כדורי גבינה קטנים, מטגנים ${Math.max(8, Math.round(cook / 2))} דקות מכל צד עד פריך וזהוב.`,
       'מניחים על נייר ספיגה לרגע, מגישים חם.',
     ],
     stepsEn: (cook) => [
@@ -159,6 +163,281 @@ export const REALISTIC_MEAL_PATTERNS = [
       'Warm a pan with butter over medium heat.',
       `Pour a thin layer of batter, scatter grated cheese, and cook about ${Math.max(10, Math.round(cook / 2))} minutes until set and golden.`,
       'Fold carefully and serve hot.',
+    ],
+  },
+  {
+    id: 'dairy_tomato_egg_skillet',
+    required: new Set(['tomato', 'egg']),
+    category: 'dairy',
+    variationGroup: 'egg_tomato',
+    cookingMethod: 'poached',
+    selectionPriority: 26,
+    nameHe: 'שקשוקה עם גבינה',
+    nameEn: 'Cheese Shakshuka',
+    userQuantities: {
+      tomato: { he: '3 עגבניות', en: '3 tomatoes' },
+      egg: { he: '4 ביצים', en: '4 eggs' },
+    },
+    pantryStaples: [
+      { canon: 'cheese', he: '150 גרם גבינה', en: '150 g cheese' },
+      { canon: 'butter', he: '2 כפות חמאה', en: '2 tbsp butter' },
+      { canon: 'onion', he: '1 בצל', en: '1 onion' },
+      { canon: 'oil', he: '2 כפות שמן', en: '2 tbsp oil' },
+      { canon: 'salt', he: '1/2 כפית מלח', en: '1/2 tsp salt' },
+      { canon: 'black pepper', he: '1/4 כפית פלפל שחור', en: '1/4 tsp black pepper' },
+    ],
+    stepsHe: (cook) => [
+      'קוצצים בצל ועגבניות.',
+      'מחממים מחבת עם שמן וחמאה ומטגנים בצל עד שקוף.',
+      'מוסיפים עגבניות, מלח ופלפל ומבשלים על אש בינונית עד רוטב סמיך.',
+      `שוברים ביצים לתוך הרוטב, מפזרים גבינה, מכסים ומבשלים ${Math.max(8, Math.round(cook / 2))} דקות עד שהביצים מתייצבות.`,
+      'מגישים חם ישר מהמחבת.',
+    ],
+    stepsEn: (cook) => [
+      'Chop the onion and tomatoes.',
+      'Warm a skillet with oil and butter; sauté the onion until translucent.',
+      'Add tomatoes, salt, and pepper; simmer until saucy.',
+      `Crack eggs into the sauce, scatter cheese, cover, and cook about ${Math.max(8, Math.round(cook / 2))} minutes until set.`,
+      'Serve hot straight from the skillet.',
+    ],
+  },
+  {
+    id: 'dairy_tomato_egg_omelette',
+    required: new Set(['tomato', 'egg']),
+    category: 'dairy',
+    variationGroup: 'egg_tomato',
+    cookingMethod: 'fried',
+    selectionPriority: 24,
+    nameHe: 'חביתת עגבניות וגבינה',
+    nameEn: 'Tomato and Cheese Omelette',
+    userQuantities: {
+      tomato: { he: '2 עגבניות', en: '2 tomatoes' },
+      egg: { he: '4 ביצים', en: '4 eggs' },
+    },
+    pantryStaples: [
+      { canon: 'cheese', he: '100 גרם גבינה', en: '100 g cheese' },
+      { canon: 'butter', he: '2 כפות חמאה', en: '2 tbsp butter' },
+      { canon: 'onion', he: '1/2 בצל', en: '1/2 onion' },
+      { canon: 'salt', he: '1/2 כפית מלח', en: '1/2 tsp salt' },
+      { canon: 'black pepper', he: '1/4 כפית פלפל שחור', en: '1/4 tsp black pepper' },
+    ],
+    stepsHe: (cook) => [
+      'קוצצים עגבניות ובצל.',
+      'מקציפים ביצים עם מלח ופלפל.',
+      'מחממים מחבת עם חמאה, מטגנים בצל ועגבניות דקות ספורות.',
+      `יוצקים את הביצים, מפזרים גבינה ומכסים ${Math.max(6, Math.round(cook / 3))} דקות עד שהחביתה מתייצבת.`,
+      'קופפים בזהירות ומגישים חם.',
+    ],
+    stepsEn: (cook) => [
+      'Chop tomatoes and onion.',
+      'Whisk eggs with salt and pepper.',
+      'Melt butter in a pan; briefly sauté onion and tomatoes.',
+      `Pour in eggs, scatter cheese, cover, and cook about ${Math.max(6, Math.round(cook / 3))} minutes until set.`,
+      'Fold carefully and serve hot.',
+    ],
+  },
+  {
+    id: 'dairy_baked_eggs_tomato',
+    required: new Set(['tomato', 'egg']),
+    category: 'dairy',
+    variationGroup: 'egg_tomato',
+    cookingMethod: 'baked',
+    selectionPriority: 22,
+    nameHe: 'ביצים אפויות עם עגבניות וגבינה',
+    nameEn: 'Baked Eggs with Tomatoes and Cheese',
+    userQuantities: {
+      tomato: { he: '3 עגבניות', en: '3 tomatoes' },
+      egg: { he: '4 ביצים', en: '4 eggs' },
+    },
+    pantryStaples: [
+      { canon: 'cheese', he: '150 גרם גבינה', en: '150 g cheese' },
+      { canon: 'cream', he: '3 כפות שמנת', en: '3 tbsp cream' },
+      { canon: 'onion', he: '1 בצל', en: '1 onion' },
+      { canon: 'oil', he: '2 כפות שמן', en: '2 tbsp oil' },
+      { canon: 'salt', he: '1/2 כפית מלח', en: '1/2 tsp salt' },
+    ],
+    stepsHe: (bake) => [
+      'מחממים תנור ל-190 מעלות.',
+      'קוצצים בצל ועגבניות ומסדרים בתבנית עם שמן, מלח וגבינה.',
+      'שוברים ביצים בין העגבניות ומוסיפים כף שמנת על כל ביצה.',
+      `אופים ${Math.max(12, Math.round(bake * 0.6))} דקות עד שהחלבון מתייצב.`,
+      'מגישים חם ישר מהתבנית.',
+    ],
+    stepsEn: (bake) => [
+      'Preheat the oven to 190°C.',
+      'Chop onion and tomatoes; arrange in a baking dish with oil, salt, and cheese.',
+      'Crack eggs between the tomatoes and add a spoonful of cream to each.',
+      `Bake about ${Math.max(12, Math.round(bake * 0.6))} minutes until the whites are set.`,
+      'Serve hot from the dish.',
+    ],
+  },
+  {
+    id: 'parve_shakshuka',
+    required: new Set(['tomato', 'egg']),
+    category: 'parve',
+    variationGroup: 'egg_tomato',
+    cookingMethod: 'poached',
+    selectionPriority: 25,
+    nameHe: 'שקשוקה',
+    nameEn: 'Shakshuka',
+    userQuantities: {
+      tomato: { he: '4 עגבניות', en: '4 tomatoes' },
+      egg: { he: '4 ביצים', en: '4 eggs' },
+    },
+    pantryStaples: [
+      { canon: 'onion', he: '1 בצל', en: '1 onion' },
+      { canon: 'garlic', he: '2 שיני שום', en: '2 garlic cloves' },
+      { canon: 'oil', he: '3 כפות שמן', en: '3 tbsp oil' },
+      { canon: 'paprika', he: '1 כפית פפריקה', en: '1 tsp paprika' },
+      { canon: 'salt', he: '1/2 כפית מלח', en: '1/2 tsp salt' },
+      { canon: 'black pepper', he: '1/4 כפית פלפל שחור', en: '1/4 tsp black pepper' },
+    ],
+    stepsHe: (cook) => [
+      'קוצצים בצל, שום ועגבניות.',
+      'מחממים שמן במחבת ומטגנים בצל ושום עד רכות.',
+      'מוסיפים עגבניות, פапrika, מלח ופלפל ומבשלים עד רוטב סמיך.',
+      `שוברים ביצים לתוך הרוטב, מכסים ומבשלים ${Math.max(8, Math.round(cook / 2))} דקות.`,
+      'מגישים חם עם לחם.',
+    ],
+    stepsEn: (cook) => [
+      'Chop onion, garlic, and tomatoes.',
+      'Warm oil in a skillet; sauté onion and garlic until soft.',
+      'Add tomatoes, paprika, salt, and pepper; simmer until thickened.',
+      `Crack eggs into the sauce, cover, and cook about ${Math.max(8, Math.round(cook / 2))} minutes.`,
+      'Serve hot with bread.',
+    ],
+  },
+  {
+    id: 'dairy_flour_tomato_crepes',
+    required: new Set(['flour', 'tomato']),
+    category: 'dairy',
+    preferred: ['cheese'],
+    selectionPriority: 22,
+    nameHe: 'קרפ מלוח בגבינה ועגבניות',
+    nameEn: 'Savory Cheese and Tomato Crepes',
+    userQuantities: {
+      flour: { he: '150 גרם קמח', en: '150 g flour' },
+      tomato: { he: '2 עגבניות', en: '2 tomatoes' },
+    },
+    pantryStaples: [
+      { canon: 'cheese', he: '150 גרם גבינה', en: '150 g cheese' },
+      { canon: 'milk', he: '200 מ"ל חלב', en: '200 ml milk' },
+      { canon: 'egg', he: '2 ביצים', en: '2 eggs' },
+      { canon: 'butter', he: '2 כפות חמאה', en: '2 tbsp butter' },
+      { canon: 'salt', he: '1/2 כפית מלח', en: '1/2 tsp salt' },
+    ],
+    stepsHe: (cook) => [
+      'קוצצים עגבניות ומגרדים גבינה.',
+      'מערבבים קמח, מלח, חלב וביצים לבלילה חלקה.',
+      'מחממים מחבת עם חמאה ומטגנים קרפים דקים משני הצדדים.',
+      `ממלאים כל קרפ בגבינה ועגבניות, מחממים שוב ${Math.max(8, Math.round(cook / 3))} דקות עד שהגבינה נמסה.`,
+      'מגישים חם.',
+    ],
+    stepsEn: (cook) => [
+      'Slice tomatoes and grate cheese.',
+      'Whisk flour, salt, milk, and eggs into a smooth batter.',
+      'Cook thin crepes in a buttered pan on both sides.',
+      `Fill each crepe with cheese and tomatoes; warm ${Math.max(8, Math.round(cook / 3))} minutes until cheese melts.`,
+      'Serve hot.',
+    ],
+  },
+  {
+    id: 'meat_tomato_rice_skillet',
+    required: new Set(['tomato', 'rice']),
+    category: 'meat',
+    variationGroup: 'meat_tomato_rice',
+    cookingMethod: 'fried',
+    selectionPriority: 23,
+    nameHe: 'תבשיל אורז עם עגבניות ועוף',
+    nameEn: 'Tomato Rice with Chicken',
+    userQuantities: {
+      tomato: { he: '3 עגבניות', en: '3 tomatoes' },
+      rice: { he: '1 כוס אורז', en: '1 cup rice' },
+    },
+    pantryStaples: [
+      { canon: 'chicken', he: '400 גרם עוף חתוך', en: '400 g diced chicken' },
+      { canon: 'onion', he: '1 בצל', en: '1 onion' },
+      { canon: 'oil', he: '2 כפות שמן', en: '2 tbsp oil' },
+      { canon: 'salt', he: '1/2 כפית מלח', en: '1/2 tsp salt' },
+    ],
+    stepsHe: (cook) => [
+      'מחממים שמן בסיר ומטגנים בצל ועוף עד הזהבה.',
+      'מוסיפים עגבניות קצוצות ומבשלים עד רוטב סמיך.',
+      'מוסיפים אורז ומים, מרתיחים ומכסים.',
+      `מבשלים על אש נמוכה ${Math.max(15, Math.round(cook * 0.7))} דקות עד שהאורז רך, מתבלים ומגישים חם.`,
+    ],
+    stepsEn: (cook) => [
+      'Brown onion and chicken in oiled pot.',
+      'Add chopped tomatoes and cook until saucy.',
+      'Add rice and water, bring to a boil, and cover.',
+      `Simmer about ${Math.max(15, Math.round(cook * 0.7))} minutes until rice is tender.`,
+      'Season and serve hot.',
+    ],
+  },
+  {
+    id: 'meat_tomato_rice_pilaf',
+    required: new Set(['tomato', 'rice']),
+    category: 'meat',
+    variationGroup: 'meat_tomato_rice',
+    cookingMethod: 'boiled',
+    selectionPriority: 21,
+    nameHe: 'פילאף אורז עם עוף ועגבניות',
+    nameEn: 'Chicken Tomato Rice Pilaf',
+    userQuantities: {
+      tomato: { he: '2 עגבניות', en: '2 tomatoes' },
+      rice: { he: '1.5 כוסות אורז', en: '1.5 cups rice' },
+    },
+    pantryStaples: [
+      { canon: 'chicken', he: '350 גרם חזה עוף', en: '350 g chicken breast' },
+      { canon: 'onion', he: '1 בצל', en: '1 onion' },
+      { canon: 'oil', he: '2 כפות שמן', en: '2 tbsp oil' },
+      { canon: 'garlic', he: '2 שיני שום', en: '2 garlic cloves' },
+      { canon: 'salt', he: '1/2 כפית מלח', en: '1/2 tsp salt' },
+    ],
+    stepsHe: (cook) => [
+      'חותכים עוף, בצל, שום ועגבניות.',
+      'מחממים שמן בסיר, מטגנים עוף ובצל עד הזהבה.',
+      'מוסיפים אורז, עגבניות, שום, מים ומלח.',
+      `מבשלים על אש נמוכה ${Math.max(18, Math.round(cook * 0.75))} דקות עד שהאורז רך.`,
+      'מניחים 5 דקות, מפרקים ומגישים.',
+    ],
+    stepsEn: (cook) => [
+      'Dice chicken, onion, garlic, and tomatoes.',
+      'Brown chicken and onion in oiled pot.',
+      'Add rice, tomatoes, garlic, water, and salt.',
+      `Simmer about ${Math.max(18, Math.round(cook * 0.75))} minutes until rice is tender.`,
+      'Rest 5 minutes, fluff, and serve.',
+    ],
+  },
+  {
+    id: 'parve_tomato_rice',
+    required: new Set(['tomato', 'rice']),
+    category: 'parve',
+    selectionPriority: 21,
+    nameHe: 'אורז עם עגבניות',
+    nameEn: 'Tomato Rice',
+    userQuantities: {
+      tomato: { he: '3 עגבניות', en: '3 tomatoes' },
+      rice: { he: '1 כוס אורז', en: '1 cup rice' },
+    },
+    pantryStaples: [
+      { canon: 'onion', he: '1 בצל', en: '1 onion' },
+      { canon: 'oil', he: '2 כפות שמן', en: '2 tbsp oil' },
+      { canon: 'salt', he: '1/2 כפית מלח', en: '1/2 tsp salt' },
+    ],
+    stepsHe: (cook) => [
+      'מחממים שמן בסיר ומטגנים בצל עד שקוף.',
+      'מוסיפים עגבניות קצוצות ומבשלים מעט.',
+      'מוסיפים אורז, מים ומלח, מרתיחים ומכסים.',
+      `מבשלים ${Math.max(15, Math.round(cook * 0.7))} דקות עד שהאורז רך.`,
+      'מגישים חם.',
+    ],
+    stepsEn: (cook) => [
+      'Sauté onion in oil until translucent.',
+      'Add chopped tomatoes and cook briefly.',
+      'Add rice, water, and salt; boil and cover.',
+      `Simmer about ${Math.max(15, Math.round(cook * 0.7))} minutes until tender.`,
+      'Serve hot.',
     ],
   },
 ]
@@ -206,27 +485,33 @@ export function buildMealIngredientList(
 
 export function rankMealPatterns(
   userCanons,
-  { category = 'dairy', language = 'he', excludeTitles = [], excludeTemplateKeys = [] } = {},
+  {
+    category = 'any',
+    language = 'he',
+    excludeTitles = [],
+    excludeTemplateKeys = [],
+    excludeCookingMethods = [],
+  } = {},
 ) {
-  const ranked = []
-  for (const pattern of REALISTIC_MEAL_PATTERNS) {
-    if (pattern.category && pattern.category !== category) continue
-    if (excludeTemplateKeys.includes(pattern.id)) continue
-    if (isExcludedMealTitle(pattern, language, excludeTitles)) continue
-    const score = scoreMealPattern(pattern, userCanons)
-    if (score == null) continue
-    ranked.push({ pattern, score })
-  }
-  ranked.sort((a, b) => {
-    if (b.score !== a.score) return b.score - a.score
-    return (b.pattern.selectionPriority ?? 0) - (a.pattern.selectionPriority ?? 0)
+  return rankRealisticPatterns(REALISTIC_MEAL_PATTERNS, userCanons, scoreMealPattern, {
+    category,
+    language,
+    excludeTitles,
+    excludeTemplateKeys,
+    excludeCookingMethods,
+    isExcludedTitle: isExcludedMealTitle,
   })
-  return ranked
 }
 
 export function getBestMealPattern(
   userIngredientsRaw,
-  { category = 'dairy', language = 'he', excludeTitles = [], excludeTemplateKeys = [] } = {},
+  {
+    category = 'any',
+    language = 'he',
+    excludeTitles = [],
+    excludeTemplateKeys = [],
+    excludeCookingMethods = [],
+  } = {},
 ) {
   const userIngredients = Array.isArray(userIngredientsRaw)
     ? userIngredientsRaw
@@ -234,8 +519,14 @@ export function getBestMealPattern(
   if (!userIngredients.length) return null
 
   const canons = canonizeList(userIngredients)
-  const ranked = rankMealPatterns(canons, { category, language, excludeTitles, excludeTemplateKeys })
-  return ranked[0]?.pattern ?? null
+  const ranked = rankMealPatterns(canons, {
+    category,
+    language,
+    excludeTitles,
+    excludeTemplateKeys,
+    excludeCookingMethods,
+  })
+  return getBestRankedPattern(ranked)
 }
 
 export function buildRealisticMealFromPattern(

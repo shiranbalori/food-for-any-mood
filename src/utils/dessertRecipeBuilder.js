@@ -1,12 +1,17 @@
 /**
  * Real-world dessert recipe construction — dessert generation only.
- * User ingredients stay primary; common pantry staples are added with a clear label.
+ * User ingredients stay primary; common pantry staples may be added internally for realistic dishes.
  */
 
 import { canonicalIngredient, ingredientsMatch } from '../data/ingredientKnowledge'
 import { getIngredientLabel } from '../data/ingredientLabels'
 import { applyRecipeQuantities } from './recipeQuantities'
 import { parseUserIngredients } from './ingredientRelevance'
+import {
+  getBestRankedPattern,
+  rankRealisticPatterns,
+} from './recipePatternEngine'
+import { isIngredientSystemLabel, stripIngredientSystemLabels } from './ingredientFormatting'
 
 export const BASIC_PANTRY_LABEL_HE = '(מרכיב מזווה בסיסי)'
 export const BASIC_PANTRY_LABEL_EN = '(Basic pantry ingredient)'
@@ -28,22 +33,27 @@ export const DESSERT_BASIC_PANTRY_CANONICAL = new Set([
   'cinnamon',
   'nutmeg',
   'water',
+  'cheese',
+  'milk',
+  'cream',
+  'yogurt',
+  'carrot',
+  'chicken',
+  'rice',
+  'onion',
 ])
-
-const BASIC_PANTRY_SUFFIX = /\((?:Basic pantry ingredient|מרכיב מזווה בסיסי)\)/i
 
 export function getBasicPantryLabel(language = 'he') {
   return language === 'en' ? BASIC_PANTRY_LABEL_EN : BASIC_PANTRY_LABEL_HE
 }
 
+/** Internal validation marker — stripped before any user-facing display. */
 export function isBasicPantryMarkedLine(line) {
-  return BASIC_PANTRY_SUFFIX.test(String(line ?? '').trim())
+  return isIngredientSystemLabel(line)
 }
 
 export function stripBasicPantryLabel(line) {
-  return String(line ?? '')
-    .replace(BASIC_PANTRY_SUFFIX, '')
-    .trim()
+  return stripIngredientSystemLabels(line)
 }
 
 function matchesPatternRequirements(pattern, userCanons) {
@@ -131,26 +141,39 @@ function isExcludedDessertTitle(pattern, language, excludeTitles = []) {
   )
 }
 
-export function rankDessertPatterns(userCanons, { category = 'dairy', language = 'he', excludeTitles = [], excludeTemplateKeys = [] } = {}) {
-  const ranked = []
-  for (const pattern of REALISTIC_DESSERT_PATTERNS) {
-    if (pattern.category && pattern.category !== category) continue
-    if (excludeTemplateKeys.includes(pattern.id)) continue
-    if (isExcludedDessertTitle(pattern, language, excludeTitles)) continue
-    const score = scoreDessertPattern(pattern, userCanons)
-    if (score == null) continue
-    ranked.push({ pattern, score })
-  }
-  ranked.sort((a, b) => {
-    if (b.score !== a.score) return b.score - a.score
-    return (b.pattern.selectionPriority ?? 0) - (a.pattern.selectionPriority ?? 0)
+
+export function rankDessertPatterns(
+  userCanons,
+  {
+    category = 'any',
+    language = 'he',
+    excludeTitles = [],
+    excludeTemplateKeys = [],
+    excludeCookingMethods = [],
+    excludeDessertCategories = [],
+  } = {},
+) {
+  return rankRealisticPatterns(REALISTIC_DESSERT_PATTERNS, userCanons, scoreDessertPattern, {
+    category,
+    language,
+    excludeTitles,
+    excludeTemplateKeys,
+    excludeCookingMethods,
+    excludeDessertCategories,
+    isExcludedTitle: isExcludedDessertTitle,
   })
-  return ranked
 }
 
 export function getBestDessertPattern(
   userIngredientsRaw,
-  { category = 'dairy', language = 'he', excludeTitles = [], excludeTemplateKeys = [] } = {},
+  {
+    category = 'any',
+    language = 'he',
+    excludeTitles = [],
+    excludeTemplateKeys = [],
+    excludeCookingMethods = [],
+    excludeDessertCategories = [],
+  } = {},
 ) {
   const userIngredients = Array.isArray(userIngredientsRaw)
     ? userIngredientsRaw
@@ -158,8 +181,15 @@ export function getBestDessertPattern(
   if (!userIngredients.length) return null
 
   const canons = canonizeList(userIngredients)
-  const ranked = rankDessertPatterns(canons, { category, language, excludeTitles, excludeTemplateKeys })
-  return ranked[0]?.pattern ?? null
+  const ranked = rankDessertPatterns(canons, {
+    category,
+    language,
+    excludeTitles,
+    excludeTemplateKeys,
+    excludeCookingMethods,
+    excludeDessertCategories,
+  })
+  return getBestRankedPattern(ranked)
 }
 
 function userHasCanon(userCanons, canon) {
@@ -230,10 +260,9 @@ export const REALISTIC_DESSERT_PATTERNS = [
       { canon: 'salt', he: '1/4 כפית מלח', en: '1/4 tsp salt' },
     ],
     stepsHe: (bake) => [
-      'מחממים תנור ל-170 מעלות ומרפדים תבנית עם נייר אפייה.',
-      'מערבבים קמח, חמאה ומלח לבצק פריך, דוחסים בתחתית התבנית ואופים 10 דקות.',
-      'מעבדים גבינה עם סוכר במיקסר עד לקרם חלק.',
-      'מוסיפים ביצים אחת-אחת, חלב ותמצית וניל ומערבבים עד לבלילה אחידה.',
+      'מערבבים קמח, חמאה ומלח לבצק פריך, דוחסים בתחתית תבנית ואופים 10 דקות ב-170 מעלות.',
+      'מקציפים גבינה עם סוכר במיקסר עד לקרם חלק.',
+      'מוסיפים ביצים, חלב ותמצית וניל ומערבבים עד לבלילה אחידה.',
       `יוצקים על בסיס הבצק ואופים ${bake} דקות עד שהעוגה יציבה במרכז.`,
       'מקררים לפחות 4 שעות, חותכים לפרוסות ומגישים.',
     ],
@@ -694,6 +723,127 @@ export const REALISTIC_DESSERT_PATTERNS = [
       'Whisk flour, baking powder, and salt; combine until smooth.',
       `Warm a pan with butter and fry pancakes about ${Math.max(12, Math.round(bake / 3))} minutes per side until golden.`,
       'Serve warm.',
+    ],
+  },
+  {
+    id: 'carrot_cake',
+    required: new Set(['flour', 'carrot']),
+    category: 'dairy',
+    variationGroup: 'carrot_flour',
+    dessertCategory: 'cake',
+    cookingMethod: 'baked',
+    signature: ['carrot'],
+    preferred: ['sugar', 'egg'],
+    supportive: ['cinnamon'],
+    selectionPriority: 26,
+    nameHe: 'עוגת גזר',
+    nameEn: 'Carrot Cake',
+    userQuantities: {
+      flour: { he: '200 גרם קמח', en: '200 g flour' },
+      carrot: { he: '3 גזרים', en: '3 carrots' },
+    },
+    pantryStaples: [
+      { canon: 'sugar', he: '150 גרם סוכר', en: '150 g sugar' },
+      { canon: 'egg', he: '3 ביצים', en: '3 eggs' },
+      { canon: 'butter', he: '100 גרם חמאה', en: '100 g butter' },
+      { canon: 'oil', he: '3 כפות שמן', en: '3 tbsp oil' },
+      { canon: 'baking powder', he: '2 כפיות אבקת אפייה', en: '2 tsp baking powder' },
+      { canon: 'cinnamon', he: '1 כפית קינמון', en: '1 tsp cinnamon' },
+      { canon: 'salt', he: '1/4 כפית מלח', en: '1/4 tsp salt' },
+    ],
+    stepsHe: (bake) => [
+      'מחממים תנור ל-175 מעלות ומרפדים תבנית.',
+      'מגרדים גזר ומערבבים עם סוכר, ביצים, חמאה ושמן.',
+      'מוסיפים קמח, אבקת אפייה, קינמון ומלח ומערבבים עד לבלילה אחידה.',
+      `יוצקים לתבנית ואופים ${bake} דקות עד שקיסם יוצא יבש.`,
+      'מקררים מעט, חותכים ומגישים.',
+    ],
+    stepsEn: (bake) => [
+      'Preheat the oven to 175°C and line a pan.',
+      'Grate carrots; mix with sugar, eggs, butter, and oil.',
+      'Add flour, baking powder, cinnamon, and salt; mix until combined.',
+      `Pour into the pan and bake about ${bake} minutes until a toothpick comes out clean.`,
+      'Cool slightly, slice, and serve.',
+    ],
+  },
+  {
+    id: 'carrot_muffins',
+    required: new Set(['flour', 'carrot']),
+    category: 'dairy',
+    variationGroup: 'carrot_flour',
+    dessertCategory: 'muffin',
+    cookingMethod: 'baked',
+    signature: ['carrot'],
+    preferred: ['egg'],
+    supportive: ['sugar'],
+    selectionPriority: 24,
+    nameHe: 'מאפינס גזר',
+    nameEn: 'Carrot Muffins',
+    userQuantities: {
+      flour: { he: '200 גרם קמח', en: '200 g flour' },
+      carrot: { he: '2 גזרים', en: '2 carrots' },
+    },
+    pantryStaples: [
+      { canon: 'sugar', he: '120 גרם סוכר', en: '120 g sugar' },
+      { canon: 'egg', he: '2 ביצים', en: '2 eggs' },
+      { canon: 'butter', he: '80 גרם חמאה', en: '80 g butter' },
+      { canon: 'milk', he: '120 מ"ל חלב', en: '120 ml milk' },
+      { canon: 'baking powder', he: '2 כפיות אבקת אפייה', en: '2 tsp baking powder' },
+      { canon: 'cinnamon', he: '1/2 כפית קינמון', en: '1/2 tsp cinnamon' },
+      { canon: 'salt', he: '1/4 כפית מלח', en: '1/4 tsp salt' },
+    ],
+    stepsHe: (bake) => [
+      'מחממים תנור ל-180 מעלות ומכינים תבנית מאפינס.',
+      'מגרדים גזר ומערבבים עם סוכר, ביצים, חמאה וחלב.',
+      'מוסיפים קמח, אבקת אפייה, קינמון ומלח ומערבבים עד לבלילה אחידה.',
+      `ממלאים כ-2/3 מכל גביע ואופים ${bake} דקות עד שקיסם יוצא יבש.`,
+      'מקררים מעט ומגישים.',
+    ],
+    stepsEn: (bake) => [
+      'Preheat the oven to 180°C and prepare a muffin tin.',
+      'Grate carrots; mix with sugar, eggs, butter, and milk.',
+      'Add flour, baking powder, cinnamon, and salt; mix until combined.',
+      `Fill cups about two-thirds full and bake about ${bake} minutes until a toothpick comes out clean.`,
+      'Cool briefly and serve.',
+    ],
+  },
+  {
+    id: 'carrot_loaf',
+    required: new Set(['flour', 'carrot']),
+    category: 'dairy',
+    variationGroup: 'carrot_flour',
+    dessertCategory: 'loaf',
+    cookingMethod: 'baked',
+    signature: ['carrot'],
+    preferred: ['sugar', 'egg'],
+    selectionPriority: 22,
+    nameHe: 'כיכר גזר',
+    nameEn: 'Carrot Loaf',
+    userQuantities: {
+      flour: { he: '220 גרם קמח', en: '220 g flour' },
+      carrot: { he: '3 גזרים', en: '3 carrots' },
+    },
+    pantryStaples: [
+      { canon: 'sugar', he: '130 גרם סוכר', en: '130 g sugar' },
+      { canon: 'egg', he: '2 ביצים', en: '2 eggs' },
+      { canon: 'butter', he: '90 גרם חמאה', en: '90 g butter' },
+      { canon: 'oil', he: '2 כפות שמן', en: '2 tbsp oil' },
+      { canon: 'baking powder', he: '2 כפיות אבקת אפייה', en: '2 tsp baking powder' },
+      { canon: 'salt', he: '1/4 כפית מלח', en: '1/4 tsp salt' },
+    ],
+    stepsHe: (bake) => [
+      'מחממים תנור ל-170 מעלות ומרפדים תבנית כיכר.',
+      'מגרדים גזר ומערבבים עם סוכר, ביצים, חמאה ושמן.',
+      'מוסיפים קמח, אבקת אפייה ומלח ומערבבים עד לבלילה חלקה.',
+      `יוצקים לתבנית ואופים ${bake} דקות עד שקיסם יוצא יבש.`,
+      'מקררים, חותכים לפרוסות ומגישים.',
+    ],
+    stepsEn: (bake) => [
+      'Preheat the oven to 170°C and line a loaf pan.',
+      'Grate carrots; mix with sugar, eggs, butter, and oil.',
+      'Add flour, baking powder, and salt; mix until smooth.',
+      `Pour into the pan and bake about ${bake} minutes until a toothpick comes out clean.`,
+      'Cool, slice, and serve.',
     ],
   },
 ]

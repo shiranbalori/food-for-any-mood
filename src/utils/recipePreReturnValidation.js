@@ -9,7 +9,7 @@ import { parseAnyLeadingMeasurement } from './measurementUnits'
 import { isValidQuantifiedDisplay } from './recipeQuantities'
 import { hasRepeatedParentheticalIngredients } from './ingredientFormatting'
 import { findUnauthorizedRecipeIngredients, SYSTEM_PANTRY_CANONICAL } from './ingredientAllowlist'
-import { assessCategoryFit } from './recipeCategoryFit'
+import { assessGenerationFeasibility } from './recipeGenerationPolicy'
 import { validateRecipeCoherence } from './recipeCoherenceValidation'
 
 const PLACEHOLDER_PATTERNS = [
@@ -30,9 +30,9 @@ const COOKING_ACTIONS = [
   'melt', 'cool', 'chill', 'refrigerate', 'freeze', 'heat', 'warm', 'toast',
   'blend', 'puree', 'crush', 'grind', 'season', 'marinate', 'drain', 'rinse',
   'peel', 'grate', 'spread', 'layer', 'roll', 'knead', 'rest', 'rise',
-  'חותך', 'קוצץ', 'מקציף', 'מערבב', 'אופה', 'מטגן', 'מבשל', 'מרתיח',
+  'חותך', 'קוצץ', 'מקציף', 'מערבב', 'אופה', 'אופים', 'מטגן', 'מטגנים', 'מבשל', 'מרתיח', 'מרתיחים',
   'ממיס', 'מקרר', 'מעביר', 'מסנן', 'שוטף', 'מקליף', 'מגרד', 'ממרח', 'מגלגל',
-  'מסדר', 'מניח', 'יוצק', 'מעצב', 'מבשלים', 'מערבבים', 'חותכים', 'אופים',
+  'מסדר', 'מניח', 'יוצק', 'מעצב', 'ממלא', 'ממלאים', 'מקציף', 'מקציפים', 'מבשלים', 'מערבבים', 'חותכים', 'אופים', 'קוצצים',
 ]
 
 const WEAK_ONLY_ACTIONS = new Set([
@@ -139,81 +139,14 @@ function classifyCanons(canons) {
 
 export function assessIngredientFeasibility(
   userIngredientsRaw,
-  { recipeType = 'meal', category = 'dairy', isGlutenFree = false, language = 'he' } = {},
+  { recipeType = 'meal', category = 'any', isGlutenFree = false, language = 'he' } = {},
 ) {
-  const userIngredients = parseUserIngredients(userIngredientsRaw)
-  const isHe = language === 'he'
-
-  if (userIngredients.length === 0) {
-    return {
-      recipePossible: true,
-      preferenceBased: true,
-      reason: '',
-      missingIngredients: [],
-    }
-  }
-
-  const categoryCheck = assessCategoryFit(userIngredientsRaw, { category, isGlutenFree, language })
-  if (!categoryCheck.categoryOk) {
-    return {
-      recipePossible: false,
-      reason: categoryCheck.reason,
-      missingIngredients: categoryCheck.missingIngredients ?? [],
-      suggestedCategory: categoryCheck.suggestedCategory,
-    }
-  }
-
-  const canons = userIngredients.map((item) => canonicalIngredient(item) || item.toLowerCase())
-  const profile = classifyCanons(canons)
-
-  if (profile.selfSufficient) {
-    return { recipePossible: true, reason: '', missingIngredients: [] }
-  }
-
-  if (profile.onlySpices) {
-    return {
-      recipePossible: false,
-      reason: isHe
-        ? 'מהמרכיבים שסיפקתם אי אפשר להכין מנה — חסרים מרכיבים מהותיים.'
-        : 'These ingredients alone cannot make a dish — substantive ingredients are missing.',
-      missingIngredients: isHe ? ['חלבונים או ירקות או פחמימות'] : ['protein, vegetables, or carbs'],
-    }
-  }
-
-  if (recipeType === 'dessert') {
-    if (profile.hasMeatFish && !profile.hasDessertBase) {
-      return {
-        recipePossible: false,
-        reason: isHe
-          ? 'מהמרכיבים האלה לא ניתן להכין קינוח — חסרים מרכיבים מתוקים או בסיס לאפייה.'
-          : 'These ingredients cannot make a dessert — sweet or baking basics are missing.',
-        missingIngredients: isHe ? ['סוכר', 'קמח', 'ביצים', 'חמאה'] : ['sugar', 'flour', 'eggs', 'butter'],
-      }
-    }
-    if (!profile.hasDessertBase) {
-      return {
-        recipePossible: false,
-        reason: isHe
-          ? 'מהמרכיבים שסיפקתם לא ניתן להכין קינוח משמעותי — חסרים מרכיבים מתוקים או בסיס.'
-          : 'These ingredients cannot make a meaningful dessert — add sweet or baking ingredients.',
-        missingIngredients: isHe ? ['סוכר', 'דבש', 'שוקולד', 'קמח', 'ביצים'] : ['sugar', 'honey', 'chocolate', 'flour', 'eggs'],
-      }
-    }
-  }
-
-  if ((recipeType === 'meal' || recipeType === 'soup_stew') && !profile.hasSavoryMain) {
-    if (canons.length <= 2 && !profile.hasSweet) {
-      return {
-        recipePossible: false,
-        reason: isHe
-          ? 'מהמרכיבים שסיפקתם לא ניתן להכין מנה מלאה — חסרים מרכיבים מרכזיים.'
-          : 'These ingredients cannot make a full meal — main components are missing.',
-        missingIngredients: isHe ? ['חלבון', 'פחמימה', 'או ירק מרכזי'] : ['protein', 'starch, or a main vegetable'],
-      }
-    }
-  }
-
-  return { recipePossible: true, reason: '', missingIngredients: [] }
+  return assessGenerationFeasibility(userIngredientsRaw, {
+    recipeType,
+    category,
+    isGlutenFree,
+    language,
+  })
 }
 
 export function validateRecipeBeforeReturn(recipe, userIngredientsRaw = '', { language = 'he' } = {}) {

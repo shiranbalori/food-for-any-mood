@@ -122,7 +122,11 @@
   }
 
   /* ── Main recipe stack ── */
-  .app__home-recipe {
+  .app__home-stack {
+    gap: 18px;
+  }
+
+  .app__home-recipe-form {
     display: flex;
     flex-direction: column;
     gap: 18px;

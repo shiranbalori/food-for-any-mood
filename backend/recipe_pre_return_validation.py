@@ -14,7 +14,7 @@ from measurement_units import parse_leading_measurement
 from recipe_utils import is_staple
 from recipe_quantities import is_valid_quantified_display
 from ingredient_allowlist import find_unauthorized_recipe_ingredients
-from recipe_category_fit import assess_category_fit
+from recipe_category_fit import _ingredient_profile, assess_category_fit
 from recipe_coherence_validation import validate_recipe_coherence
 from recipe_step_sanitize import has_repeated_parenthetical_ingredients
 from ingredient_relevance import ingredients_match
@@ -203,16 +203,8 @@ def assess_ingredient_feasibility(
             "suggested_category": category_check.get("suggested_category"),
         }
 
-    canons = [
-        canonical_ingredient(item) or normalize_ingredient(item)
-        for item in user_ingredients
-    ]
-    profile = _classify_canons(canons)
-
-    if profile["self_sufficient"]:
-        return {"recipe_possible": True, "reason": "", "missing_ingredients": []}
-
-    if profile["only_spices"]:
+    profile = _ingredient_profile(user_ingredients)
+    if profile.get("only_spices"):
         missing = ["חלבונים או ירקות או פחמימות"] if is_he else ["protein, vegetables, or carbs"]
         return {
             "recipe_possible": False,
@@ -223,55 +215,6 @@ def assess_ingredient_feasibility(
             ),
             "missing_ingredients": missing,
         }
-
-    if recipe_type == "dessert":
-        if profile["has_meat_fish"] and not profile["has_dessert_base"]:
-            missing = (
-                ["סוכר", "קמח", "ביצים", "חמאה"]
-                if is_he
-                else ["sugar", "flour", "eggs", "butter"]
-            )
-            return {
-                "recipe_possible": False,
-                "reason": (
-                    "מהמרכיבים האלה לא ניתן להכין קינוח — חסרים מרכיבים מתוקים או בסיס לאפייה."
-                    if is_he
-                    else "These ingredients cannot make a dessert — sweet or baking basics are missing."
-                ),
-                "missing_ingredients": missing,
-            }
-        if not profile["has_dessert_base"]:
-            missing = (
-                ["סוכר", "דבש", "שוקולד", "קמח", "ביצים"]
-                if is_he
-                else ["sugar", "honey", "chocolate", "flour", "eggs"]
-            )
-            return {
-                "recipe_possible": False,
-                "reason": (
-                    "מהמרכיבים שסיפקתם לא ניתן להכין קינוח משמעותי — חסרים מרכיבים מתוקים או בסיס."
-                    if is_he
-                    else "These ingredients cannot make a meaningful dessert — add sweet or baking ingredients."
-                ),
-                "missing_ingredients": missing,
-            }
-
-    if (recipe_type == "meal" or recipe_type == "soup_stew") and not profile["has_savory_main"]:
-        if len(canons) <= 2 and not profile["has_sweet"]:
-            missing = (
-                ["חלבון", "פחמימה", "או ירק מרכזי"]
-                if is_he
-                else ["protein", "starch, or a main vegetable"]
-            )
-            return {
-                "recipe_possible": False,
-                "reason": (
-                    "מהמרכיבים שסיפקתם לא ניתן להכין מנה מלאה — חסרים מרכיבים מרכזיים."
-                    if is_he
-                    else "These ingredients cannot make a full meal — main components are missing."
-                ),
-                "missing_ingredients": missing,
-            }
 
     return {"recipe_possible": True, "reason": "", "missing_ingredients": []}
 

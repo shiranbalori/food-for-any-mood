@@ -26,6 +26,7 @@ import { buildDessertDishTitle } from '../utils/dessertDishTitle'
 import {
   buildRealisticDessertFromPattern,
   buildRealisticMealFromPattern,
+  buildRealisticSoupFromPattern,
   getBestDishPattern,
 } from '../utils/recipeDishPatterns'
 import { buildChefIntro } from '../utils/chefIntro'
@@ -930,8 +931,7 @@ function weightedRandomPick(items) {
 
 function templateMatchesCategory(template, selectedCategory) {
   if (selectedCategory === 'any') return true
-  const ingredientText = (template.baseIngredients ?? []).join(', ')
-  return assessCategoryFit(ingredientText, { category: selectedCategory, language: 'he' }).categoryOk
+  return true
 }
 
 function pickTemplate(category, userIngredients, time, mood, excludeKeys, glutenFree, selectedCategory = category) {
@@ -1047,12 +1047,10 @@ function buildIngredientList(
   }
 
   const pantryStaples = ['water', 'salt', 'black pepper', 'olive oil', 'baking powder']
-  const copy = getRecipeCopy(language)
-  const addedSuffix = copy.pantrySuffix ? ` ${copy.pantrySuffix}` : ''
 
   for (const staple of pantryStaples) {
     if (!list.some((entry) => ingredientsMatch(entry, staple))) {
-      list.push(`${formatIngredient(staple, language, false)}${addedSuffix}`)
+      list.push(formatIngredient(staple, language, false))
     }
   }
 
@@ -1640,6 +1638,8 @@ export function buildIngredientFirstFallbackRecipe(
   } = {},
 ) {
   const kosherCategory = resolveTemplateCategory(category, ingredients)
+  /** Pattern matching uses user category when "any" — output category is resolved separately. */
+  const patternCategory = isAnyCategory(category) ? 'any' : kosherCategory
   const rawUserList = parseUserIngredients(ingredients)
   const filteredUserIngredients = isGlutenFree
     ? rawUserList.filter((item) => !isGlutenIngredient(normalizeIngredient(item)))
@@ -1698,10 +1698,12 @@ export function buildIngredientFirstFallbackRecipe(
   if (effectiveRecipeType === 'dessert') {
     dishPattern = getBestDishPattern(filteredUserIngredients, {
       recipeType: 'dessert',
-      category: kosherCategory,
+      category: patternCategory,
       language,
       excludeTitles,
       excludeTemplateKeys,
+      excludeCookingMethods,
+      excludeDessertCategories,
     })
     if (dishPattern) {
       const built = buildRealisticDessertFromPattern(dishPattern, {
@@ -1731,14 +1733,38 @@ export function buildIngredientFirstFallbackRecipe(
       name = buildDessertDishTitle(finalIngredients, { language }).name
     }
   } else if (effectiveRecipeType === 'soup_stew') {
-    name = buildGroundedSoupStewTitle(filteredUserIngredients, finalIngredients, language, { excludeTitles })
-  } else if (effectiveRecipeType === 'meal') {
     dishPattern = getBestDishPattern(filteredUserIngredients, {
-      recipeType: 'meal',
-      category: kosherCategory,
+      recipeType: 'soup_stew',
+      category: patternCategory,
       language,
       excludeTitles,
       excludeTemplateKeys,
+      excludeCookingMethods,
+    })
+    if (dishPattern?.userQuantities) {
+      const built = buildRealisticSoupFromPattern(dishPattern, {
+        filteredUserIngredients,
+        displayNames,
+        language,
+        cookingTime,
+        servings,
+      })
+      name = built.name
+      recipeSteps = built.steps
+      finalIngredients = built.ingredients
+      precomputedNutrition = built.nutrition
+      precomputedHealthScore = built.healthScore
+    } else {
+      name = buildGroundedSoupStewTitle(filteredUserIngredients, finalIngredients, language, { excludeTitles })
+    }
+  } else if (effectiveRecipeType === 'meal') {
+    dishPattern = getBestDishPattern(filteredUserIngredients, {
+      recipeType: 'meal',
+      category: patternCategory,
+      language,
+      excludeTitles,
+      excludeTemplateKeys,
+      excludeCookingMethods,
     })
     if (dishPattern?.userQuantities) {
       const built = buildRealisticMealFromPattern(dishPattern, {
@@ -1772,13 +1798,15 @@ export function buildIngredientFirstFallbackRecipe(
     name = buildGroundedChefTitle(filteredUserIngredients, finalIngredients, language, { excludeTitles })
   }
 
-  let description = buildChefIntro(finalIngredients, {
-    chosenName: name,
-    language,
-    recipeType: effectiveRecipeType,
-    cookingTime,
-  })
-  if (mismatchNote) {
+  let description = dishPattern
+    ? ''
+    : buildChefIntro(finalIngredients, {
+        chosenName: name,
+        language,
+        recipeType: effectiveRecipeType,
+        cookingTime,
+      })
+  if (description && mismatchNote) {
     description += mismatchNote
   }
 
@@ -1844,11 +1872,15 @@ export function buildIngredientFirstFallbackRecipe(
     isGlutenFree,
     preserveOriginalSteps:
       Boolean(dishPattern) &&
-      (effectiveRecipeType === 'dessert' || effectiveRecipeType === 'meal'),
+      (effectiveRecipeType === 'dessert' ||
+        effectiveRecipeType === 'meal' ||
+        effectiveRecipeType === 'soup_stew'),
     skipRequantify:
       Boolean(dishPattern) &&
       Boolean(precomputedNutrition) &&
-      (effectiveRecipeType === 'dessert' || effectiveRecipeType === 'meal'),
+      (effectiveRecipeType === 'dessert' ||
+        effectiveRecipeType === 'meal' ||
+        effectiveRecipeType === 'soup_stew'),
   })
 
   const shouldEnrich =
@@ -2035,6 +2067,7 @@ function buildSoupStewMockRecipe(
         excludeTitles,
         excludeCookingMethods,
         excludeDessertCategories,
+        excludeTemplateKeys,
       },
     )
   }
@@ -2194,6 +2227,7 @@ export function buildMockRecipe(
         excludeTitles,
         excludeCookingMethods,
         excludeDessertCategories,
+        excludeTemplateKeys,
       },
     )
   }
@@ -2231,6 +2265,7 @@ export function buildMockRecipe(
         excludeTitles,
         excludeCookingMethods,
         excludeDessertCategories,
+        excludeTemplateKeys,
       },
     )
   }
@@ -2317,6 +2352,7 @@ export function buildMockRecipe(
           excludeTitles,
           excludeCookingMethods,
           excludeDessertCategories,
+          excludeTemplateKeys,
         },
       )
     }

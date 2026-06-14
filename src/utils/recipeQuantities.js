@@ -6,6 +6,7 @@ import {
   lightSanitizeRecipeSteps,
   sanitizeIngredientList,
   sanitizeRecipeSteps,
+  stripIngredientSystemLabels,
   toReadableIngredientLine,
 } from './ingredientFormatting'
 import { alignStepsWithIngredientList, naturalizeRecipeSteps, toStepIngredientReference } from './recipeStepWording'
@@ -20,8 +21,6 @@ import {
 } from './measurementUnits'
 
 export const DEFAULT_SERVINGS = 2
-
-const PANTRY_SUFFIX = /\s*\([^)]*\)\s*$/
 
 const STAPLE_PROFILE_KEYS = {
   salt: 'salt',
@@ -225,7 +224,7 @@ function computeAmount(profile, servings, baseServings = DEFAULT_SERVINGS) {
 }
 
 function stripQuantity(raw) {
-  const trimmed = String(raw ?? '').trim().replace(PANTRY_SUFFIX, '').trim()
+  const trimmed = stripIngredientSystemLabels(String(raw ?? '').trim())
   const measured = parseAnyLeadingMeasurement(trimmed)
   if (measured) {
     return { name: measured.name, canonical: canonicalIngredient(measured.name), measured }
@@ -317,7 +316,7 @@ function formatMeasuredDisplay(amount, unit, name, language) {
   return `${qty} ${unitLabel} ${name}`
 }
 
-function buildReadableQuantifiedItem(raw, language, pantryNote = '') {
+function buildReadableQuantifiedItem(raw, language) {
   const readable = toReadableIngredientLine(raw, language)
   if (!readable) return null
 
@@ -325,7 +324,6 @@ function buildReadableQuantifiedItem(raw, language, pantryNote = '') {
   if (!name || isNumericOnlyText(name)) return null
 
   const displayName = getIngredientLabel(canon ?? name, language) || name
-  const display = pantryNote ? `${readable} ${pantryNote}` : readable
   const stepPhrase =
     language === 'he' ? toStepIngredientReference(displayName, language) : displayName
 
@@ -335,7 +333,7 @@ function buildReadableQuantifiedItem(raw, language, pantryNote = '') {
     name: displayName,
     amount: 1,
     unit: 'whole',
-    display,
+    display: readable,
     stepPhrase,
   }
 }
@@ -361,14 +359,10 @@ function getNutritionForItem(canon, unit, amount, rawText = '') {
 }
 
 export function quantifyIngredient(raw, servings = DEFAULT_SERVINGS, language = 'he') {
-  const pantryNote = String(raw ?? '').match(PANTRY_SUFFIX)?.[0]?.trim() ?? ''
-  const trimmed = String(raw ?? '')
-    .trim()
-    .replace(PANTRY_SUFFIX, '')
-    .trim()
+  const trimmed = stripIngredientSystemLabels(String(raw ?? '').trim())
 
   if (!trimmed || !isValidIngredientLine(trimmed)) {
-    return buildReadableQuantifiedItem(raw, language, pantryNote)
+    return buildReadableQuantifiedItem(raw, language)
   }
 
   const existing = parseAnyLeadingMeasurement(trimmed)
@@ -376,7 +370,7 @@ export function quantifyIngredient(raw, servings = DEFAULT_SERVINGS, language = 
   if (existing && language === 'he') {
     const { name, canonical: canon } = stripQuantity(trimmed)
     if (!name || isNumericOnlyText(name)) {
-      return buildReadableQuantifiedItem(raw, language, pantryNote)
+      return buildReadableQuantifiedItem(raw, language)
     }
 
     const displayName = getIngredientLabel(canon ?? name, language) || name
@@ -388,26 +382,26 @@ export function quantifyIngredient(raw, servings = DEFAULT_SERVINGS, language = 
       name: displayName,
       amount: parseAmount(existing.qty),
       unit: existing.unit,
-      display: pantryNote ? `${display} ${pantryNote}` : display,
-      stepPhrase: pantryNote ? `${stepPhrase} ${pantryNote}` : stepPhrase,
+      display,
+      stepPhrase,
     }
 
     if (!isValidQuantifiedDisplay(result.display, result.unit)) {
-      return buildReadableQuantifiedItem(raw, language, pantryNote)
+      return buildReadableQuantifiedItem(raw, language)
     }
     return result
   }
 
   const { name, canonical: canon } = stripQuantity(raw)
   if (!name || isNumericOnlyText(name)) {
-    return buildReadableQuantifiedItem(raw, language, pantryNote)
+    return buildReadableQuantifiedItem(raw, language)
   }
 
   const profileKey = resolveProfileKey(canon, name)
   const hasKnownProfile = Boolean(profileKey && QUANTITY_PROFILES[profileKey])
 
   if (!hasKnownProfile) {
-    return buildReadableQuantifiedItem(raw, language, pantryNote)
+    return buildReadableQuantifiedItem(raw, language)
   }
 
   const profile = resolveProfile(canon, name, language)
@@ -425,12 +419,12 @@ export function quantifyIngredient(raw, servings = DEFAULT_SERVINGS, language = 
     name: displayName,
     amount,
     unit: profile.unit,
-    display: pantryNote ? `${display} ${pantryNote}` : display,
-    stepPhrase: pantryNote ? `${stepPhrase} ${pantryNote}` : stepPhrase,
+    display,
+    stepPhrase,
   }
 
   if (!isValidQuantifiedDisplay(result.display, result.unit)) {
-    return buildReadableQuantifiedItem(raw, language, pantryNote)
+    return buildReadableQuantifiedItem(raw, language)
   }
   return result
 }

@@ -358,6 +358,7 @@ export function pickAlternateMealVariant({
   )
   const hasPasta = set.has('pasta')
   const hasEgg = set.has('egg') || set.has('eggs')
+  const hasTomato = set.has('tomato') || set.has('tomatoes')
   const variants =
     hasPasta && hasEgg
       ? [
@@ -380,7 +381,67 @@ export function pickAlternateMealVariant({
             steps: buildPastaEggSteps(listPhrase, cookingTime, language, 'rustic'),
           },
         ]
-      : [
+      : hasEgg && hasTomato
+        ? [
+            {
+              id: 'egg-tomato-shakshuka',
+              method: 'poached',
+              name: language === 'he' ? 'שקשוקה' : 'Shakshuka',
+              steps:
+                language === 'he'
+                  ? [
+                      'קוצצים בצל ועגבניות.',
+                      'מחממים שמן במחבת, מטגנים בצל ומוסיפים עגבניות עד רוטב סמיך.',
+                      `שוברים ביצים לתוך הרוטב, מכסים ומבשלים ${Math.max(8, Math.round(cookingTime / 2))} דקות.`,
+                      'מגישים חם.',
+                    ]
+                  : [
+                      'Chop onion and tomatoes.',
+                      'Sauté onion in oil, add tomatoes, and simmer until saucy.',
+                      `Crack eggs into the sauce, cover, and cook about ${Math.max(8, Math.round(cookingTime / 2))} minutes.`,
+                      'Serve hot.',
+                    ],
+            },
+            {
+              id: 'egg-tomato-omelette',
+              method: 'fried',
+              name: language === 'he' ? 'חביתת עגבניות' : 'Tomato Omelette',
+              steps:
+                language === 'he'
+                  ? [
+                      'קוצצים עגבניות, מקציפים ביצים עם מלח.',
+                      'מטגנים עגבניות במחבת עם שמן דקות ספורות.',
+                      `יוצקים ביצים, מכסים ומבשלים ${Math.max(6, Math.round(cookingTime / 3))} דקות עד יציבות.`,
+                      'קופפים ומגישים חם.',
+                    ]
+                  : [
+                      'Chop tomatoes; whisk eggs with salt.',
+                      'Briefly sauté tomatoes in oiled pan.',
+                      `Pour eggs, cover, and cook about ${Math.max(6, Math.round(cookingTime / 3))} minutes until set.`,
+                      'Fold and serve hot.',
+                    ],
+            },
+            {
+              id: 'egg-tomato-baked',
+              method: 'baked',
+              name: language === 'he' ? 'ביצים אפויות עם עגבניות' : 'Baked Eggs with Tomatoes',
+              steps:
+                language === 'he'
+                  ? [
+                      'מחממים תנור ל-190 מעלות.',
+                      'קוצצים עגבניות ומסדרים בתבנית עם שמן ומלח.',
+                      `שוברים ביצים בין העגבניות ואופים ${Math.max(12, Math.round(cookingTime * 0.6))} דקות.`,
+                      'מגישים חם.',
+                    ]
+                  : [
+                      'Preheat the oven to 190°C.',
+                      'Chop tomatoes; arrange in a dish with oil and salt.',
+                      `Crack eggs among the tomatoes and bake about ${Math.max(12, Math.round(cookingTime * 0.6))} minutes.`,
+                      'Serve hot.',
+                    ],
+            },
+          ]
+        : [
           {
             id: 'meal-skillet',
             method: 'fried',

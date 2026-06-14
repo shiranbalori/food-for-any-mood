@@ -63,10 +63,10 @@ const KNOWN_DISH_PREFIXES = [
   'פסטה',
   'סלט',
   'מרק',
+  'תבשיל',
   'קארי',
   'אורז',
   'טאקו',
-  'קציצ',
   'ריזוטו',
   'מוקפץ',
   'עוף',
@@ -74,6 +74,10 @@ const KNOWN_DISH_PREFIXES = [
   'טונה',
   'פנקייק',
   'קוביות',
+  'קרפ',
+  'לביב',
+  'כדורי',
+  'עוג',
 ]
 
 const GENERIC_DISH_TITLES = new Set([
@@ -246,10 +250,10 @@ function titleMatchesIngredients(title, ingredients = []) {
  * Detect titles that simply list ingredients instead of naming a dish.
  */
 export function isLiteralIngredientTitle(title, ingredients = [], language = 'he') {
-  if (isIngredientListTitle(title, ingredients, language)) return true
-
   const text = String(title ?? '').trim()
   if (!text || hasDishNamePrefix(text)) return false
+
+  if (isIngredientListTitle(title, ingredients, language)) return true
 
   const labels = [...new Set(toDisplayLabels(ingredients, language))].filter(Boolean)
   if (labels.length === 0) return false
@@ -330,6 +334,9 @@ export function titleDescribesDish(title, ingredients = [], language = 'he', use
   const text = String(title ?? '').trim()
   if (!text || isMoodBasedTitle(text) || isForbiddenGenericTitle(text)) {
     return false
+  }
+  if (hasDishNamePrefix(text)) {
+    return true
   }
   if (countTitleWords(text) > 4) {
     return false

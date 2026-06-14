@@ -17,6 +17,12 @@ import {
   buildRealisticMealFromPattern,
   getBestMealPattern,
 } from './mealRecipeBuilder'
+import {
+  REALISTIC_SOUP_PATTERNS,
+  buildSoupIngredientList,
+  buildRealisticSoupFromPattern,
+  getBestSoupPattern,
+} from './soupRecipeBuilder'
 
 const MEAL_DISH_PATTERNS = [
   {
@@ -109,6 +115,8 @@ export function getBestDishPattern(
     language = 'he',
     excludeTitles = [],
     excludeTemplateKeys = [],
+    excludeCookingMethods = [],
+    excludeDessertCategories = [],
   } = {},
 ) {
   if (recipeType === 'dessert') {
@@ -117,6 +125,18 @@ export function getBestDishPattern(
       language,
       excludeTitles,
       excludeTemplateKeys,
+      excludeCookingMethods,
+      excludeDessertCategories,
+    })
+  }
+
+  if (recipeType === 'soup_stew') {
+    return getBestSoupPattern(userIngredientsRaw, {
+      category,
+      language,
+      excludeTitles,
+      excludeTemplateKeys,
+      excludeCookingMethods,
     })
   }
 
@@ -125,6 +145,7 @@ export function getBestDishPattern(
     language,
     excludeTitles,
     excludeTemplateKeys,
+    excludeCookingMethods,
   })
   if (mealPattern) return mealPattern
 
@@ -171,6 +192,12 @@ export function buildPatternIngredients(
 ) {
   if (!pattern) return []
   if (pattern.userQuantities) {
+    if (REALISTIC_SOUP_PATTERNS.some((item) => item.id === pattern.id)) {
+      return buildSoupIngredientList(pattern, filteredUserIngredients, displayNames, {
+        language,
+        pantryLabel,
+      })
+    }
     if (pattern.recipeType === 'meal' || REALISTIC_MEAL_PATTERNS.some((item) => item.id === pattern.id)) {
       return buildMealIngredientList(pattern, filteredUserIngredients, displayNames, {
         language,
@@ -193,3 +220,4 @@ export function buildPatternIngredients(
 
 export { buildRealisticDessertFromPattern } from './dessertRecipeBuilder'
 export { buildRealisticMealFromPattern, getBestMealPattern } from './mealRecipeBuilder'
+export { buildRealisticSoupFromPattern, getBestSoupPattern } from './soupRecipeBuilder'

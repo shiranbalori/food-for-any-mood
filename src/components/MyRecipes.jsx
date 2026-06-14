@@ -11,6 +11,7 @@ import {
 } from '../services/userRecipeService'
 import AuthModal from './AuthModal'
 import PrivateRecipeFormModal from './PrivateRecipeFormModal'
+import { sanitizeIngredientLine } from '../utils/ingredientFormatting'
 import './MyRecipes.css'
 
 export default function MyRecipes({ onRecipesChanged }) {
@@ -257,7 +258,7 @@ export default function MyRecipes({ onRecipesChanged }) {
                   <h4>{t('ingredientsLabel')}</h4>
                   <ul>
                     {recipe.ingredients.map((item) => (
-                      <li key={item}>{item}</li>
+                      <li key={item}>{sanitizeIngredientLine(item)}</li>
                     ))}
                   </ul>
                   <h4>{t('cookingSteps')}</h4>

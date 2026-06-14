@@ -14,7 +14,7 @@ import {
 } from './ingredientRelevance'
 import { applyDescriptiveDishTitle, validateDishTitle } from './recipeTitle'
 import { applyRecipeQuantities } from './recipeQuantities'
-import { sanitizeIngredientList, sanitizeRecipeSteps, stripIngredientBullets, isValidIngredientLine, lightSanitizeRecipeSteps } from './ingredientFormatting'
+import { sanitizeIngredientList, sanitizeRecipeSteps, stripIngredientBullets, isValidIngredientLine, lightSanitizeRecipeSteps, stripIngredientSystemLabels } from './ingredientFormatting'
 import {
   formatStepIngredientList,
   hasUnnaturalStepPhrasing,
@@ -50,16 +50,8 @@ import { isBasicPantryMarkedLine, stripBasicPantryLabel } from './dessertRecipeB
 
 const SPLIT_PATTERN = /\s*(?:,|;|\n|\+|\band\b|\&|\u05d5(?=\s[\u0590-\u05FFa-z]))\s*/i
 
-const PAREN_SUFFIX = /\s*\([^)]*\)\s*$/
-
-function extractBasicPantrySuffix(text) {
-  if (!isBasicPantryMarkedLine(text)) return ''
-  return String(text ?? '').match(PAREN_SUFFIX)?.[0]?.trim() ?? ''
-}
-
 function stripIngredientParenthetical(text) {
-  if (isBasicPantryMarkedLine(text)) return stripBasicPantryLabel(text)
-  return String(text ?? '').replace(PAREN_SUFFIX, '').trim()
+  return stripIngredientSystemLabels(String(text ?? ''))
 }
 
 const SORTED_LABEL_KEYS = Object.keys(INGREDIENT_LABELS_HE).sort((a, b) => b.length - a.length)
@@ -139,16 +131,15 @@ export function toHebrewIngredient(raw, language = 'he') {
   const trimmed = stripIngredientBullets(String(raw ?? '').trim())
   if (!trimmed || !isValidIngredientLine(trimmed)) return ''
 
-  if (language !== 'he') return trimmed
+  if (language !== 'he') return stripIngredientSystemLabels(trimmed)
 
-  const pantrySuffix = extractBasicPantrySuffix(trimmed)
   const withoutSuffix = stripIngredientParenthetical(trimmed)
   const measured = parseAnyLeadingMeasurement(withoutSuffix)
   const localized = measured
     ? formatHebrewMeasurement(measured.qty, measured.unit, toHebrewIngredientName(measured.name))
     : toHebrewIngredientName(withoutSuffix)
 
-  return pantrySuffix ? `${localized} ${pantrySuffix}`.trim() : localized
+  return localized
 }
 
 /**
@@ -162,14 +153,6 @@ export function splitIngredientEntry(raw) {
     .split(SPLIT_PATTERN)
     .map((part) => stripIngredientParenthetical(part))
     .filter((part) => part && isValidIngredientLine(part))
-    .map((part, _, parts) => {
-      const originalPart = String(raw ?? '')
-        .split(SPLIT_PATTERN)
-        .map((entry) => entry.trim())
-        .find((entry) => stripIngredientParenthetical(entry) === part)
-      const pantrySuffix = extractBasicPantrySuffix(originalPart ?? part)
-      return pantrySuffix ? `${part} ${pantrySuffix}`.trim() : part
-    })
 }
 
 function dedupeIngredients(list) {
@@ -291,9 +274,9 @@ export function normalizeRecipeIngredients(
   ingredients = ensureUserIngredientsInList(userIngredients, ingredients, language)
   if (!preserveOriginalSteps) {
     steps = hebrewizeSteps(steps, ingredients, language)
+    ingredients = filterIngredientsUsedInSteps(ingredients, steps, userIngredients, language)
+    ingredients = ensureUserIngredientsInList(userIngredients, ingredients, language)
   }
-  ingredients = filterIngredientsUsedInSteps(ingredients, steps, userIngredients, language)
-  ingredients = ensureUserIngredientsInList(userIngredients, ingredients, language)
 
   return {
     ...recipe,
@@ -415,7 +398,7 @@ function validateRecipeQualityCore(userIngredients, recipe, language = 'he', opt
   const invalidOk = invalidIngredients.length === 0
   const userIngredientsOk = userExplicitMissing.length === 0
   const titleOk = titleValidation.ok
-  const groundingOk = userIngredients.length === 0 || grounding.ok
+  const groundingOk = userIngredients.length === 0 || grounding.titleOk
   const maxAllowedWeakSteps = (recipe.steps?.length ?? 0) >= 4 ? 1 : 0
   const stepsQualityOk =
     stepsAligned && unnaturalSteps.length === 0 && weakSteps.length <= maxAllowedWeakSteps
@@ -538,14 +521,16 @@ export function applyRecipeIngredientParser(recipe, userIngredientsRaw = '', lan
     preserveOriginalSteps,
     recipeType: options.recipeType ?? 'meal',
   })
-  const titled = applyDescriptiveDishTitle(normalized, {
-    cookingTime: options.cookingTime,
-    style: options.style,
-    language,
-    recipeType: options.recipeType ?? 'meal',
-    category: options.category ?? 'dairy',
-    userIngredients,
-  })
+  const titled = preserveOriginalSteps
+    ? normalized
+    : applyDescriptiveDishTitle(normalized, {
+        cookingTime: options.cookingTime,
+        style: options.style,
+        language,
+        recipeType: options.recipeType ?? 'meal',
+        category: options.category ?? 'dairy',
+        userIngredients,
+      })
   const quantified = skipRequantify
     ? titled
     : applyRecipeQuantities(titled, {
@@ -575,7 +560,7 @@ export function applyRecipeIngredientParser(recipe, userIngredientsRaw = '', lan
     cookTime: options.cookingTime ?? 30,
   })
 
-  if (userIngredients.length > 0) {
+  if (userIngredients.length > 0 && !preserveOriginalSteps) {
     tagged = repairRecipeGrounding(tagged, userIngredientsRaw, language, {
       excludeTitles: options.excludeTitles ?? [],
       recipeType: options.recipeType ?? 'meal',
@@ -584,6 +569,7 @@ export function applyRecipeIngredientParser(recipe, userIngredientsRaw = '', lan
   }
 
   if (
+    !preserveOriginalSteps &&
     userIngredients.length > 0 &&
     (options.recipeType ?? 'meal') !== 'dessert' &&
     (hasUnnaturalStepPhrasing(tagged.steps ?? [], language).length > 0 ||

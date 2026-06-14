@@ -71,6 +71,60 @@ html[dir='rtl'] .app__backend-notice {
   text-align: right;
 }
 
+.app__home-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  width: 100%;
+}
+
+.app__home-recipe-form {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  width: 100%;
+}
+
+.app__generation-result {
+  width: 100%;
+}
+
+.app__generation-result-title {
+  margin: 0 0 0.75rem;
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1.3;
+  color: var(--text);
+  text-align: start;
+}
+
+html[dir='rtl'] .app__generation-result-title {
+  text-align: right;
+}
+
+.app__generation-result .app__backend-notice {
+  margin: 0;
+}
+
+.app__home-community {
+  width: 100%;
+  margin-top: 0.15rem;
+  padding-top: 1.1rem;
+  border-top: 1px solid color-mix(in srgb, var(--glass-border, rgba(148, 163, 184, 0.28)) 85%, transparent);
+}
+
+.app__home-community .community-top5 {
+  margin-top: 0;
+}
+
+@media (min-width: 900px) {
+  .app__home-community {
+    margin-top: 0;
+    padding-top: 0;
+    border-top: none;
+  }
+}
+
 /* Premium buttons */
 .btn {
   position: relative;

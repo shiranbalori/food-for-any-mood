@@ -27,6 +27,9 @@ export const SYSTEM_PANTRY_CANONICAL = new Set([
   'cinnamon',
   'nutmeg',
   'ginger',
+  'carrot',
+  'lentils',
+  'lentil',
 ])
 
 /** Highlights for prompts — not allowed unless the user provided them. */

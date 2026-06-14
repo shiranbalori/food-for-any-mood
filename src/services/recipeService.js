@@ -1,4 +1,6 @@
 import { RECIPE_GENERATION_MODE } from '../config/recipeProvider'
+import { assessGenerationFeasibility } from '../utils/recipeGenerationPolicy.js'
+import { buildValidationFailureMessage } from '../utils/recipePreReturnValidation.js'
 import { generateAIRecipe } from './aiRecipeService'
 import { buildMockRecipe } from './mockRecipeProvider'
 
@@ -236,7 +238,27 @@ function toAppRecipe(recipe, meta) {
  */
 export async function generateAppRecipe(params, options = {}) {
   const normalized = normalizeGenerateParams(params)
-  const mergedOptions = { ...DEFAULT_OPTIONS, ...options }
+  const mergedOptions = { ...DEFAULT_OPTIONS, ...options, language: options.language ?? normalized.language ?? 'he' }
+
+  const feasibility = assessGenerationFeasibility(normalized.ingredients, {
+    recipeType: normalized.recipeType,
+    category: normalized.category,
+    isGlutenFree: normalized.isGlutenFree,
+    language: mergedOptions.language,
+  })
+  if (!feasibility.recipePossible) {
+    const { reason, missingIngredients } = buildValidationFailureMessage({}, feasibility, {
+      language: mergedOptions.language,
+    })
+    return {
+      recipe: null,
+      recipePossible: false,
+      impossibleReason: reason,
+      missingIngredients,
+      fallbackReason: null,
+    }
+  }
+
   const result = reconcileGenerationResult(await generateWithActiveProvider(normalized, mergedOptions))
 
   if (result.recipePossible === false || !validateGeneratedRecipe(result.recipe)) {

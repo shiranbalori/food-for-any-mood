@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { getTheme } from '../utils/themes'
 import { useLanguage } from '../i18n/useLanguage'
+import { sanitizeIngredientLine } from '../utils/ingredientFormatting'
 import SpiceLevel from './SpiceLevel'
 import './SavedRecipes.css'
 
@@ -140,7 +141,7 @@ export default function SavedRecipes({
                           <h4 className="saved-card__community-section">{t('ingredients')}</h4>
                           <ul className="saved-card__community-list">
                             {recipe.ingredients.map((item, i) => (
-                              <li key={i}>{item}</li>
+                              <li key={i}>{sanitizeIngredientLine(item)}</li>
                             ))}
                           </ul>
                         </>

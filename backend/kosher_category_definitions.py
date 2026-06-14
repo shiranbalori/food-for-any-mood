@@ -46,9 +46,12 @@ def build_kosher_rules_he(*, category: str, category_label: str) -> str:
     return f"""
 כללי כשרות (חובה — קטגוריה שנבחרה: {category_label} / {category}):
 {KOSHER_CATEGORY_DEFINITIONS_HE.strip()}
-- אם אין במרכיבי המשתמש מוצרי חלב/בשר המתאימים לקטגוריה — אל תמציא חלב, גבינה, בשר או דג.
-- בנה את המתכון הטוב ביותר מהמרכיבים בפועל; המערכת תסווג את הקטגוריה הסופית לפי המנה.
-- המרכיבים שהמשתמש הזין הם מקור האמת — לא קטגוריה או מצב רוח.
+- הקטגוריה ({category_label}) היא דרישת פלט — המתכון הסופי חייב להתאים אליה.
+- המשתמש/ת לא חייב/ת להזין מרכיבים מסוג הקטגוריה — בנה/י מהמרכיבים שהוזנו והוסף/י מרכיבי מזוון סבירים לפי הצורך.
+- חלבי: אם חסרים מוצרי חלב — הוסף/י גבינה, חלב, חמאה או שמנת (מרכיב מזווה בסיסי).
+- בשרי: אם חסר בשר/עוף/דג — הוסף/י עוף, בשר או דג מתאים (מרכיב מזווה בסיסי).
+- פרווה/טבעוני: המתכון חייב להישאר ללא המוצרים האסורים בקטגוריה.
+- חסימת קלט רק בסתירות קשות (טבעוני+מוצרים מהחי, בשר+חלב יחד) — לא כי חסר מרכיב מסוג הקטגוריה.
 """
 
 
@@ -62,7 +65,10 @@ KOSHER RULES — no preference:
     return f"""
 KOSHER RULES (mandatory — selected category: {category_label} / {category}):
 {KOSHER_CATEGORY_DEFINITIONS_EN.strip()}
-- If user ingredients lack dairy/meat for the selected category — do NOT invent milk, cheese, or meat.
-- Build the best recipe from actual ingredients; final category is inferred from the dish.
-- User ingredients are the source of truth — not category or mood alone.
+- The selected category ({category_label}) is an OUTPUT requirement — the final recipe must match it.
+- Users do NOT need to enter ingredients from that category — build from what they listed and add reasonable pantry staples as needed.
+- Dairy: if dairy is missing, add cheese, milk, butter, or cream as needed.
+- Meat: if meat/fish/poultry is missing, add chicken, beef, or fish as appropriate.
+- Parve/vegan: the dish must stay free of forbidden products for that category.
+- Block input only on hard conflicts (vegan + animal products, meat + dairy together) — not because category-type ingredients are missing.
 """

@@ -1,10 +1,7 @@
-"""Validate that user ingredients match the selected kosher category.
+"""Input category constraints — output category is enforced after generation.
 
-Definitions:
-- dairy: milk, cheese, yogurt, cream, butter (no meat/fish/poultry).
-- meat: meat, chicken, turkey, fish (no dairy).
-- parve: neither dairy nor meat.
-- any: no user preference; category inferred after generation.
+Users may enter any normal food ingredients for any category.
+Only hard conflicts block generation (gluten-free+gluten, meat+dairy together, vegan+animal).
 """
 
 from __future__ import annotations
@@ -25,6 +22,7 @@ CATEGORY_LABELS = {
 
 
 def build_category_mismatch_message(category: str, *, language: str) -> str:
+    """Legacy message — kept for scripts; generation no longer blocks on category mismatch."""
     labels = CATEGORY_LABELS["he" if language == "he" else "en"]
     label = labels.get(category)
     if label:
@@ -32,10 +30,6 @@ def build_category_mismatch_message(category: str, *, language: str) -> str:
             return f"המרכיבים שהוזנו אינם תואמים לקטגוריה {label}"
         return f"The ingredients you entered do not match the {label} category"
     return CATEGORY_MISMATCH_MESSAGE["he"] if language == "he" else CATEGORY_MISMATCH_MESSAGE["en"]
-
-
-def _category_mismatch_reason(*, category: str, language: str) -> str:
-    return build_category_mismatch_message(category, language=language)
 
 DAIRY_CANON = frozenset(
     {
@@ -92,6 +86,59 @@ MEAT_TEXT = re.compile(
 EGG_TEXT = re.compile(r"ביצ|\begg\b|\beggs\b", re.IGNORECASE)
 HONEY_TEXT = re.compile(r"דבש|\bhoney\b", re.IGNORECASE)
 
+SPICE_ONLY_CANON = frozenset(
+    {
+        "salt",
+        "pepper",
+        "black pepper",
+        "cinnamon",
+        "vanilla",
+        "nutmeg",
+        "paprika",
+        "cumin",
+        "oregano",
+        "basil",
+        "thyme",
+        "ginger",
+    }
+)
+
+
+def build_vegan_conflict_message(conflicting_ingredients: list[str], *, language: str) -> str:
+    is_he = language == "he"
+    sample = ", ".join(conflicting_ingredients[:2])
+    if is_he:
+        return (
+            f"בחרתם טבעוני, אבל הוזנו מרכיבים מן החי ({sample}) — "
+            "מתכון טבעוני לא יכול לכלול עוף, בשר, חלב, ביצים או דבש."
+            if sample
+            else "בחרתם טבעוני, אבל הוזנו מרכיבים מן החי — מתכון טבעוני לא יכול לכלול מוצרים מהחי."
+        )
+    return (
+        f"You selected vegan, but entered animal ingredients ({sample}) — "
+        "a vegan recipe cannot include meat, dairy, eggs, or honey."
+        if sample
+        else "You selected vegan, but entered animal ingredients — a vegan recipe cannot include animal products."
+    )
+
+
+def build_meat_dairy_conflict_message(*, language: str) -> str:
+    return (
+        "לא ניתן לבחור קטגוריה אחת — יש גם בשר/עוף וגם מוצרי חלב. הסירו קבוצה אחת."
+        if language == "he"
+        else "Cannot pick one category — you have both meat/poultry and dairy. Remove one group."
+    )
+
+
+def build_gluten_free_conflict_message(*, language: str) -> str:
+    return (
+        "בחרתם «ללא גלוטן» אבל יש במרכיבים מוצרים עם גלוטן (למשל קמח, פסטה או לחם). "
+        "הסירו אותם או בטלו את סימון ללא גלוטן."
+        if language == "he"
+        else "Gluten-free is selected but your ingredients include gluten (e.g. flour, pasta, or bread). "
+        "Remove them or turn off gluten-free."
+    )
+
 
 def _ingredient_profile(user_ingredients: list[str]) -> dict:
     canons: list[str] = []
@@ -120,6 +167,8 @@ def _ingredient_profile(user_ingredients: list[str]) -> dict:
         "has_eggs": has_eggs,
         "has_honey": has_honey,
         "has_gluten": has_gluten,
+        "only_spices": bool(canons)
+        and all(c in SPICE_ONLY_CANON or c in {"oil", "olive oil", "water"} for c in canon_set),
     }
 
 
@@ -144,80 +193,34 @@ def assess_category_fit(
     is_gluten_free: bool = False,
     language: str = "he",
 ) -> dict:
+    """Hard input constraints only — never reject because category lacks matching ingredients."""
     user_ingredients = parse_user_ingredients(user_ingredients_raw)
-    if not user_ingredients:
-        suggested = "parve" if category == "any" else category
-        return {"category_ok": True, "reason": "", "suggested_category": suggested, "missing_ingredients": []}
-
-    profile = _ingredient_profile(user_ingredients)
     is_he = language == "he"
-    suggested = _suggest_category(profile)
+    profile = _ingredient_profile(user_ingredients)
+    suggested = _suggest_category(profile) if category == "any" else category
 
-    if category == "any":
-        if is_gluten_free and profile["has_gluten"]:
-            gluten_items = [item for item in user_ingredients if canonical_ingredient(item) in GLUTEN_CANON]
-            return {
-                "category_ok": False,
-                "reason": (
-                    "בחרתם «ללא גלוטן» אבל יש במרכיבים מוצרים עם גלוטן (למשל קמח, פסטה או לחם). "
-                    "הסירו אותם או בטלו את סימון ללא גלוטן."
-                    if is_he
-                    else "Gluten-free is selected but your ingredients include gluten (e.g. flour, pasta, or bread). "
-                    "Remove them or turn off gluten-free."
-                ),
-                "suggested_category": suggested,
-                "missing_ingredients": gluten_items[:4],
-            }
-        return {"category_ok": True, "reason": "", "suggested_category": suggested, "missing_ingredients": []}
+    if not user_ingredients:
+        return {
+            "category_ok": True,
+            "reason": "",
+            "suggested_category": suggested if category != "any" else "parve",
+            "missing_ingredients": [],
+        }
 
     if is_gluten_free and profile["has_gluten"]:
         gluten_items = [item for item in user_ingredients if canonical_ingredient(item) in GLUTEN_CANON]
         return {
             "category_ok": False,
-            "reason": (
-                "בחרתם «ללא גלוטן» אבל יש במרכיבים מוצרים עם גלוטן (למשל קמח, פסטה או לחם). "
-                "הסירו אותם או בטלו את סימון ללא גלוטן."
-                if is_he
-                else "Gluten-free is selected but your ingredients include gluten (e.g. flour, pasta, or bread). "
-                "Remove them or turn off gluten-free."
-            ),
-            "suggested_category": suggested,
+            "reason": build_gluten_free_conflict_message(language=language),
+            "suggested_category": _suggest_category(profile),
             "missing_ingredients": gluten_items[:4],
         }
 
     if profile["has_land_meat"] and profile["has_dairy"]:
         return {
             "category_ok": False,
-            "reason": (
-                "לא ניתן לבחור קטגוריה אחת — יש גם בשר/עוף וגם מוצרי חלב. הסירו קבוצה אחת."
-                if is_he
-                else "Cannot pick one category — you have both meat/poultry and dairy. Remove one group."
-            ),
-            "suggested_category": suggested,
-            "missing_ingredients": [],
-        }
-
-    if category == "dairy" and not profile["has_dairy"]:
-        return {
-            "category_ok": False,
-            "reason": _category_mismatch_reason(category=category, language=language),
-            "suggested_category": suggested,
-            "missing_ingredients": [],
-        }
-
-    if category == "meat" and not profile["has_meat"]:
-        return {
-            "category_ok": False,
-            "reason": _category_mismatch_reason(category=category, language=language),
-            "suggested_category": suggested,
-            "missing_ingredients": [],
-        }
-
-    if category == "parve" and (profile["has_land_meat"] or profile["has_dairy"]):
-        return {
-            "category_ok": False,
-            "reason": _category_mismatch_reason(category=category, language=language),
-            "suggested_category": suggested,
+            "reason": build_meat_dairy_conflict_message(language=language),
+            "suggested_category": _suggest_category(profile),
             "missing_ingredients": [],
         }
 
@@ -240,7 +243,7 @@ def assess_category_fit(
         ]
         return {
             "category_ok": False,
-            "reason": _category_mismatch_reason(category=category, language=language),
+            "reason": build_vegan_conflict_message(vegan_conflicts, language=language),
             "suggested_category": "parve",
             "missing_ingredients": vegan_conflicts[:4],
         }
@@ -248,6 +251,6 @@ def assess_category_fit(
     return {
         "category_ok": True,
         "reason": "",
-        "suggested_category": category,
+        "suggested_category": suggested if category != "any" else _suggest_category(profile),
         "missing_ingredients": [],
     }

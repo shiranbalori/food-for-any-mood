@@ -487,6 +487,23 @@ function finalizeRecipeForUser(userInput, recipe, meta = {}) {
   }
 }
 
+function isLegacyInputCategoryMismatchReason(reason) {
+  return /אינם תואמים לקטגוריה|do not match the .* category/i.test(String(reason ?? ''))
+}
+
+function genericGenerationFailureReason(language) {
+  return language === 'he'
+    ? 'לא הצלחנו ליצור מתכון אמין מהמרכיבים — נסו שוב בעוד רגע.'
+    : 'We could not build a reliable recipe from these ingredients — please try again shortly.'
+}
+
+function resolveFallbackFailureReason(backendReason, language) {
+  if (isLegacyInputCategoryMismatchReason(backendReason)) {
+    return genericGenerationFailureReason(language)
+  }
+  return backendReason || genericGenerationFailureReason(language)
+}
+
 const MAX_PREFERENCE_MOCK_ATTEMPTS = 24
 
 function getFailedValidationChecks(validation) {
@@ -780,7 +797,7 @@ async function generateAIRecipeCore(userInput) {
       return {
         recipe: null,
         recipePossible: false,
-        impossibleReason: backendResult.impossibleReason,
+        impossibleReason: resolveFallbackFailureReason(backendResult.impossibleReason, normalized.language),
         missingIngredients: backendResult.missingIngredients ?? [],
         fallbackReason: null,
       }
