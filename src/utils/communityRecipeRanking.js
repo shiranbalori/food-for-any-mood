@@ -137,3 +137,19 @@ export function getWeeklyTopCommunityRecipes(recipes, limit = 5, referenceDate =
     })
     .slice(0, limit)
 }
+
+/**
+ * Recipes for the Top 5 strip: prefer current-week ranking, otherwise show top available.
+ * Empty only when the fetched list has no recipes.
+ * @param {ReturnType<typeof enrichCommunityRecipe>[]} recipes
+ * @param {number} [limit=5]
+ * @param {Date} [referenceDate]
+ */
+export function getCommunityTop5DisplayRecipes(recipes, limit = 5, referenceDate = new Date()) {
+  if (!recipes?.length) return []
+
+  const weekly = getWeeklyTopCommunityRecipes(recipes, limit, referenceDate)
+  if (weekly.length > 0) return weekly
+
+  return sortCommunityRecipesByCategory(recipes, COMMUNITY_RECIPE_CATEGORIES.popular).slice(0, limit)
+}

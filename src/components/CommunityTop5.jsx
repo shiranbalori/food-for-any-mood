@@ -9,7 +9,7 @@ import {
   saveCommunityRecipe,
 } from '../utils/storage'
 import { addFavoriteCommunityRecipe, removeFavoriteRecipe } from '../utils/favoritesStorage'
-import { getWeeklyTopCommunityRecipes } from '../utils/communityRecipeRanking'
+import { getCommunityTop5DisplayRecipes } from '../utils/communityRecipeRanking'
 import { getTheme } from '../utils/themes'
 import AuthModal from './AuthModal'
 import './CommunityTop5.css'
@@ -47,7 +47,7 @@ export default function CommunityTop5({
   const [localSaved, setLocalSaved] = useState({})
 
   useEffect(() => {
-    if (recipesProp) {
+    if (recipesProp != null) {
       setLoading(false)
       return undefined
     }
@@ -80,7 +80,7 @@ export default function CommunityTop5({
   const sourceRecipes = recipesProp ?? fetchedRecipes
 
   const recipes = useMemo(
-    () => getWeeklyTopCommunityRecipes(sourceRecipes, 5),
+    () => getCommunityTop5DisplayRecipes(sourceRecipes, 5),
     [sourceRecipes],
   )
 
@@ -180,7 +180,7 @@ export default function CommunityTop5({
         {t('communityWeeklyTop5Title')}
       </h2>
 
-      {recipes.length === 0 ? (
+      {sourceRecipes.length === 0 ? (
         <p className="community-top5__empty">{t('communityWeeklyTop5Empty')}</p>
       ) : (
         <div className="community-top5__strip" role="list">
