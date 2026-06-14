@@ -237,6 +237,10 @@
     min-height: 42px;
     padding: 0.65rem 1rem;
   }
+
+  .recipe-form__meta-grid--mood-hidden .recipe-form__field--servings-only {
+    margin-bottom: 0;
+  }
 }
 
 @media (max-width: 480px) {

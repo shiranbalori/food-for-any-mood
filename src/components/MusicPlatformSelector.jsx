@@ -27,7 +27,7 @@ const PLATFORMS = [
   },
 ]
 
-export default function MusicPlatformSelector({ selected, onChange, theme }) {
+export default function MusicPlatformSelector({ selected, onChange, allowDeselect = false, theme }) {
   const { t } = useLanguage()
 
   return (
@@ -48,7 +48,13 @@ export default function MusicPlatformSelector({ selected, onChange, theme }) {
             className={`music-platform__card music-platform__card--${platform.id} ${
               selected === platform.id ? 'music-platform__card--active' : ''
             }`}
-            onClick={() => onChange(platform.id)}
+            onClick={() => {
+              if (allowDeselect && selected === platform.id) {
+                onChange(null)
+                return
+              }
+              onChange(platform.id)
+            }}
             aria-pressed={selected === platform.id}
           >
             {platform.icon}

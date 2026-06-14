@@ -350,6 +350,12 @@
     align-items: start;
   }
 
+  .app__home-kitchen .recipe-form__meta-grid--mood-hidden {
+    grid-template-areas:
+      'time time'
+      'servings servings';
+  }
+
   .app__home-kitchen .recipe-form__field--time {
     grid-area: time;
     margin-bottom: 0;

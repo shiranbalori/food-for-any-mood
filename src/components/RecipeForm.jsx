@@ -7,7 +7,14 @@ import './RecipeForm.css'
 
 const SERVING_OPTIONS = [1, 2, 4, 6, 8]
 
-export default function RecipeForm({ form, onChange, onSubmit, disabled, theme }) {
+export default function RecipeForm({
+  form,
+  onChange,
+  onSubmit,
+  disabled,
+  theme,
+  showMoodSection = true,
+}) {
   const { t } = useLanguage()
 
   return (
@@ -53,7 +60,11 @@ export default function RecipeForm({ form, onChange, onSubmit, disabled, theme }
       </div>
 
       <div className="recipe-form__controls">
-        <div className="recipe-form__meta-grid">
+        <div
+          className={`recipe-form__meta-grid${
+            showMoodSection ? '' : ' recipe-form__meta-grid--mood-hidden'
+          }`}
+        >
           <div className="recipe-form__field recipe-form__field--time">
             <label htmlFor="time">
               {t('timeLabel')}: <strong>{t('timeMinutes', { count: form.time })}</strong>
@@ -73,25 +84,31 @@ export default function RecipeForm({ form, onChange, onSubmit, disabled, theme }
             </div>
           </div>
 
-          <div className="recipe-form__field recipe-form__field--mood">
-            <label>{t('moodLabel')}</label>
-            <div className="mood-grid">
-              {MOODS.map((mood) => (
-                <button
-                  key={mood.id}
-                  type="button"
-                  className={`mood-chip ${form.mood === mood.id ? 'mood-chip--active' : ''}`}
-                  onClick={() => onChange('mood', mood.id)}
-                  aria-pressed={form.mood === mood.id}
-                >
-                  <span>{mood.emoji}</span>
-                  {t(`moods.${mood.id}`)}
-                </button>
-              ))}
+          {showMoodSection && (
+            <div className="recipe-form__field recipe-form__field--mood">
+              <label>{t('moodLabel')}</label>
+              <div className="mood-grid">
+                {MOODS.map((mood) => (
+                  <button
+                    key={mood.id}
+                    type="button"
+                    className={`mood-chip ${form.mood === mood.id ? 'mood-chip--active' : ''}`}
+                    onClick={() => onChange('mood', mood.id)}
+                    aria-pressed={form.mood === mood.id}
+                  >
+                    <span>{mood.emoji}</span>
+                    {t(`moods.${mood.id}`)}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
 
-          <div className="recipe-form__field recipe-form__field--servings">
+          <div
+            className={`recipe-form__field recipe-form__field--servings${
+              showMoodSection ? '' : ' recipe-form__field--servings-only'
+            }`}
+          >
             <label>{t('servingsLabel')}</label>
             <div className="servings-row">
               {SERVING_OPTIONS.map((count) => (

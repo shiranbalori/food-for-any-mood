@@ -32,6 +32,7 @@ import { userSubmittedToday } from './services/dailyChallengeService'
 import { useLanguage } from './i18n/useLanguage'
 import { getTheme } from './utils/themes'
 import { generateAppRecipe } from './services/recipeService'
+import { useIsMobileLayout } from './hooks/useIsMobileLayout'
 import { regenerateRecipeSteps } from './services/regenerateStepsService'
 import { upgradeRecipe } from './services/recipeUpgradeService'
 import { fetchMoreRecipeIdeas } from './services/recipeIdeasService'
@@ -84,14 +85,22 @@ const INITIAL_FORM = {
   servings: 4,
 }
 
+function createInitialForm(isMobileLayout) {
+  return {
+    ...INITIAL_FORM,
+    musicPlatform: isMobileLayout ? null : INITIAL_FORM.musicPlatform,
+  }
+}
+
 export default function App() {
   const { t, language } = useLanguage()
+  const isMobileLayout = useIsMobileLayout()
   const { user, isAuthenticated, getPublicDisplayName } = useAuth()
   const publicDisplayName = usePublicDisplayName()
   const [myRecipesCount, setMyRecipesCount] = useState(0)
   const [category, setCategory] = useState('dairy')
   const [recipeType, setRecipeType] = useState('meal')
-  const [form, setForm] = useState(INITIAL_FORM)
+  const [form, setForm] = useState(() => createInitialForm(isMobileLayout))
   const [recipe, setRecipe] = useState(null)
   const [loading, setLoading] = useState(false)
   const [savedRecipes, setSavedRecipes] = useState(getSavedRecipes)
@@ -138,6 +147,11 @@ export default function App() {
   useEffect(() => {
     recipeRef.current = recipe
   }, [recipe])
+
+  useEffect(() => {
+    if (isMobileLayout) return
+    setForm((prev) => (prev.musicPlatform ? prev : { ...prev, musicPlatform: 'spotify' }))
+  }, [isMobileLayout])
 
   const getNavigationSnapshot = useCallback(
     (overrides = {}) => ({
@@ -329,6 +343,15 @@ export default function App() {
   const handleFormChange = (field, value) => {
     setForm((prev) => ({ ...prev, [field]: value }))
   }
+
+  const handleMusicPlatformChange = (platformId) => {
+    setForm((prev) => ({ ...prev, musicPlatform: platformId }))
+  }
+
+  const showMoodSection =
+    !isMobileLayout ||
+    form.musicPlatform === 'spotify' ||
+    form.musicPlatform === 'youtube'
 
   const handleGenerate = useCallback(
     async (options = {}) => {
@@ -823,7 +846,8 @@ export default function App() {
 
                 <MusicPlatformSelector
                   selected={form.musicPlatform}
-                  onChange={(value) => handleFormChange('musicPlatform', value)}
+                  onChange={handleMusicPlatformChange}
+                  allowDeselect={isMobileLayout}
                   theme={theme}
                 />
               </div>
@@ -836,6 +860,7 @@ export default function App() {
                 onSubmit={() => handleGenerate()}
                 disabled={loading}
                 theme={theme}
+                showMoodSection={showMoodSection}
               />
             </div>
 
