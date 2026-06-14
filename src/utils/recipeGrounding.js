@@ -8,6 +8,8 @@ import {
 import { getSystemPantryItems, isSystemPantryIngredient } from './ingredientAllowlist'
 import { ingredientAppearsInText, parseUserIngredients } from './ingredientRelevance'
 import { stripQuantityPrefix } from './measurementUnits'
+import { buildDessertDishTitle } from './dessertDishTitle'
+import { isValidDessertTitle, pickGuaranteedDessertTitle } from './recipeTypeGuard'
 
 const QTY_PREFIX =
   /^[\d./]+\s*(?:כפית|כפיות|כף|כפות|גרם|מ"ל|כוס|כוסות|tsp|tbsp|gram|grams|g|ml|cup|cups)?\s*/i
@@ -125,6 +127,14 @@ export function findTextIngredientViolations(text, recipeIngredients = [], userI
 
     const inRecipe = canonicalInIngredientList(canon, recipeIngredients)
     const allowedHelper = isAllowedHelperCanonical(canon, userIngredients)
+    const userCanonSet = new Set(
+      userIngredients.map((item) => canonicalIngredient(stripQty(item))).filter(Boolean),
+    )
+    const genericCheeseOnly =
+      userCanonSet.has('cheese') && !userCanonSet.has('feta') && !userCanonSet.has('parmesan')
+    const specificCheeseInTitle =
+      genericCheeseOnly && (canon === 'feta' || canon === 'parmesan' || canon === 'ricotta')
+    if (specificCheeseInTitle) continue
     if (!inRecipe && !allowedHelper) {
       violations.push({ canonical: canon, matchedTerm })
     }
@@ -345,9 +355,22 @@ export function repairRecipeGrounding(recipe, userIngredientsRaw, language = 'he
 
   const titleCheck = validateTitleGrounding(name, recipeIngredients, userIngredients, language)
   if (!titleCheck.ok) {
-    name = buildGroundedChefTitle(userIngredients, recipeIngredients, language, {
-      excludeTitles: options.excludeTitles ?? [],
-    })
+    const recipeType = options.recipeType ?? 'meal'
+    const category = options.category ?? 'dairy'
+    if (
+      recipeType === 'dessert' &&
+      isValidDessertTitle(name, recipeIngredients, language)
+    ) {
+      // Keep grounded dessert dish titles (e.g. עוגת גבינה) even when strict title grounding fails.
+    } else if (recipeType === 'dessert') {
+      name =
+        pickGuaranteedDessertTitle(category, language, recipeIngredients) ??
+        buildDessertDishTitle(recipeIngredients, { language }).name
+    } else {
+      name = buildGroundedChefTitle(userIngredients, recipeIngredients, language, {
+        excludeTitles: options.excludeTitles ?? [],
+      })
+    }
   }
 
   const descriptionCheck = validateDescriptionGrounding(description, recipeIngredients, userIngredients, language)

@@ -24,9 +24,8 @@ import { buildGroundedChefTitle, buildGroundedSoupStewTitle, validateTitleGround
 import { isLiteralIngredientTitle } from '../utils/recipeTitle'
 import { buildDessertDishTitle } from '../utils/dessertDishTitle'
 import {
-  buildPatternSteps,
+  buildRealisticDessertFromPattern,
   getBestDishPattern,
-  getDishPatternName,
 } from '../utils/recipeDishPatterns'
 import { buildChefIntro } from '../utils/chefIntro'
 import { buildStepsFromUserIngredients } from '../utils/userIngredientSteps'
@@ -1315,6 +1314,8 @@ function finalizeRecipe(recipe, ingredientsRaw, language, meta = {}) {
     isGlutenFree: meta.isGlutenFree ?? false,
     spiceLevel: recipe.spiceLevel ?? 0,
     source: 'mock',
+    preserveOriginalSteps: Boolean(meta.preserveOriginalSteps),
+    skipRequantify: Boolean(meta.skipRequantify),
   })
   return parsed
 }
@@ -1634,6 +1635,7 @@ export function buildIngredientFirstFallbackRecipe(
     excludeTitles = [],
     excludeCookingMethods = [],
     excludeDessertCategories = [],
+    excludeTemplateKeys = [],
   } = {},
 ) {
   const kosherCategory = resolveTemplateCategory(category, ingredients)
@@ -1670,7 +1672,7 @@ export function buildIngredientFirstFallbackRecipe(
   }
 
   const ingredientList = [...displayNames]
-  const finalIngredients = isGlutenFree
+  let finalIngredients = isGlutenFree
     ? applyGlutenFreeToIngredientList(ingredientList, language)
     : ingredientList
 
@@ -1688,6 +1690,9 @@ export function buildIngredientFirstFallbackRecipe(
 
   let name
   let recipeSteps = steps
+  let dishPattern = null
+  let precomputedNutrition = null
+  let precomputedHealthScore = null
   if (effectiveRecipeType === 'dessert' && hasRegenerationConstraints) {
     const variant = pickAlternateDessertVariant({
       ingredients: finalIngredients,
@@ -1700,13 +1705,26 @@ export function buildIngredientFirstFallbackRecipe(
     name = variant.name
     recipeSteps = variant.steps
   } else if (effectiveRecipeType === 'dessert') {
-    const pattern = getBestDishPattern(filteredUserIngredients, {
+    dishPattern = getBestDishPattern(filteredUserIngredients, {
       recipeType: 'dessert',
       category: kosherCategory,
+      language,
+      excludeTitles,
+      excludeTemplateKeys,
     })
-    if (pattern) {
-      name = getDishPatternName(pattern, language)
-      recipeSteps = buildPatternSteps(pattern, { language, cookingTime }) ?? steps
+    if (dishPattern) {
+      const built = buildRealisticDessertFromPattern(dishPattern, {
+        filteredUserIngredients,
+        displayNames,
+        language,
+        cookingTime,
+        servings,
+      })
+      name = built.name
+      recipeSteps = built.steps
+      finalIngredients = built.ingredients
+      precomputedNutrition = built.nutrition
+      precomputedHealthScore = built.healthScore
     } else {
       name = buildDessertDishTitle(finalIngredients, { language }).name
     }
@@ -1757,28 +1775,30 @@ export function buildIngredientFirstFallbackRecipe(
     matchPercentage,
     spiceLevel: recipeType === 'dessert' ? 0 : kosherCategory === 'parve' ? 1 : 0,
     optionalUpgrades: buildOptionalUpgrades(filteredUserIngredients, { language, recipeType }),
-    nutrition: {
+    nutrition: precomputedNutrition ?? {
       calories: 360 + displayNames.length * 25,
       protein: 14 + displayNames.length * 2,
       carbs: 30 + displayNames.length * 3,
       fat: 16 + displayNames.length,
       servings,
     },
-    healthScore: calculateHealthScoreFromRecipe({
-      ingredients: finalIngredients,
-      calories: 360 + displayNames.length * 25,
-      protein: 14 + displayNames.length * 2,
-      carbs: 30 + displayNames.length * 3,
-      fat: 16 + displayNames.length,
-      servings,
-    }),
+    healthScore:
+      precomputedHealthScore ??
+      calculateHealthScoreFromRecipe({
+        ingredients: finalIngredients,
+        calories: 360 + displayNames.length * 25,
+        protein: 14 + displayNames.length * 2,
+        carbs: 30 + displayNames.length * 3,
+        fat: 16 + displayNames.length,
+        servings,
+      }),
     tags: cookingTime <= 25 ? ['quick'] : ['comfortFood'],
     playlist,
   }
 
   const meta = {
     id: `ingredient-fallback-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-    templateKey: 'ingredient-fallback',
+    templateKey: dishPattern?.id ?? 'ingredient-fallback',
     category,
     mood,
     cookingTime,
@@ -1796,6 +1816,8 @@ export function buildIngredientFirstFallbackRecipe(
     recipeType: effectiveRecipeType,
     category,
     isGlutenFree,
+    preserveOriginalSteps: effectiveRecipeType === 'dessert' && Boolean(dishPattern),
+    skipRequantify: effectiveRecipeType === 'dessert' && Boolean(precomputedNutrition),
   })
 
   const shouldEnrich =
@@ -1862,6 +1884,7 @@ function buildDessertMockRecipe(
         excludeTitles,
         excludeCookingMethods,
         excludeDessertCategories,
+        excludeTemplateKeys,
       },
     )
   }

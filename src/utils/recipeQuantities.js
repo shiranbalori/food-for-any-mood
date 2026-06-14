@@ -3,6 +3,7 @@ import { canonicalIngredient, normalizeIngredient } from '../data/ingredientKnow
 import {
   isNumericOnlyText,
   isValidIngredientLine,
+  lightSanitizeRecipeSteps,
   sanitizeIngredientList,
   sanitizeRecipeSteps,
   toReadableIngredientLine,
@@ -103,6 +104,9 @@ const QUANTITY_PROFILES = {
   flour: { unit: 'cup', base: 0.25, perServing: false },
   sugar: { unit: 'tbsp', base: 1, perServing: false },
   cinnamon: { unit: 'tsp', base: 0.5, perServing: false },
+  cocoa: { unit: 'tbsp', base: 2, perServing: false },
+  chocolate: { unit: 'gram', base: 100, perServing: false },
+  banana: { unit: 'whole', base: 2, perServing: false, wholeSingular: 'בננה', wholePlural: 'בננות' },
   honey: { unit: 'tbsp', base: 1, perServing: false },
   coffee: { unit: 'cup', base: 1, perServing: false },
   tahini: { unit: 'tbsp', base: 2, perServing: false },

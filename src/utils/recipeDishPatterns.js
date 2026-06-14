@@ -5,33 +5,14 @@
 
 import { canonicalIngredient } from '../data/ingredientKnowledge'
 import { parseUserIngredients } from './ingredientRelevance'
+import {
+  REALISTIC_DESSERT_PATTERNS,
+  buildDessertIngredientList,
+  buildRealisticDessertFromPattern,
+  getBestDessertPattern,
+} from './dessertRecipeBuilder'
 
-const DISH_PATTERNS = [
-  {
-    id: 'butter_cinnamon_cookies',
-    required: new Set(['flour', 'sugar', 'cinnamon', 'butter']),
-    recipeType: 'dessert',
-    nameHe: 'עוגיות חמאה וקינמון',
-    nameEn: 'Butter Cinnamon Cookies',
-    titleKeywordsHe: ['עוג', 'קינמון', 'חמאה', 'בצק'],
-    titleKeywordsEn: ['cookie', 'cake', 'cinnamon', 'butter'],
-    stepsHe: (bake) => [
-      'מחממים תנור ל-180 מעלות לפני שאופים את העוגיות.',
-      'מרככים חמאה ומערבבים עם סוכר וקינמון בקערה עד לתערובת אחידה.',
-      'מוסיפים קמח ולשים עד לקבלת בצק רך.',
-      `יוצרים עוגיות, מסדרים על תבנית ואופים בתנור ${bake} דקות עד פריך וזהוב.`,
-      'מקררים על רשת כמה דקות לפני ההגשה.',
-      'מקררים לגמרי ומגישים עם תה או קפה.',
-    ],
-    stepsEn: (bake) => [
-      'Preheat the oven to 180°C.',
-      'Soften butter and mix with sugar and cinnamon.',
-      'Add flour and mix until a soft dough forms.',
-      `Shape cookies and bake for about ${bake} minutes until crisp.`,
-      'Cool on a rack before serving.',
-      'Serve with tea or coffee.',
-    ],
-  },
+const MEAL_DISH_PATTERNS = [
   {
     id: 'creamy_mushroom_pasta',
     required: new Set(['pasta', 'cream', 'mushroom']),
@@ -76,6 +57,13 @@ const DISH_PATTERNS = [
   },
 ]
 
+const DESSERT_DISH_PATTERNS = REALISTIC_DESSERT_PATTERNS.map((pattern) => ({
+  ...pattern,
+  recipeType: 'dessert',
+}))
+
+const DISH_PATTERNS = [...MEAL_DISH_PATTERNS, ...DESSERT_DISH_PATTERNS]
+
 function canonicalizeIngredients(userIngredients) {
   const canons = new Set()
   for (const item of userIngredients) {
@@ -91,7 +79,41 @@ function scorePattern(pattern, canons) {
   return pattern.required.size * 10 + (canons.size - pattern.required.size <= 2 ? 2 : 0)
 }
 
-export function getBestDishPattern(userIngredientsRaw, { recipeType = 'meal', category = 'dairy' } = {}) {
+function isExcludedPatternTitle(pattern, language, excludeTitles = []) {
+  if (!excludeTitles.length) return false
+  const name = language === 'he' ? pattern.nameHe : pattern.nameEn
+  const normalized = String(name ?? '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+  return excludeTitles.some(
+    (title) =>
+      String(title ?? '')
+        .trim()
+        .toLowerCase()
+        .replace(/\s+/g, ' ') === normalized,
+  )
+}
+
+export function getBestDishPattern(
+  userIngredientsRaw,
+  {
+    recipeType = 'meal',
+    category = 'dairy',
+    language = 'he',
+    excludeTitles = [],
+    excludeTemplateKeys = [],
+  } = {},
+) {
+  if (recipeType === 'dessert') {
+    return getBestDessertPattern(userIngredientsRaw, {
+      category,
+      language,
+      excludeTitles,
+      excludeTemplateKeys,
+    })
+  }
+
   const userIngredients = Array.isArray(userIngredientsRaw)
     ? userIngredientsRaw
     : parseUserIngredients(userIngredientsRaw)
@@ -103,6 +125,9 @@ export function getBestDishPattern(userIngredientsRaw, { recipeType = 'meal', ca
 
   for (const pattern of DISH_PATTERNS) {
     if (pattern.recipeType !== recipeType) continue
+    if (pattern.category && pattern.category !== category) continue
+    if (excludeTemplateKeys.includes(pattern.id)) continue
+    if (isExcludedPatternTitle(pattern, language, excludeTitles)) continue
     const score = scorePattern(pattern, canons)
     if (score != null && score > bestScore) {
       bestScore = score
@@ -125,3 +150,25 @@ export function getDishPatternName(pattern, language = 'he') {
   if (!pattern) return ''
   return language === 'he' ? pattern.nameHe : pattern.nameEn
 }
+
+export function buildPatternIngredients(
+  pattern,
+  { language = 'he', filteredUserIngredients = [], displayNames = [], pantryLabel } = {},
+) {
+  if (!pattern) return []
+  if (pattern.userQuantities) {
+    return buildDessertIngredientList(pattern, filteredUserIngredients, displayNames, {
+      language,
+      pantryLabel,
+    })
+  }
+  if (language === 'he' && typeof pattern.ingredientsHe === 'function') {
+    return pattern.ingredientsHe()
+  }
+  if (language === 'en' && typeof pattern.ingredientsEn === 'function') {
+    return pattern.ingredientsEn()
+  }
+  return []
+}
+
+export { buildRealisticDessertFromPattern } from './dessertRecipeBuilder'

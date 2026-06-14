@@ -46,10 +46,21 @@ import {
   isSystemPantryIngredient,
   SYSTEM_PANTRY_CANONICAL,
 } from './ingredientAllowlist'
+import { isBasicPantryMarkedLine, stripBasicPantryLabel } from './dessertRecipeBuilder'
 
 const SPLIT_PATTERN = /\s*(?:,|;|\n|\+|\band\b|\&|\u05d5(?=\s[\u0590-\u05FFa-z]))\s*/i
 
 const PAREN_SUFFIX = /\s*\([^)]*\)\s*$/
+
+function extractBasicPantrySuffix(text) {
+  if (!isBasicPantryMarkedLine(text)) return ''
+  return String(text ?? '').match(PAREN_SUFFIX)?.[0]?.trim() ?? ''
+}
+
+function stripIngredientParenthetical(text) {
+  if (isBasicPantryMarkedLine(text)) return stripBasicPantryLabel(text)
+  return String(text ?? '').replace(PAREN_SUFFIX, '').trim()
+}
 
 const SORTED_LABEL_KEYS = Object.keys(INGREDIENT_LABELS_HE).sort((a, b) => b.length - a.length)
 
@@ -130,13 +141,14 @@ export function toHebrewIngredient(raw, language = 'he') {
 
   if (language !== 'he') return trimmed
 
-  const withoutSuffix = trimmed.replace(PAREN_SUFFIX, '').trim()
+  const pantrySuffix = extractBasicPantrySuffix(trimmed)
+  const withoutSuffix = stripIngredientParenthetical(trimmed)
   const measured = parseAnyLeadingMeasurement(withoutSuffix)
-  if (measured) {
-    return formatHebrewMeasurement(measured.qty, measured.unit, toHebrewIngredientName(measured.name))
-  }
+  const localized = measured
+    ? formatHebrewMeasurement(measured.qty, measured.unit, toHebrewIngredientName(measured.name))
+    : toHebrewIngredientName(withoutSuffix)
 
-  return toHebrewIngredientName(withoutSuffix)
+  return pantrySuffix ? `${localized} ${pantrySuffix}`.trim() : localized
 }
 
 /**
@@ -148,14 +160,25 @@ export function splitIngredientEntry(raw) {
 
   return trimmed
     .split(SPLIT_PATTERN)
-    .map((part) => part.replace(PAREN_SUFFIX, '').trim())
+    .map((part) => stripIngredientParenthetical(part))
     .filter((part) => part && isValidIngredientLine(part))
+    .map((part, _, parts) => {
+      const originalPart = String(raw ?? '')
+        .split(SPLIT_PATTERN)
+        .map((entry) => entry.trim())
+        .find((entry) => stripIngredientParenthetical(entry) === part)
+      const pantrySuffix = extractBasicPantrySuffix(originalPart ?? part)
+      return pantrySuffix ? `${part} ${pantrySuffix}`.trim() : part
+    })
 }
 
 function dedupeIngredients(list) {
   const seen = []
   for (const item of list) {
-    const duplicate = seen.some((existing) => ingredientsMatch(existing, item))
+    const itemKey = stripBasicPantryLabel(String(item ?? ''))
+    const duplicate = seen.some((existing) =>
+      ingredientsMatch(stripBasicPantryLabel(String(existing ?? '')), itemKey),
+    )
     if (!duplicate) seen.push(item)
   }
   return seen
@@ -230,6 +253,9 @@ function ensureUserIngredientsInList(userIngredients, ingredients, language) {
 
 function filterIngredientsUsedInSteps(ingredients, steps, userIngredients = [], language = 'he') {
   return ingredients.filter((item) => {
+    if (isBasicPantryMarkedLine(item)) {
+      return userIngredients.length === 0 || isRecipeIngredientAllowed(item, userIngredients)
+    }
     if (userIngredients.length > 0 && !isRecipeIngredientAllowed(item, userIngredients)) {
       return false
     }
@@ -244,7 +270,13 @@ function filterIngredientsUsedInSteps(ingredients, steps, userIngredients = [], 
 /**
  * Normalize recipe ingredients and steps to Hebrew with clean separation.
  */
-export function normalizeRecipeIngredients(recipe, userIngredientsRaw = '', language = 'he') {
+export function normalizeRecipeIngredients(
+  recipe,
+  userIngredientsRaw = '',
+  language = 'he',
+  options = {},
+) {
+  const preserveOriginalSteps = Boolean(options.preserveOriginalSteps)
   const userIngredients = parseUserIngredients(userIngredientsRaw)
   const rawEntries = Array.isArray(recipe.ingredients) ? recipe.ingredients : []
 
@@ -257,14 +289,18 @@ export function normalizeRecipeIngredients(recipe, userIngredientsRaw = '', lang
   let steps = Array.isArray(recipe.steps) ? [...recipe.steps] : []
 
   ingredients = ensureUserIngredientsInList(userIngredients, ingredients, language)
-  steps = hebrewizeSteps(steps, ingredients, language)
+  if (!preserveOriginalSteps) {
+    steps = hebrewizeSteps(steps, ingredients, language)
+  }
   ingredients = filterIngredientsUsedInSteps(ingredients, steps, userIngredients, language)
   ingredients = ensureUserIngredientsInList(userIngredients, ingredients, language)
 
   return {
     ...recipe,
     ingredients: sanitizeIngredientList(dedupeIngredients(ingredients)),
-    steps: sanitizeRecipeSteps(steps),
+    steps: preserveOriginalSteps
+      ? (Array.isArray(recipe.steps) ? [...recipe.steps] : steps)
+      : sanitizeRecipeSteps(steps),
   }
 }
 
@@ -496,8 +532,12 @@ export function logRecipeValidationDetails(report, extra = {}) {
  */
 export function applyRecipeIngredientParser(recipe, userIngredientsRaw = '', language = 'he', options = {}) {
   const preserveOriginalSteps = Boolean(options.preserveOriginalSteps)
+  const skipRequantify = Boolean(options.skipRequantify)
   const userIngredients = parseUserIngredients(userIngredientsRaw)
-  const normalized = normalizeRecipeIngredients(recipe, userIngredientsRaw, language)
+  const normalized = normalizeRecipeIngredients(recipe, userIngredientsRaw, language, {
+    preserveOriginalSteps,
+    recipeType: options.recipeType ?? 'meal',
+  })
   const titled = applyDescriptiveDishTitle(normalized, {
     cookingTime: options.cookingTime,
     style: options.style,
@@ -506,12 +546,14 @@ export function applyRecipeIngredientParser(recipe, userIngredientsRaw = '', lan
     category: options.category ?? 'dairy',
     userIngredients,
   })
-  const quantified = applyRecipeQuantities(titled, {
-    language,
-    servings: options.servings ?? titled.nutrition?.servings,
-    preserveOriginalSteps,
-    recipeType: options.recipeType ?? 'meal',
-  })
+  const quantified = skipRequantify
+    ? titled
+    : applyRecipeQuantities(titled, {
+        language,
+        servings: options.servings ?? titled.nutrition?.servings,
+        preserveOriginalSteps,
+        recipeType: options.recipeType ?? 'meal',
+      })
   const ingredients = sanitizeIngredientList(
     dedupeIngredients(quantified.ingredients ?? []),
   )
@@ -536,11 +578,14 @@ export function applyRecipeIngredientParser(recipe, userIngredientsRaw = '', lan
   if (userIngredients.length > 0) {
     tagged = repairRecipeGrounding(tagged, userIngredientsRaw, language, {
       excludeTitles: options.excludeTitles ?? [],
+      recipeType: options.recipeType ?? 'meal',
+      category: options.category ?? 'dairy',
     })
   }
 
   if (
     userIngredients.length > 0 &&
+    (options.recipeType ?? 'meal') !== 'dessert' &&
     (hasUnnaturalStepPhrasing(tagged.steps ?? [], language).length > 0 ||
       !verifyStepIngredientAlignment(tagged.ingredients ?? [], tagged.steps ?? [], language, {
         staples: SYSTEM_PANTRY_CANONICAL,

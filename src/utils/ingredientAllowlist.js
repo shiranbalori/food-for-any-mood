@@ -1,6 +1,11 @@
 import { canonicalIngredient, ingredientsMatch, normalizeIngredient } from '../data/ingredientKnowledge'
 import { parseUserIngredients } from './ingredientRelevance'
 import { stripQuantityPrefix } from './measurementUnits'
+import {
+  DESSERT_BASIC_PANTRY_CANONICAL,
+  isBasicPantryMarkedLine,
+  stripBasicPantryLabel,
+} from './dessertRecipeBuilder'
 
 /** System pantry items always allowed when the user listed ingredients. */
 export const SYSTEM_PANTRY_CANONICAL = new Set([
@@ -86,6 +91,13 @@ export function isRecipeIngredientAllowed(recipeLine, userIngredients) {
 
   if (userIngredients.some((userIng) => ingredientsMatch(userIng, recipeLine))) {
     return true
+  }
+
+  if (isBasicPantryMarkedLine(recipeLine)) {
+    const base = stripBasicPantryLabel(stripQuantityPrefix(String(recipeLine ?? '')))
+    const canon = canonicalIngredient(base)
+    if (canon && DESSERT_BASIC_PANTRY_CANONICAL.has(canon)) return true
+    return [...DESSERT_BASIC_PANTRY_CANONICAL].some((item) => ingredientsMatch(base, item))
   }
 
   return getSystemPantryItems(userIngredients).some((pantryItem) =>

@@ -46,6 +46,9 @@ export const INGREDIENT_SYNONYMS = {
     flour: ['קמח', 'flour', 'all-purpose flour'],
     sugar: ['סוכר', 'sugar', 'white sugar'],
     cinnamon: ['קינמון', 'cinnamon', 'ground cinnamon'],
+  chocolate: ['שוקולד', 'dark chocolate', 'milk chocolate', 'bittersweet chocolate', 'שוקולד מריר'],
+  cocoa: ['cocoa', 'cocoa powder', 'אבקת קקאו', 'קקאו'],
+  banana: ['בננה', 'banana', 'bananas', 'בננות'],
   honey: ['דבש'],
   blueberry: ['blueberries', 'אוכמניות'],
   blueberries: ['blueberry', 'אוכמניות'],
@@ -97,6 +100,10 @@ export const INGREDIENT_NUTRITION = {
   avocado: { calories: 40, protein: 0.5, carbs: 2, fat: 4 },
   potato: { calories: 25, protein: 0.5, carbs: 6, fat: 0 },
   broccoli: { calories: 10, protein: 1, carbs: 2, fat: 0 },
+  blueberries: { calories: 20, protein: 0.2, carbs: 5, fat: 0.1 },
+  chocolate: { calories: 55, protein: 0.5, carbs: 6, fat: 3.5 },
+  cocoa: { calories: 12, protein: 1, carbs: 3, fat: 0.5 },
+  banana: { calories: 25, protein: 0.3, carbs: 6, fat: 0.1 },
   default: { calories: 15, protein: 0.5, carbs: 2, fat: 0.5 },
 }
 

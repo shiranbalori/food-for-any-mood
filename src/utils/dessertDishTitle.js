@@ -86,6 +86,13 @@ export const DESSERT_STYLE_VARIANTS = [
     titleHe: (main) => `פנקייק ${main}`,
     titleEn: (main) => `${main} pancakes`,
   },
+  {
+    id: 'cheese_cake',
+    category: 'baked_custard',
+    method: 'baked',
+    titleHe: () => 'עוגת גבינה',
+    titleEn: () => 'Cheesecake',
+  },
 ]
 
 function stripQtyPrefix(raw) {
@@ -135,6 +142,7 @@ export function pickPrimaryFlavorLabel(ingredients = [], language = 'he') {
 
 export function inferDefaultDessertStyleId(mainCanon = []) {
   const set = new Set(mainCanon)
+  if (set.has('flour') && set.has('cheese') && set.has('milk')) return 'cheese_cake'
   if (set.has('flour') && set.has('sugar')) return 'cream'
   if ((set.has('egg') || set.has('eggs')) && (set.has('cream') || set.has('milk'))) {
     return 'baked_custard'
