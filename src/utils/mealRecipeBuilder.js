@@ -6,9 +6,9 @@
 import { canonicalIngredient, ingredientsMatch } from '../data/ingredientKnowledge'
 import { getIngredientLabel } from '../data/ingredientLabels'
 import { applyRecipeQuantities } from './recipeQuantities'
+import { ensureRecipeCookingEssentials } from './recipeCookingEssentials'
 import { parseUserIngredients } from './ingredientRelevance'
 import {
-  getBasicPantryLabel,
   scoreDessertPattern as scoreMealPattern,
 } from './dessertRecipeBuilder'
 import {
@@ -295,7 +295,7 @@ export const REALISTIC_MEAL_PATTERNS = [
     stepsHe: (cook) => [
       'קוצצים בצל, שום ועגבניות.',
       'מחממים שמן במחבת ומטגנים בצל ושום עד רכות.',
-      'מוסיפים עגבניות, פапrika, מלח ופלפל ומבשלים עד רוטב סמיך.',
+      'מוסיפים עגבניות, פפריקה, מלח ופלפל ומבשלים עד רוטב סמיך.',
       `שוברים ביצים לתוך הרוטב, מכסים ומבשלים ${Math.max(8, Math.round(cook / 2))} דקות.`,
       'מגישים חם עם לחם.',
     ],
@@ -305,6 +305,72 @@ export const REALISTIC_MEAL_PATTERNS = [
       'Add tomatoes, paprika, salt, and pepper; simmer until thickened.',
       `Crack eggs into the sauce, cover, and cook about ${Math.max(8, Math.round(cook / 2))} minutes.`,
       'Serve hot with bread.',
+    ],
+  },
+  {
+    id: 'parve_tomato_egg_omelette',
+    required: new Set(['tomato', 'egg']),
+    category: 'parve',
+    variationGroup: 'egg_tomato',
+    cookingMethod: 'fried',
+    selectionPriority: 24,
+    nameHe: 'חביתת עגבניות',
+    nameEn: 'Tomato Omelette',
+    userQuantities: {
+      tomato: { he: '3 עגבניות', en: '3 tomatoes' },
+      egg: { he: '4 ביצים', en: '4 eggs' },
+    },
+    pantryStaples: [
+      { canon: 'onion', he: '1/2 בצל', en: '1/2 onion' },
+      { canon: 'oil', he: '2 כפות שמן', en: '2 tbsp oil' },
+      { canon: 'salt', he: '1/2 כפית מלח', en: '1/2 tsp salt' },
+      { canon: 'black pepper', he: '1/4 כפית פלפל שחור', en: '1/4 tsp black pepper' },
+    ],
+    stepsHe: (cook) => [
+      'קוצצים עגבניות ובצל.',
+      'מקציפים ביצים עם מלח ופלפל.',
+      'מחממים שמן במחבת, מטגנים בצל ועגבניות דקות ספורות.',
+      `יוצקים את הביצים, מכסים ומבשלים ${Math.max(6, Math.round(cook / 3))} דקות עד שהחביתה מתייצבת.`,
+      'קופפים בזהירות ומגישים חם.',
+    ],
+    stepsEn: (cook) => [
+      'Chop tomatoes and onion.',
+      'Whisk eggs with salt and pepper.',
+      'Warm oil in a pan; briefly sauté onion and tomatoes.',
+      `Pour in eggs, cover, and cook about ${Math.max(6, Math.round(cook / 3))} minutes until set.`,
+      'Fold carefully and serve hot.',
+    ],
+  },
+  {
+    id: 'parve_baked_eggs_tomato',
+    required: new Set(['tomato', 'egg']),
+    category: 'parve',
+    variationGroup: 'egg_tomato',
+    cookingMethod: 'baked',
+    selectionPriority: 23,
+    nameHe: 'ביצים אפויות עם עגבניות',
+    nameEn: 'Baked Eggs with Tomatoes',
+    userQuantities: {
+      tomato: { he: '4 עגבניות', en: '4 tomatoes' },
+      egg: { he: '4 ביצים', en: '4 eggs' },
+    },
+    pantryStaples: [
+      { canon: 'onion', he: '1 בצל', en: '1 onion' },
+      { canon: 'oil', he: '2 כפות שמן', en: '2 tbsp oil' },
+      { canon: 'salt', he: '1/2 כפית מלח', en: '1/2 tsp salt' },
+      { canon: 'black pepper', he: '1/4 כפית פלפל שחור', en: '1/4 tsp black pepper' },
+    ],
+    stepsHe: (bake) => [
+      'מחממים תנור ל-190 מעלות.',
+      'קוצצים בצל ועגבניות ומסדרים בתבנית עם שמן, מלח ופלפל.',
+      `שוברים ביצים בין העגבניות ואופים ${Math.max(12, Math.round(bake * 0.6))} דקות עד שהחלבון מתייצב.`,
+      'מניחים 2 דקות, מתבלים לפי הצורך ומגישים חם.',
+    ],
+    stepsEn: (bake) => [
+      'Preheat the oven to 190°C.',
+      'Chop onion and tomatoes; arrange in a baking dish with oil, salt, and pepper.',
+      `Crack eggs between the tomatoes and bake about ${Math.max(12, Math.round(bake * 0.6))} minutes until the whites are set.`,
+      'Rest 2 minutes, adjust seasoning, and serve hot.',
     ],
   },
   {
@@ -440,13 +506,145 @@ export const REALISTIC_MEAL_PATTERNS = [
       'Serve hot.',
     ],
   },
+  {
+    id: 'parve_roasted_potatoes_caramelized_onion',
+    required: new Set(['potato', 'onion']),
+    category: 'parve',
+    selectionPriority: 27,
+    nameHe: 'תפוחי אדמה אפויים עם בצל מקורמל',
+    nameEn: 'Roasted Potatoes with Caramelized Onions',
+    userQuantities: {
+      potato: { he: '4 תפוחי אדמה', en: '4 potatoes' },
+      onion: { he: '2 בצלים', en: '2 onions' },
+    },
+    pantryStaples: [
+      { canon: 'oil', he: '3 כפות שמן', en: '3 tbsp oil' },
+      { canon: 'salt', he: '1/2 כפית מלח', en: '1/2 tsp salt' },
+      { canon: 'black pepper', he: '1/4 כפית פלפל שחור', en: '1/4 tsp black pepper' },
+      { canon: 'thyme', he: '1/2 כפית טימין', en: '1/2 tsp thyme' },
+    ],
+    stepsHe: (cook) => [
+      'קוצצים תפוחי אדמה לקוביות ובצל לפרוסות דקות.',
+      'מחממים תנור ל-200 מעלות ומסדרים תפוחי אדמה וחצי מהבצל בתבנית עם שמן, מלח ופלפל.',
+      `אופים ${Math.max(15, Math.round(cook * 0.6))} דקות, מוסיפים את שאר הבצל וממשיכים ${Math.max(10, Math.round(cook * 0.4))} דקות עד הזהבה.`,
+      'מתבלים בטימין, מערבבים ומגישים חם.',
+    ],
+    stepsEn: (cook) => [
+      'Dice potatoes and slice onions thinly.',
+      'Preheat the oven to 200°C; toss potatoes and half the onion with oil, salt, and pepper.',
+      `Roast about ${Math.max(15, Math.round(cook * 0.6))} minutes, add remaining onion, and roast ${Math.max(10, Math.round(cook * 0.4))} minutes until golden.`,
+      'Season with thyme, toss, and serve hot.',
+    ],
+  },
+  {
+    id: 'parve_tuna_corn_pasta_salad',
+    required: new Set(['tuna', 'corn']),
+    category: 'parve',
+    selectionPriority: 26,
+    nameHe: 'סלט פסטה עם טונה ותירס',
+    nameEn: 'Tuna and Corn Pasta Salad',
+    userQuantities: {
+      tuna: { he: '2 קופסאות טונה', en: '2 cans tuna' },
+      corn: { he: '1 קופסת תירס', en: '1 can corn' },
+    },
+    pantryStaples: [
+      { canon: 'pasta', he: '250 גרם פסטה', en: '250 g pasta' },
+      { canon: 'onion', he: '1/2 בצל', en: '1/2 onion' },
+      { canon: 'lemon', he: 'מיץ מלימון אחד', en: 'juice of 1 lemon' },
+      { canon: 'oil', he: '3 כפות שמן', en: '3 tbsp oil' },
+      { canon: 'salt', he: '1/2 כפית מלח', en: '1/2 tsp salt' },
+    ],
+    stepsHe: (cook) => [
+      'מרתיחים סיר מים מומלחים ומבשלים את הפסטה עד רכות נעימה, מסננים ומקררים.',
+      'מסננים את הטונה והתירס, קוצצים בצל דק.',
+      'מערבבים פסטה, טונה, תירס ובצל בקערה גדולה.',
+      'מוסיפים שמן, מיץ לימון ומלח, מערבבים היטב.',
+      'מגישים מיד או מקררים שעה לפני ההגשה.',
+    ],
+    stepsEn: (cook) => [
+      'Boil salted water and cook pasta until tender; drain and cool.',
+      'Drain tuna and corn; finely chop the onion.',
+      'Toss pasta, tuna, corn, and onion in a large bowl.',
+      'Add oil, lemon juice, and salt; mix well.',
+      'Serve immediately or chill for an hour before serving.',
+    ],
+  },
+  {
+    id: 'dairy_creamy_mushroom_pasta',
+    required: new Set(['mushroom', 'cream']),
+    category: 'dairy',
+    selectionPriority: 28,
+    nameHe: 'פסטה בפטריות ושמנת',
+    nameEn: 'Creamy Mushroom Pasta',
+    userQuantities: {
+      mushroom: { he: '300 גרם פטריות', en: '300 g mushrooms' },
+      cream: { he: '200 מ"ל שמנת', en: '200 ml cream' },
+    },
+    pantryStaples: [
+      { canon: 'pasta', he: '250 גרם פסטה', en: '250 g pasta' },
+      { canon: 'onion', he: '1 בצל', en: '1 onion' },
+      { canon: 'garlic', he: '2 שיני שום', en: '2 garlic cloves' },
+      { canon: 'butter', he: '2 כפות חמאה', en: '2 tbsp butter' },
+      { canon: 'salt', he: '1/2 כפית מלח', en: '1/2 tsp salt' },
+      { canon: 'black pepper', he: '1/4 כפית פלפל שחור', en: '1/4 tsp black pepper' },
+    ],
+    stepsHe: (cook) => [
+      'מרתיחים סיר מים מומלחים ומבשלים את הפסטה, מסננים.',
+      'קוצצים פטריות, בצל ושום.',
+      'מחממים חמאה במחבת, מטגנים בצל ושום עד רכות, מוסיפים פטריות עד הזהבה.',
+      `מוסיפים שמנת ומבשלים ${Math.max(8, Math.round(cook / 2))} דקות עד רוטב סמיך.`,
+      'מערבבים עם הפסטה, מתבלים ומגישים חם.',
+    ],
+    stepsEn: (cook) => [
+      'Boil salted water and cook pasta; drain.',
+      'Slice mushrooms, onion, and garlic.',
+      'Melt butter in a pan; sauté onion and garlic, then mushrooms until golden.',
+      `Add cream and simmer about ${Math.max(8, Math.round(cook / 2))} minutes until thickened.`,
+      'Toss with pasta, season, and serve hot.',
+    ],
+  },
+  {
+    id: 'vegan_chickpea_tomato_stew',
+    requiredAny: ['chickpea', 'chickpeas', 'hummus'],
+    category: 'parve',
+    selectionPriority: 25,
+    nameHe: 'תבשיל חומוס ועגבניות',
+    nameEn: 'Chickpea and Tomato Stew',
+    userQuantities: {
+      chickpea: { he: '2 כוסות חומוס מבושל', en: '2 cups cooked chickpeas' },
+      chickpeas: { he: '2 כוסות חומוס מבושל', en: '2 cups cooked chickpeas' },
+      hummus: { he: '2 כוסות חומוס מבושל', en: '2 cups cooked chickpeas' },
+    },
+    pantryStaples: [
+      { canon: 'tomato', he: '3 עגבניות', en: '3 tomatoes' },
+      { canon: 'onion', he: '1 בצל', en: '1 onion' },
+      { canon: 'garlic', he: '2 שיני שום', en: '2 garlic cloves' },
+      { canon: 'cumin', he: '1 כפית כמון', en: '1 tsp cumin' },
+      { canon: 'oil', he: '2 כפות שמן', en: '2 tbsp oil' },
+      { canon: 'salt', he: '1/2 כפית מלח', en: '1/2 tsp salt' },
+    ],
+    stepsHe: (cook) => [
+      'קוצצים בצל, שום ועגבניות.',
+      'מחממים שמן בסיר, מטגנים בצל ושום עד רכות.',
+      'מוסיפים עגבניות, חומוס, כמון ומים, מרתיחים.',
+      `מבשלים ${Math.max(18, Math.round(cook * 0.75))} דקות עד רוטב סמיך.`,
+      'מתבלים במלח ומגישים חם עם לחם.',
+    ],
+    stepsEn: (cook) => [
+      'Chop onion, garlic, and tomatoes.',
+      'Warm oil in a pot; sauté onion and garlic until soft.',
+      'Add tomatoes, chickpeas, cumin, and water; bring to a boil.',
+      `Simmer about ${Math.max(18, Math.round(cook * 0.75))} minutes until thickened.`,
+      'Season with salt and serve hot with bread.',
+    ],
+  },
 ]
 
 export function buildMealIngredientList(
   pattern,
   filteredUserIngredients,
   displayNames,
-  { language = 'he', pantryLabel = getBasicPantryLabel(language) } = {},
+  { language = 'he', pantryLabel = '' } = {},
 ) {
   if (!pattern) return []
 
@@ -487,6 +685,8 @@ export function rankMealPatterns(
   userCanons,
   {
     category = 'any',
+    selectedCategory = category,
+    userIngredientsRaw = '',
     language = 'he',
     excludeTitles = [],
     excludeTemplateKeys = [],
@@ -495,6 +695,8 @@ export function rankMealPatterns(
 ) {
   return rankRealisticPatterns(REALISTIC_MEAL_PATTERNS, userCanons, scoreMealPattern, {
     category,
+    selectedCategory,
+    userIngredientsRaw,
     language,
     excludeTitles,
     excludeTemplateKeys,
@@ -507,6 +709,7 @@ export function getBestMealPattern(
   userIngredientsRaw,
   {
     category = 'any',
+    selectedCategory = category,
     language = 'he',
     excludeTitles = [],
     excludeTemplateKeys = [],
@@ -521,6 +724,10 @@ export function getBestMealPattern(
   const canons = canonizeList(userIngredients)
   const ranked = rankMealPatterns(canons, {
     category,
+    selectedCategory,
+    userIngredientsRaw: Array.isArray(userIngredientsRaw)
+      ? userIngredients.join(', ')
+      : String(userIngredientsRaw ?? ''),
     language,
     excludeTitles,
     excludeTemplateKeys,
@@ -536,17 +743,21 @@ export function buildRealisticMealFromPattern(
     displayNames = [],
     language = 'he',
     cookingTime = 30,
-    pantryLabel = getBasicPantryLabel(language),
+    pantryLabel = '',
     servings = 4,
   } = {},
 ) {
   const cook = Math.min(cookingTime, Math.max(12, Math.round(cookingTime / 2)))
   const name = language === 'en' ? pattern.nameEn : pattern.nameHe
-  const ingredients = buildMealIngredientList(pattern, filteredUserIngredients, displayNames, {
+  let ingredients = buildMealIngredientList(pattern, filteredUserIngredients, displayNames, {
     language,
     pantryLabel,
   })
   const steps = language === 'en' ? pattern.stepsEn(cook) : pattern.stepsHe(cook)
+  ;({ ingredients } = ensureRecipeCookingEssentials(
+    { ingredients, steps },
+    { language, recipeType: 'meal', pantryLabel },
+  ))
 
   const base = {
     name,

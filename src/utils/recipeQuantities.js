@@ -85,6 +85,7 @@ const QUANTITY_PROFILES = {
   oil: { unit: 'tbsp', base: 1, perServing: false },
   pasta: { unit: 'gram', base: 100, perServing: true },
   rice: { unit: 'cup', base: 0.5, perServing: true },
+  water: { unit: 'cup', base: 1, perServing: true },
   cream: { unit: 'ml', base: 100, perServing: true },
   milk: { unit: 'ml', base: 150, perServing: true },
   chicken: { unit: 'gram', base: 150, perServing: true },

@@ -1,3 +1,5 @@
+import { polishHebrewRecipeForDisplay } from './recipeHebrewPolish'
+
 const HEBREW_CHAR = /[\u0590-\u05FF]/
 const LATIN_CHAR = /[A-Za-z]/
 
@@ -156,7 +158,7 @@ export function normalizeHebrewRecipeContent(recipe, language = 'he') {
       reason: normalizeHebrewDisplayText(upgrade.reason, language),
     }))
   }
-  return out
+  return polishHebrewRecipeForDisplay(out, language)
 }
 
 function normalizeDictFields(data, { stringKeys, listKeys, language }) {

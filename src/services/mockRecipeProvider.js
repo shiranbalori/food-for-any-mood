@@ -23,12 +23,7 @@ import { applyRecipeIngredientParser } from '../utils/recipeIngredientParser'
 import { buildGroundedChefTitle, buildGroundedSoupStewTitle, validateTitleGrounding } from '../utils/recipeGrounding'
 import { isLiteralIngredientTitle } from '../utils/recipeTitle'
 import { buildDessertDishTitle } from '../utils/dessertDishTitle'
-import {
-  buildRealisticDessertFromPattern,
-  buildRealisticMealFromPattern,
-  buildRealisticSoupFromPattern,
-  getBestDishPattern,
-} from '../utils/recipeDishPatterns'
+import { selectAndBuildDishFromPatterns } from '../utils/dishSelection'
 import { buildChefIntro } from '../utils/chefIntro'
 import { buildStepsFromUserIngredients } from '../utils/userIngredientSteps'
 import {
@@ -1470,6 +1465,33 @@ function titlePasses(title, ingredients, userIngredients, language) {
   return validateTitleGrounding(title, ingredients, userIngredients, language).ok
 }
 
+function heFallbackPlaceholderTitle(language) {
+  return language === 'en' ? 'Home skillet' : 'תבשיל ביתי'
+}
+
+/** Pantry lines for regenerate meal variants (parve only unless user listed dairy). */
+function enrichMealVariantIngredients(filteredUserIngredients, displayNames, variantId, language) {
+  const he = language !== 'en'
+  const userLines = buildUserIngredientLines(
+    filteredUserIngredients,
+    displayNames,
+    displayNames,
+    language,
+  )
+  const staplesHe = {
+    'egg-tomato-omelette': ['1 בצל', '2 כפות שמן זית', '1/2 כפית מלח', '1/4 כפית פלפל שחור'],
+    'egg-tomato-baked': ['2 כפות שמן זית', '1/2 כפית מלח', '1/4 כפית פלפל שחור'],
+    'egg-tomato-shakshuka': ['1 בצל', '2 שיני שום', '2 כפות שמן זית', '1 כפית פפריקה', '1/2 כפית מלח'],
+  }
+  const staplesEn = {
+    'egg-tomato-omelette': ['1 onion', '2 tbsp olive oil', '1/2 tsp salt', '1/4 tsp black pepper'],
+    'egg-tomato-baked': ['2 tbsp olive oil', '1/2 tsp salt', '1/4 tsp black pepper'],
+    'egg-tomato-shakshuka': ['1 onion', '2 garlic cloves', '2 tbsp olive oil', '1 tsp paprika', '1/2 tsp salt'],
+  }
+  const extras = (he ? staplesHe : staplesEn)[variantId] ?? (he ? ['2 כפות שמן זית', '1/2 כפית מלח'] : ['2 tbsp olive oil', '1/2 tsp salt'])
+  return [...userLines, ...extras]
+}
+
 function fmtPhrase(displays, language) {
   const refs = (displays ?? []).map((name) => toStepIngredientReference(name, language))
   return language === 'en' ? formatEnglishStepIngredientList(refs) : formatHebrewStepIngredientList(refs)
@@ -1638,8 +1660,9 @@ export function buildIngredientFirstFallbackRecipe(
   } = {},
 ) {
   const kosherCategory = resolveTemplateCategory(category, ingredients)
-  /** Pattern matching uses user category when "any" — output category is resolved separately. */
-  const patternCategory = isAnyCategory(category) ? 'any' : kosherCategory
+  /** Infer parve/dairy/meat from ingredients — never use "any" (that allows dairy patterns). */
+  const patternCategory = kosherCategory
+  const selectedCategory = category
   const rawUserList = parseUserIngredients(ingredients)
   const filteredUserIngredients = isGlutenFree
     ? rawUserList.filter((item) => !isGlutenIngredient(normalizeIngredient(item)))
@@ -1696,28 +1719,27 @@ export function buildIngredientFirstFallbackRecipe(
   let precomputedHealthScore = null
 
   if (effectiveRecipeType === 'dessert') {
-    dishPattern = getBestDishPattern(filteredUserIngredients, {
+    const selection = selectAndBuildDishFromPatterns(filteredUserIngredients, {
       recipeType: 'dessert',
       category: patternCategory,
+      selectedCategory,
+      userIngredientsRaw: ingredients,
       language,
+      displayNames,
+      cookingTime,
+      servings,
       excludeTitles,
       excludeTemplateKeys,
       excludeCookingMethods,
       excludeDessertCategories,
     })
-    if (dishPattern) {
-      const built = buildRealisticDessertFromPattern(dishPattern, {
-        filteredUserIngredients,
-        displayNames,
-        language,
-        cookingTime,
-        servings,
-      })
-      name = built.name
-      recipeSteps = built.steps
-      finalIngredients = built.ingredients
-      precomputedNutrition = built.nutrition
-      precomputedHealthScore = built.healthScore
+    if (selection) {
+      dishPattern = selection.pattern
+      name = selection.built.name
+      recipeSteps = selection.built.steps
+      finalIngredients = selection.built.ingredients
+      precomputedNutrition = selection.built.nutrition
+      precomputedHealthScore = selection.built.healthScore
     } else if (hasRegenerationConstraints) {
       const variant = pickAlternateDessertVariant({
         ingredients: finalIngredients,
@@ -1733,55 +1755,53 @@ export function buildIngredientFirstFallbackRecipe(
       name = buildDessertDishTitle(finalIngredients, { language }).name
     }
   } else if (effectiveRecipeType === 'soup_stew') {
-    dishPattern = getBestDishPattern(filteredUserIngredients, {
+    const selection = selectAndBuildDishFromPatterns(filteredUserIngredients, {
       recipeType: 'soup_stew',
       category: patternCategory,
+      selectedCategory,
+      userIngredientsRaw: ingredients,
       language,
+      displayNames,
+      cookingTime,
+      servings,
       excludeTitles,
       excludeTemplateKeys,
       excludeCookingMethods,
     })
-    if (dishPattern?.userQuantities) {
-      const built = buildRealisticSoupFromPattern(dishPattern, {
-        filteredUserIngredients,
-        displayNames,
-        language,
-        cookingTime,
-        servings,
-      })
-      name = built.name
-      recipeSteps = built.steps
-      finalIngredients = built.ingredients
-      precomputedNutrition = built.nutrition
-      precomputedHealthScore = built.healthScore
+    if (selection) {
+      dishPattern = selection.pattern
+      name = selection.built.name
+      recipeSteps = selection.built.steps
+      finalIngredients = selection.built.ingredients
+      precomputedNutrition = selection.built.nutrition
+      precomputedHealthScore = selection.built.healthScore
     } else {
       name = buildGroundedSoupStewTitle(filteredUserIngredients, finalIngredients, language, { excludeTitles })
     }
   } else if (effectiveRecipeType === 'meal') {
-    dishPattern = getBestDishPattern(filteredUserIngredients, {
+    const selection = selectAndBuildDishFromPatterns(filteredUserIngredients, {
       recipeType: 'meal',
       category: patternCategory,
+      selectedCategory,
+      userIngredientsRaw: ingredients,
       language,
+      displayNames,
+      cookingTime,
+      servings,
       excludeTitles,
       excludeTemplateKeys,
       excludeCookingMethods,
     })
-    if (dishPattern?.userQuantities) {
-      const built = buildRealisticMealFromPattern(dishPattern, {
-        filteredUserIngredients,
-        displayNames,
-        language,
-        cookingTime,
-        servings,
-      })
-      name = built.name
-      recipeSteps = built.steps
-      finalIngredients = built.ingredients
-      precomputedNutrition = built.nutrition
-      precomputedHealthScore = built.healthScore
+    if (selection) {
+      dishPattern = selection.pattern
+      name = selection.built.name
+      recipeSteps = selection.built.steps
+      finalIngredients = selection.built.ingredients
+      precomputedNutrition = selection.built.nutrition
+      precomputedHealthScore = selection.built.healthScore
     } else if (hasRegenerationConstraints) {
       const variant = pickAlternateMealVariant({
-        ingredients: finalIngredients,
+        ingredients: filteredUserIngredients,
         language,
         cookingTime,
         excludeTitles,
@@ -1789,8 +1809,10 @@ export function buildIngredientFirstFallbackRecipe(
       })
       name = variant.name
       recipeSteps = variant.steps
-    } else if (kosherCategory === 'meat') {
-      name = buildGroundedChefTitle(filteredUserIngredients, finalIngredients, language, { excludeTitles })
+      finalIngredients = enrichMealVariantIngredients(filteredUserIngredients, displayNames, variant.id, language)
+      dishPattern = { id: variant.id, cookingMethod: variant.method }
+    } else if (filteredUserIngredients.length > 0) {
+      name = heFallbackPlaceholderTitle(language)
     } else {
       name = buildGroundedChefTitle(filteredUserIngredients, finalIngredients, language, { excludeTitles })
     }
@@ -1828,7 +1850,11 @@ export function buildIngredientFirstFallbackRecipe(
     steps: recipeSteps,
     matchPercentage,
     spiceLevel: recipeType === 'dessert' ? 0 : kosherCategory === 'parve' ? 1 : 0,
-    optionalUpgrades: buildOptionalUpgrades(filteredUserIngredients, { language, recipeType }),
+    optionalUpgrades: buildOptionalUpgrades(filteredUserIngredients, {
+      language,
+      recipeType,
+      selectedCategory: category,
+    }),
     nutrition: precomputedNutrition ?? {
       calories: 360 + displayNames.length * 25,
       protein: 14 + displayNames.length * 2,
@@ -1884,10 +1910,10 @@ export function buildIngredientFirstFallbackRecipe(
   })
 
   const shouldEnrich =
-    effectiveRecipeType !== 'dessert' &&
-    effectiveRecipeType !== 'meal' &&
     filteredUserIngredients.length > 0 &&
-    !dishPattern
+    !dishPattern &&
+    (effectiveRecipeType === 'meal' ||
+      (effectiveRecipeType !== 'dessert' && effectiveRecipeType !== 'soup_stew'))
 
   return {
     recipe: shouldEnrich

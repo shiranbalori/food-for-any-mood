@@ -27,6 +27,16 @@ const DESSERT_UPGRADES = [
   { canon: 'coconut', he: 'קוקוס', en: 'shredded coconut', reasonHe: 'מוסיף מרקם וטעם', reasonEn: 'Adds texture and flavor', match: [] },
 ]
 
+const DAIRY_UPGRADE_CANONS = new Set(['feta', 'parmesan', 'cheese', 'mozzarella', 'ricotta'])
+
+function userAllowsDairy(userIngredients, selectedCategory = 'any') {
+  if (selectedCategory === 'dairy') return true
+  return (userIngredients ?? []).some((user) => {
+    const canon = canonicalIngredient(user)
+    return canon && ['cheese', 'milk', 'cream', 'butter', 'yogurt', 'feta', 'parmesan'].includes(canon)
+  })
+}
+
 function userHas(userIngredients, canon) {
   return (userIngredients ?? []).some(
     (user) => ingredientsMatch(user, canon) || canonicalIngredient(user) === canon,
@@ -42,12 +52,17 @@ function userHas(userIngredients, canon) {
  * @param {string[]} userIngredients
  * @param {{ language?: string, recipeType?: string, limit?: number }} [options]
  */
-export function buildOptionalUpgrades(userIngredients, { language = 'he', recipeType = 'meal', limit = 3 } = {}) {
+export function buildOptionalUpgrades(
+  userIngredients,
+  { language = 'he', recipeType = 'meal', selectedCategory = 'any', limit = 3 } = {},
+) {
   const catalog = recipeType === 'dessert' ? DESSERT_UPGRADES : SAVORY_UPGRADES
   const userCanons = new Set((userIngredients ?? []).map((user) => canonicalIngredient(user)).filter(Boolean))
+  const allowDairy = userAllowsDairy(userIngredients, selectedCategory)
 
   return catalog
     .filter((item) => !userHas(userIngredients, item.canon))
+    .filter((item) => allowDairy || !DAIRY_UPGRADE_CANONS.has(item.canon))
     .map((item) => ({
       item,
       score: (item.match ?? []).filter((canon) => userCanons.has(canon)).length,

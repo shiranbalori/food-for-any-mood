@@ -25,6 +25,7 @@ import {
   parseAnyLeadingMeasurement,
   stripQuantityPrefix,
 } from './measurementUnits'
+import { ensureRecipeCookingEssentials } from './recipeCookingEssentials'
 import {
   stepHasMeaningfulAction,
   validateRecipeBeforeReturn,
@@ -272,6 +273,10 @@ export function normalizeRecipeIngredients(
   let steps = Array.isArray(recipe.steps) ? [...recipe.steps] : []
 
   ingredients = ensureUserIngredientsInList(userIngredients, ingredients, language)
+  ;({ ingredients, steps } = ensureRecipeCookingEssentials(
+    { ...recipe, ingredients, steps },
+    { language, recipeType: options.recipeType ?? 'meal' },
+  ))
   if (!preserveOriginalSteps) {
     steps = hebrewizeSteps(steps, ingredients, language)
     ingredients = filterIngredientsUsedInSteps(ingredients, steps, userIngredients, language)
@@ -539,12 +544,20 @@ export function applyRecipeIngredientParser(recipe, userIngredientsRaw = '', lan
         preserveOriginalSteps,
         recipeType: options.recipeType ?? 'meal',
       })
+  const enriched = ensureRecipeCookingEssentials(
+    {
+      ...quantified,
+      ingredients: quantified.ingredients ?? [],
+      steps: quantified.steps ?? [],
+    },
+    { language, recipeType: options.recipeType ?? 'meal' },
+  )
   const ingredients = sanitizeIngredientList(
-    dedupeIngredients(quantified.ingredients ?? []),
+    dedupeIngredients(enriched.ingredients ?? []),
   )
   const steps = preserveOriginalSteps
-    ? lightSanitizeRecipeSteps(quantified.steps ?? [])
-    : sanitizeRecipeSteps(quantified.steps ?? [])
+    ? lightSanitizeRecipeSteps(enriched.steps ?? quantified.steps ?? [])
+    : sanitizeRecipeSteps(enriched.steps ?? quantified.steps ?? [])
 
   const finalized = {
     ...quantified,

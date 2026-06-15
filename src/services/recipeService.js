@@ -1,7 +1,7 @@
 import { RECIPE_GENERATION_MODE } from '../config/recipeProvider'
 import { assessGenerationFeasibility } from '../utils/recipeGenerationPolicy.js'
 import { buildValidationFailureMessage } from '../utils/recipePreReturnValidation.js'
-import { generateAIRecipe } from './aiRecipeService'
+import { buildValidatedMockRecipe, generateAIRecipe } from './aiRecipeService'
 import { buildMockRecipe } from './mockRecipeProvider'
 
 /**
@@ -228,6 +228,36 @@ function toAppRecipe(recipe, meta) {
   }
 }
 
+/** Last-resort local recipe when AI/backend path returns no displayable recipe. */
+function tryLastResortLocalFallback(normalized, mergedOptions) {
+  const fallbackRecipe = buildValidatedMockRecipe({
+    ...normalized,
+    language: mergedOptions.language,
+    pantrySuffix: mergedOptions.pantrySuffix,
+    excludeTemplateKeys: mergedOptions.excludeTemplateKeys,
+    excludeTitles: mergedOptions.excludeTitles,
+    excludeCookingMethods: mergedOptions.excludeCookingMethods,
+    excludeDessertCategories: mergedOptions.excludeDessertCategories,
+  })
+  if (!validateGeneratedRecipe(fallbackRecipe)) return null
+
+  const meta = buildAiRecipeMeta(normalized, mergedOptions)
+  if (fallbackRecipe.templateKey) {
+    meta.templateKey = fallbackRecipe.templateKey
+  }
+
+  console.warn('[recipeService] Using last-resort local fallback recipe', {
+    title: fallbackRecipe.name,
+    templateKey: meta.templateKey,
+  })
+
+  return {
+    recipe: toAppRecipe(fallbackRecipe, meta),
+    recipePossible: true,
+    fallbackReason: 'fallback',
+  }
+}
+
 /**
  * Generates a recipe and returns the UI/storage model.
  * Uses the FastAPI backend by default; falls back to mock if the server fails.
@@ -262,10 +292,19 @@ export async function generateAppRecipe(params, options = {}) {
   const result = reconcileGenerationResult(await generateWithActiveProvider(normalized, mergedOptions))
 
   if (result.recipePossible === false || !validateGeneratedRecipe(result.recipe)) {
+    const lastResort = tryLastResortLocalFallback(normalized, mergedOptions)
+    if (lastResort) {
+      return lastResort
+    }
+
     return {
       recipe: null,
       recipePossible: false,
-      impossibleReason: result.impossibleReason ?? '',
+      impossibleReason:
+        result.impossibleReason ||
+        (mergedOptions.language === 'he'
+          ? 'לא הצלחנו ליצור מתכון אמין מהמרכיבים — נסו שוב.'
+          : 'We could not create a trustworthy recipe from your ingredients — please try again.'),
       missingIngredients: result.missingIngredients ?? [],
       fallbackReason: null,
     }

@@ -3,7 +3,7 @@
 export const ENGLISH_UNIT_ALTERNATIVES =
   'tablespoons|tablespoon|teaspoons|teaspoon|cups|cup|grams|gram|pieces|piece|tbsp|tsp|g|ml|pcs'
 
-const HEBREW_UNIT_WORDS = 'כפית|כפיות|כף|כפות|גרם|מ"ל|כוס|כוסות|יחידה|יחידות'
+const HEBREW_UNIT_WORDS = 'כפיות|כפית|כפות|כף|כוסות|כוס|גרם|מ"ל|יחידות|יחידה'
 
 const HEBREW_TO_UNIT_KEY = {
   כפית: 'tsp',

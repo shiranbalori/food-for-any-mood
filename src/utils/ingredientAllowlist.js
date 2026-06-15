@@ -77,9 +77,10 @@ export function getSystemPantryItems(userIngredients = []) {
 }
 
 export function isSystemPantryIngredient(name) {
-  const canon = canonicalIngredient(stripQuantityPrefix(String(name ?? '')))
-  if (!canon) return false
-  if (SYSTEM_PANTRY_CANONICAL.has(canon)) return true
+  const text = String(name ?? '')
+  const canon = canonicalIngredient(stripQuantityPrefix(text))
+  if (canon && SYSTEM_PANTRY_CANONICAL.has(canon)) return true
+  if (/פפריק|paprika/i.test(text)) return true
   return ['water', 'salt', 'black pepper', 'oil', 'olive oil', 'baking powder'].some((item) =>
     ingredientsMatch(name, item),
   )

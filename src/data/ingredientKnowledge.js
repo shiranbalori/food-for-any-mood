@@ -16,6 +16,7 @@ export const INGREDIENT_SYNONYMS = {
   milk: ['חלב'],
     butter: ['חמאה', 'butter', 'unsalted butter'],
   salt: ['מלח', 'sea salt', 'מלח ים'],
+  water: ['מים', 'water', 'hot water'],
   garlic: ['שום', 'שום טרי'],
   onion: ['בצל', 'red onion', 'בצל סגול'],
   tomato: ['עגבניה', 'tomatoes', 'עגבניות', 'cherry tomatoes'],

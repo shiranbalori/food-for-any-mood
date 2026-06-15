@@ -2,6 +2,7 @@ import { API_BASE_URL } from '../config/api'
 import { buildAlternateStepsFromUserIngredients } from '../utils/alternateUserIngredientSteps'
 import { lightSanitizeRecipeSteps } from '../utils/ingredientFormatting'
 import { normalizeHebrewDisplayText } from '../utils/hebrewDisplayText'
+import { naturalizeRecipeSteps } from '../utils/recipeStepWording'
 
 const REGENERATE_STEPS_URL = `${API_BASE_URL}/regenerate-steps`
 

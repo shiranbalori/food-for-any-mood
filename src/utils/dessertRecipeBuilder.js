@@ -6,6 +6,7 @@
 import { canonicalIngredient, ingredientsMatch } from '../data/ingredientKnowledge'
 import { getIngredientLabel } from '../data/ingredientLabels'
 import { applyRecipeQuantities } from './recipeQuantities'
+import { ensureRecipeCookingEssentials } from './recipeCookingEssentials'
 import { parseUserIngredients } from './ingredientRelevance'
 import {
   getBestRankedPattern,
@@ -146,6 +147,8 @@ export function rankDessertPatterns(
   userCanons,
   {
     category = 'any',
+    selectedCategory = category,
+    userIngredientsRaw = '',
     language = 'he',
     excludeTitles = [],
     excludeTemplateKeys = [],
@@ -155,6 +158,8 @@ export function rankDessertPatterns(
 ) {
   return rankRealisticPatterns(REALISTIC_DESSERT_PATTERNS, userCanons, scoreDessertPattern, {
     category,
+    selectedCategory,
+    userIngredientsRaw,
     language,
     excludeTitles,
     excludeTemplateKeys,
@@ -852,7 +857,7 @@ export function buildDessertIngredientList(
   pattern,
   filteredUserIngredients,
   displayNames,
-  { language = 'he', pantryLabel = getBasicPantryLabel(language) } = {},
+  { language = 'he', pantryLabel = '' } = {},
 ) {
   if (!pattern) return []
 
@@ -896,17 +901,21 @@ export function buildRealisticDessertFromPattern(
     displayNames = [],
     language = 'he',
     cookingTime = 30,
-    pantryLabel = getBasicPantryLabel(language),
+    pantryLabel = '',
     servings = 4,
   } = {},
 ) {
   const bake = Math.min(cookingTime, Math.max(20, Math.round(cookingTime * 0.85)))
   const name = language === 'en' ? pattern.nameEn : pattern.nameHe
-  const ingredients = buildDessertIngredientList(pattern, filteredUserIngredients, displayNames, {
+  let ingredients = buildDessertIngredientList(pattern, filteredUserIngredients, displayNames, {
     language,
     pantryLabel,
   })
   const steps = language === 'en' ? pattern.stepsEn(bake) : pattern.stepsHe(bake)
+  ;({ ingredients } = ensureRecipeCookingEssentials(
+    { ingredients, steps },
+    { language, recipeType: 'dessert', pantryLabel },
+  ))
 
   const base = {
     name,

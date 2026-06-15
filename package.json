@@ -10,6 +10,8 @@
     "preview": "vite preview",
     "test:quality": "npx vite-node scripts/test-recipe-quality.mjs",
     "test:nutrition": "npx vite-node scripts/test-nutrition-scoring.mjs",
+    "test:generation-flow": "npx vite-node scripts/test-generation-flow.mjs",
+    "test:dish-examples": "npx vite-node scripts/show-dish-examples.mjs",
     "test:community-top5": "npx vite-node scripts/test-community-top5.mjs"
   },
   "dependencies": {

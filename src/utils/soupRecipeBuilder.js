@@ -5,9 +5,9 @@
 import { canonicalIngredient, ingredientsMatch } from '../data/ingredientKnowledge'
 import { getIngredientLabel } from '../data/ingredientLabels'
 import { applyRecipeQuantities } from './recipeQuantities'
+import { ensureRecipeCookingEssentials } from './recipeCookingEssentials'
 import { parseUserIngredients } from './ingredientRelevance'
 import {
-  getBasicPantryLabel,
   scoreDessertPattern as scoreSoupPattern,
 } from './dessertRecipeBuilder'
 import { getBestRankedPattern, rankRealisticPatterns } from './recipePatternEngine'
@@ -125,7 +125,42 @@ export const REALISTIC_SOUP_PATTERNS = [
     ],
   },
   {
+    id: 'vegan_lentil_vegetable_soup',
+    required: new Set(['onion', 'carrot']),
+    requiredAny: ['lentil', 'lentils'],
+    category: 'parve',
+    selectionPriority: 28,
+    nameHe: 'מרק עדשים וירקות',
+    nameEn: 'Lentil Vegetable Soup',
+    userQuantities: {
+      onion: { he: '1 בצל', en: '1 onion' },
+      carrot: { he: '2 גזרים', en: '2 carrots' },
+      lentils: { he: '1 כוס עדשים', en: '1 cup lentils' },
+      lentil: { he: '1 כוס עדשים', en: '1 cup lentils' },
+    },
+    pantryStaples: [
+      { canon: 'oil', he: '2 כפות שמן', en: '2 tbsp oil' },
+      { canon: 'garlic', he: '2 שיני שום', en: '2 garlic cloves' },
+      { canon: 'salt', he: '1/2 כפית מלח', en: '1/2 tsp salt' },
+    ],
+    stepsHe: (cook) => [
+      'קוצצים בצל, גזר ושום.',
+      'מחממים שמן בסיר ומטגנים בצל, גזר ושום 3–4 דקות.',
+      'מוסיפים עדשים ומים, מרתיחים.',
+      `מבשלים על אש נמוכה ${Math.max(22, Math.round(cook * 0.85))} דקות עד שהעדשים רכות.`,
+      'מתבלים במלח, מערבבים ומגישים חם.',
+    ],
+    stepsEn: (cook) => [
+      'Chop onion, carrots, and garlic.',
+      'Sauté onion, carrots, and garlic in oil for 3–4 minutes.',
+      'Add lentils and water; bring to a boil.',
+      `Simmer about ${Math.max(22, Math.round(cook * 0.85))} minutes until lentils are tender.`,
+      'Season with salt, stir, and serve hot.',
+    ],
+  },
+  {
     id: 'parve_tomato_rice_soup',
+    required: new Set(['tomato', 'rice']),
     category: 'parve',
     selectionPriority: 18,
     nameHe: 'מרק אורז ועגבניות',
@@ -158,7 +193,7 @@ export function buildSoupIngredientList(
   pattern,
   filteredUserIngredients,
   displayNames,
-  { language = 'he', pantryLabel = getBasicPantryLabel(language) } = {},
+  { language = 'he', pantryLabel = '' } = {},
 ) {
   if (!pattern) return []
 
@@ -195,6 +230,8 @@ export function rankSoupPatterns(
   userCanons,
   {
     category = 'any',
+    selectedCategory = category,
+    userIngredientsRaw = '',
     language = 'he',
     excludeTitles = [],
     excludeTemplateKeys = [],
@@ -203,6 +240,8 @@ export function rankSoupPatterns(
 ) {
   return rankRealisticPatterns(REALISTIC_SOUP_PATTERNS, userCanons, scoreSoupPattern, {
     category,
+    selectedCategory,
+    userIngredientsRaw,
     language,
     excludeTitles,
     excludeTemplateKeys,
@@ -244,17 +283,21 @@ export function buildRealisticSoupFromPattern(
     displayNames = [],
     language = 'he',
     cookingTime = 30,
-    pantryLabel = getBasicPantryLabel(language),
+    pantryLabel = '',
     servings = 4,
   } = {},
 ) {
   const cook = Math.min(cookingTime, Math.max(20, Math.round(cookingTime * 0.85)))
   const name = language === 'en' ? pattern.nameEn : pattern.nameHe
-  const ingredients = buildSoupIngredientList(pattern, filteredUserIngredients, displayNames, {
+  let ingredients = buildSoupIngredientList(pattern, filteredUserIngredients, displayNames, {
     language,
     pantryLabel,
   })
   const steps = language === 'en' ? pattern.stepsEn(cook) : pattern.stepsHe(cook)
+  ;({ ingredients } = ensureRecipeCookingEssentials(
+    { ingredients, steps },
+    { language, recipeType: 'soup_stew', pantryLabel },
+  ))
 
   const base = {
     name,

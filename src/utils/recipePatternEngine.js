@@ -8,6 +8,10 @@
  */
 
 import { isAnyCategory } from './recipeCategoryGuard'
+import {
+  buildUserIngredientProfile,
+  suggestCategoryFromIngredients,
+} from './recipeGenerationPolicy'
 
 /** Common pantry staples the engine may add for realistic dishes. */
 export const REAL_WORLD_PANTRY_CANONS = new Set([
@@ -38,6 +42,92 @@ export const REAL_WORLD_PANTRY_CANONS = new Set([
   'vanilla',
 ])
 
+const DAIRY_RESTRICTED_CANONS = new Set([
+  'milk',
+  'cheese',
+  'cream',
+  'butter',
+  'yogurt',
+  'ricotta',
+  'parmesan',
+  'feta',
+  'mozzarella',
+  'cottage cheese',
+])
+
+const LAND_MEAT_RESTRICTED_CANONS = new Set([
+  'chicken',
+  'beef',
+  'turkey',
+  'lamb',
+  'pork',
+  'meat',
+  'steak',
+  'ground beef',
+])
+
+const EGG_CANONS = new Set(['egg', 'eggs'])
+
+export function resolvePatternCategory(selectedCategory, userIngredientsRaw = '') {
+  if (selectedCategory === 'vegan') return 'parve'
+  if (isAnyCategory(selectedCategory)) {
+    const profile = buildUserIngredientProfile(userIngredientsRaw)
+    return suggestCategoryFromIngredients(profile)
+  }
+  return selectedCategory
+}
+
+function patternUsesRestrictedCanons(pattern, restrictedSet) {
+  for (const canon of pattern.required ?? []) {
+    if (restrictedSet.has(canon)) return true
+  }
+  for (const staple of pattern.pantryStaples ?? []) {
+    if (restrictedSet.has(staple.canon)) return true
+  }
+  return false
+}
+
+/**
+ * Block dairy/meat patterns unless the user selected that category or listed those ingredients.
+ */
+export function patternAllowedForUserIngredients(
+  pattern,
+  { selectedCategory = 'any', userCanons = new Set(), userIngredientsRaw = '' } = {},
+) {
+  const profile = buildUserIngredientProfile(userIngredientsRaw)
+  const effectiveCategory = resolvePatternCategory(selectedCategory, userIngredientsRaw)
+  const patternCategory = pattern.category ?? 'parve'
+
+  if (!patternMatchesSelectedCategory(pattern, effectiveCategory)) return false
+
+  const userAllowsDairy = selectedCategory === 'dairy' || profile.hasDairy
+  if (!userAllowsDairy) {
+    if (patternCategory === 'dairy') return false
+    if (patternUsesRestrictedCanons(pattern, DAIRY_RESTRICTED_CANONS)) return false
+  }
+
+  const userAllowsMeat = selectedCategory === 'meat' || profile.hasLandMeat
+  if (!userAllowsMeat) {
+    if (patternCategory === 'meat') return false
+    if (patternUsesRestrictedCanons(pattern, LAND_MEAT_RESTRICTED_CANONS)) return false
+  }
+
+  if (selectedCategory === 'vegan') {
+    if (patternCategory === 'dairy' || patternCategory === 'meat') return false
+    if (patternUsesRestrictedCanons(pattern, DAIRY_RESTRICTED_CANONS)) return false
+    if (patternUsesRestrictedCanons(pattern, LAND_MEAT_RESTRICTED_CANONS)) return false
+    for (const canon of pattern.required ?? []) {
+      if (EGG_CANONS.has(canon)) return false
+    }
+    for (const staple of pattern.pantryStaples ?? []) {
+      if (EGG_CANONS.has(staple.canon)) return false
+    }
+  }
+
+  void userCanons
+  return true
+}
+
 /**
  * @param {object} pattern
  * @param {string} category
@@ -64,6 +154,8 @@ export function rankRealisticPatterns(
   scorePattern,
   {
     category = 'any',
+    selectedCategory = category,
+    userIngredientsRaw = '',
     language = 'he',
     excludeTitles = [],
     excludeTemplateKeys = [],
@@ -75,7 +167,15 @@ export function rankRealisticPatterns(
   const ranked = []
 
   for (const pattern of patterns) {
-    if (!patternMatchesSelectedCategory(pattern, category)) continue
+    if (
+      !patternAllowedForUserIngredients(pattern, {
+        selectedCategory,
+        userCanons,
+        userIngredientsRaw,
+      })
+    ) {
+      continue
+    }
     if (excludeTemplateKeys.includes(pattern.id)) continue
     if (isExcludedTitle(pattern, language, excludeTitles)) continue
     if (pattern.cookingMethod && excludeCookingMethods.includes(pattern.cookingMethod)) continue

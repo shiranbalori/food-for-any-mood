@@ -5,6 +5,7 @@
 import { ingredientsMatch } from '../data/ingredientKnowledge'
 import { parseUserIngredients } from './ingredientRelevance'
 import { validateTitleGrounding } from './recipeGrounding'
+import { isLiteralIngredientTitle } from './recipeTitle'
 import { hasUnnaturalStepPhrasing } from './recipeStepWording'
 import { validateRecipeRelevance } from './ingredientRelevance'
 
@@ -25,6 +26,15 @@ export function isGenericRecipeTitle(title, userIngredients = []) {
     userIngredients.length > 0 &&
     FORBIDDEN_TITLE_TERMS.some((pattern) => pattern.test(text)) &&
     !userIngredients.some((item) => /וניל|vanilla/i.test(item))
+  ) {
+    return true
+  }
+  if (
+    userIngredients.length > 0 &&
+    !/אפויים|מקורמל|בשמנת|סלט|שקשוק|חבית|עוגת|מאפינס|מרק|פסטה|קרמ|כיכר|פנקייק|לביבות|קרפ/i.test(
+      text,
+    ) &&
+    isLiteralIngredientTitle(text, userIngredients, 'he')
   ) {
     return true
   }

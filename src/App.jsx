@@ -864,7 +864,7 @@ export default function App() {
                 showMoodSection={showMoodSection}
               />
             </div>
-          </div>
+        </div>
         )}
 
         {(loading ||
@@ -938,10 +938,10 @@ export default function App() {
                     onMealPlanUpdated={handleMealPlanUpdated}
                     onBackToEdit={!showRecipeForm ? handleBackToEdit : undefined}
                   />
-                </div>
+        </div>
               </>
             )}
-          </section>
+      </section>
         )}
 
         <div className="app__home-community">
