@@ -46,6 +46,13 @@ const DISH_IDEA_TARGETS = [
     match: /cheesecake|cheese\s*cake|עוג(?:ת|ה)\s*גבינ/i,
   },
   {
+    key: 'carrot_cake',
+    recipeType: 'dessert',
+    patternId: 'carrot_cake',
+    categoryHint: 'dairy',
+    match: /carrot\s*cake|עוג(?:ת|ה)\s*גזר/i,
+  },
+  {
     key: 'pancakes',
     recipeType: 'meal',
     patternId: 'classic_pancakes',
@@ -110,10 +117,24 @@ function findPatternByName(dishIdea, recipeType) {
   return null
 }
 
+function patternToTarget(pattern) {
+  return {
+    key: pattern.id,
+    recipeType: REALISTIC_DESSERT_PATTERNS.some((p) => p.id === pattern.id)
+      ? 'dessert'
+      : REALISTIC_SOUP_PATTERNS.some((p) => p.id === pattern.id)
+        ? 'soup_stew'
+        : 'meal',
+    patternId: pattern.id,
+    categoryHint: pattern.category,
+  }
+}
+
 /**
  * Resolve a dish idea to a concrete pattern target.
  */
 export function resolveDishIdeaTarget(dishIdeaRaw, { category = 'any', recipeType = 'meal', language = 'he' } = {}) {
+  void language
   const dishIdea = normalizeDishIdea(dishIdeaRaw)
   if (!dishIdea) return null
 
@@ -128,17 +149,13 @@ export function resolveDishIdeaTarget(dishIdeaRaw, { category = 'any', recipeTyp
 
   const byName = findPatternByName(dishIdea, recipeType)
   if (byName) {
-    return {
-      key: byName.id,
-      recipeType:
-        REALISTIC_DESSERT_PATTERNS.some((p) => p.id === byName.id)
-          ? 'dessert'
-          : REALISTIC_SOUP_PATTERNS.some((p) => p.id === byName.id)
-            ? 'soup_stew'
-            : 'meal',
-      patternId: byName.id,
-      categoryHint: byName.category,
-    }
+    return patternToTarget(byName)
+  }
+
+  for (const fallbackType of ['dessert', 'soup_stew', 'meal']) {
+    if (fallbackType === recipeType) continue
+    const crossMatch = findPatternByName(dishIdea, fallbackType)
+    if (crossMatch) return patternToTarget(crossMatch)
   }
 
   return null
@@ -175,6 +192,7 @@ export function buildRecipeFromDishIdea(
   dishIdeaRaw,
   {
     category = 'any',
+    recipeType = 'meal',
     ingredients = '',
     language = 'he',
     cookingTime = 30,
@@ -187,7 +205,7 @@ export function buildRecipeFromDishIdea(
   } = {},
 ) {
   const dishIdea = normalizeDishIdea(dishIdeaRaw)
-  const target = resolveDishIdeaTarget(dishIdea, { category, language })
+  const target = resolveDishIdeaTarget(dishIdea, { category, recipeType, language })
   if (!target) return null
 
   if (excludeTemplateKeys.includes(target.patternId)) return null

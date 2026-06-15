@@ -1684,6 +1684,7 @@ export function buildIngredientFirstFallbackRecipe(
   if (dishIdea?.trim()) {
     dishIdeaBuild = buildRecipeFromDishIdea(dishIdea, {
       category,
+      recipeType,
       ingredients,
       language,
       cookingTime,

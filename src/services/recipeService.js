@@ -1,5 +1,6 @@
 import { RECIPE_GENERATION_MODE } from '../config/recipeProvider'
-import { assessGenerationFeasibility } from '../utils/recipeGenerationPolicy.js'
+import { assessGenerationFeasibility, hasDishIdea } from '../utils/recipeGenerationPolicy.js'
+import { parseUserIngredients } from '../utils/ingredientRelevance.js'
 import { buildValidationFailureMessage } from '../utils/recipePreReturnValidation.js'
 import { normalizeMusicPlatform } from '../utils/musicPlatform'
 import { buildValidatedMockRecipe, generateAIRecipe } from './aiRecipeService'
@@ -282,6 +283,12 @@ export async function generateAppRecipe(params, options = {}) {
     dishIdea: normalized.dishIdea,
   })
   if (!feasibility.recipePossible) {
+    const hasInput =
+      hasDishIdea(normalized.dishIdea) || parseUserIngredients(normalized.ingredients ?? '').length > 0
+    if (hasInput) {
+      const lastResort = tryLastResortLocalFallback(normalized, mergedOptions)
+      if (lastResort) return lastResort
+    }
     const { reason, missingIngredients } = buildValidationFailureMessage({}, feasibility, {
       language: mergedOptions.language,
     })

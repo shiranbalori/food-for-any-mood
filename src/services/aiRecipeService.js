@@ -598,6 +598,7 @@ function canAcceptLocalFallbackRecipe(userInput, recipe, validation) {
     recipeType: userInput.recipeType,
     category: userInput.category,
     cookingTime: userInput.cookingTime,
+    dishIdeaDriven: Boolean(recipe.dishIdeaDriven) || hasDishIdea(userInput),
   })
 
   if ((preReturn.failures ?? []).some((f) => LOCAL_FALLBACK_BLOCKING_PRE_RETURN.has(f))) {
@@ -621,7 +622,59 @@ function acceptFallbackRecipe(userInput, fallbackRecipe, passed, validation, cat
   return null
 }
 
+function hasGenerationInput(userInput) {
+  return hasDishIdea(userInput) || parseUserIngredients(userInput.ingredients ?? '').length > 0
+}
+
+function acceptDishIdeaFallbackRecipe(userInput, recipe, meta) {
+  if (!hasDishIdea(userInput) && !recipe?.dishIdeaDriven) return null
+  if (!isValidGeneratedRecipe(recipe)) return null
+  return {
+    ...recipe,
+    templateKey: meta?.templateKey ?? recipe.patternId ?? recipe.templateKey ?? 'dish-idea',
+  }
+}
+
+function buildDishIdeaFallbackRecipe(userInput) {
+  if (!hasDishIdea(userInput)) return null
+
+  const effectiveRecipeType = getEffectiveRecipeType(userInput.recipeType, userInput.category)
+  const { recipe, meta } = buildMockRecipe(
+    {
+      category: userInput.category,
+      ingredients: userInput.ingredients,
+      dishIdea: userInput.dishIdea ?? '',
+      cookingTime: userInput.cookingTime,
+      mood: userInput.mood,
+      isGlutenFree: userInput.isGlutenFree,
+      musicPlatform: userInput.musicPlatform,
+      servings: userInput.servings,
+      recipeType: effectiveRecipeType,
+    },
+    {
+      language: userInput.language,
+      pantrySuffix: userInput.pantrySuffix,
+      excludeTemplateKeys: userInput.excludeTemplateKeys,
+      excludeTitles: userInput.excludeTitles,
+      excludeCookingMethods: userInput.excludeCookingMethods,
+      excludeDessertCategories: userInput.excludeDessertCategories,
+      dishIdea: userInput.dishIdea ?? '',
+    },
+  )
+
+  return acceptDishIdeaFallbackRecipe(userInput, recipe, meta)
+}
+
 function buildCategoryFallbackRecipe(userInput) {
+  const dishIdeaFallback = buildDishIdeaFallbackRecipe(userInput)
+  if (dishIdeaFallback) {
+    console.warn('[aiRecipeService] Using dish-idea local fallback recipe', {
+      title: dishIdeaFallback.name,
+      patternId: dishIdeaFallback.patternId,
+    })
+    return dishIdeaFallback
+  }
+
   const effectiveRecipeType = getEffectiveRecipeType(userInput.recipeType, userInput.category)
   const triedTemplateKeys = [...(userInput.excludeTemplateKeys ?? [])]
 
@@ -839,8 +892,38 @@ function tryValidatedMockFallback(userInput, timer = null, reason = 'unknown') {
     category: userInput.category,
     recipeType: userInput.recipeType,
     ingredientCount: parseUserIngredients(userInput.ingredients ?? '').length,
+    dishIdea: userInput.dishIdea ?? '',
   })
+  const dishIdeaFallback = buildDishIdeaFallbackRecipe(userInput)
+  if (dishIdeaFallback) return dishIdeaFallback
   return fetchMockFallbackRecipe(userInput, timer)
+}
+
+function resolveLocalFallbackOrUnavailable(userInput, timer, context, impossibleReason, missingIngredients = []) {
+  if (hasGenerationInput(userInput)) {
+    const dishIdeaFallback = buildDishIdeaFallbackRecipe(userInput)
+    if (dishIdeaFallback) {
+      timer?.mark(`${context}:dishIdeaFallback`, 'Success', dishIdeaFallback.name)
+      return buildMockFallbackSuccessResult(dishIdeaFallback, timer)
+    }
+
+    const mockFallback = tryValidatedMockFallback(userInput, timer, context)
+    if (mockFallback) {
+      return buildMockFallbackSuccessResult(mockFallback, timer)
+    }
+
+    const cinnamonEmergency = attemptCinnamonEmergencyResult(userInput, timer, `${context}:mockFailed`)
+    if (cinnamonEmergency) return cinnamonEmergency
+  }
+
+  timer?.printTable()
+  return {
+    recipe: null,
+    recipePossible: false,
+    impossibleReason: resolveFallbackFailureReason(impossibleReason, userInput.language),
+    missingIngredients,
+    fallbackReason: null,
+  }
 }
 
 function buildMockFallbackSuccessResult(recipe, timer = null) {
@@ -890,6 +973,9 @@ async function generateAIRecipeCore(userInput) {
   const safety = assessIngredientSafety(normalized.ingredients, { language: normalized.language })
   timer.mark('assessIngredientSafety', safety.ok ? 'Success' : 'Failed')
   if (!safety.ok) {
+    if (hasGenerationInput(normalized)) {
+      return resolveLocalFallbackOrUnavailable(normalized, timer, 'safety:reject', safety.reason, safety.invalidIngredients ?? [])
+    }
     timer.printTable()
     return {
       recipe: null,
@@ -909,6 +995,12 @@ async function generateAIRecipeCore(userInput) {
   })
   timer.mark('assessIngredientFeasibility', feasibility.recipePossible ? 'Success' : 'Failed')
   if (!feasibility.recipePossible) {
+    if (hasGenerationInput(normalized)) {
+      const { reason, missingIngredients } = buildValidationFailureMessage({}, feasibility, {
+        language: normalized.language,
+      })
+      return resolveLocalFallbackOrUnavailable(normalized, timer, 'feasibility:reject', reason, missingIngredients)
+    }
     timer.printTable()
     const { reason, missingIngredients } = buildValidationFailureMessage({}, feasibility, {
       language: normalized.language,
@@ -931,18 +1023,13 @@ async function generateAIRecipeCore(userInput) {
         'backend:recipePossibleFalse',
       )
       if (cinnamonEmergency) return cinnamonEmergency
-      const mockFallback = tryValidatedMockFallback(normalized, timer, 'backend:recipePossibleFalse')
-      if (mockFallback) {
-        return buildMockFallbackSuccessResult(mockFallback, timer)
-      }
-      timer.printTable()
-      return {
-        recipe: null,
-        recipePossible: false,
-        impossibleReason: resolveFallbackFailureReason(backendResult.impossibleReason, normalized.language),
-        missingIngredients: backendResult.missingIngredients ?? [],
-        fallbackReason: null,
-      }
+      return resolveLocalFallbackOrUnavailable(
+        normalized,
+        timer,
+        'backend:recipePossibleFalse',
+        backendResult.impossibleReason,
+        backendResult.missingIngredients ?? [],
+      )
     }
 
     const { recipe: backendRecipe, source, geminiError } = backendResult
@@ -973,28 +1060,21 @@ async function generateAIRecipeCore(userInput) {
         'processGeneratedRecipe:reject',
       )
       if (cinnamonEmergency) return cinnamonEmergency
-      const mockFallback = tryValidatedMockFallback(normalized, timer, 'processGeneratedRecipe:reject')
-      if (mockFallback) {
-        return buildMockFallbackSuccessResult(mockFallback, timer)
-      }
-      timer.mark('processGeneratedRecipe:reject', 'Failed')
-      timer.printTable()
       const { reason, missingIngredients } = buildValidationFailureMessage(
         processed.validation?.preReturn ?? processed.validation ?? {},
         null,
         { language: normalized.language },
       )
-      return {
-        recipe: null,
-        recipePossible: false,
-        impossibleReason:
-          reason ||
+      return resolveLocalFallbackOrUnavailable(
+        normalized,
+        timer,
+        'processGeneratedRecipe:reject',
+        reason ||
           (normalized.language === 'he'
             ? 'לא הצלחנו ליצור מתכון אמין מהמרכיבים — נסו שוב.'
             : 'We could not create a trustworthy recipe from your ingredients — please try again.'),
         missingIngredients,
-        fallbackReason: null,
-      }
+      )
     }
     const recipe = processed.recipe
     const userIngredients = parseUserIngredients(normalized.ingredients ?? '')
@@ -1036,23 +1116,18 @@ async function generateAIRecipeCore(userInput) {
           'preReturnValidation:reject',
         )
         if (cinnamonEmergency) return cinnamonEmergency
-        const mockFallback = tryValidatedMockFallback(normalized, timer, 'preReturnValidation:reject')
-        if (mockFallback) {
-          return buildMockFallbackSuccessResult(mockFallback, timer)
-        }
-        console.warn('[aiRecipeService] Recipe failed pre-return validation:', preReturn.failures)
-        timer.mark('preReturnValidation:reject', 'Failed')
-        timer.printTable()
         const { reason, missingIngredients } = buildValidationFailureMessage(preReturn, null, {
           language: normalized.language,
         })
-        return {
-          recipe: null,
-          recipePossible: false,
-          impossibleReason: reason,
+        console.warn('[aiRecipeService] Recipe failed pre-return validation:', preReturn.failures)
+        timer.mark('preReturnValidation:reject', 'Failed')
+        return resolveLocalFallbackOrUnavailable(
+          normalized,
+          timer,
+          'preReturnValidation:reject',
+          reason,
           missingIngredients,
-          fallbackReason: null,
-        }
+        )
       }
       console.warn('[aiRecipeService] Continuing despite pre-return validation failures', {
         failures: preReturn.failures ?? [],
@@ -1092,18 +1167,17 @@ async function generateAIRecipeCore(userInput) {
       if (mockFallback) {
         return buildMockFallbackSuccessResult(mockFallback, timer)
       }
-      timer.printTable()
       const reason =
         normalized.language === 'he'
           ? 'לא הצלחנו ליצור מתכון שונה מהמתכון הקודם. נסו שוב.'
           : 'We could not generate a recipe different from the previous one. Please try again.'
-      return {
-        recipe: null,
-        recipePossible: false,
-        impossibleReason: reason,
-        missingIngredients: [],
-        fallbackReason: null,
-      }
+      return resolveLocalFallbackOrUnavailable(
+        normalized,
+        timer,
+        'diversityValidation:reject',
+        reason,
+        [],
+      )
     }
 
     if (source === 'gemini') {
@@ -1130,23 +1204,15 @@ async function generateAIRecipeCore(userInput) {
     timer.fail('generateAIRecipeCore', error)
     logFetchError('Generate-recipe failed', error)
     console.warn('[aiRecipeService] Using local mock fallback after generate failure')
-    const fallbackRecipe = fetchMockFallbackRecipe(normalized, timer)
-    timer.mark('complete', 'Success', 'frontend mock after error')
-    timer.printTable()
-    if (!fallbackRecipe) {
-      const cinnamonEmergency = attemptCinnamonEmergencyResult(
-        normalized,
-        timer,
-        'catch:mockFallbackFailed',
-      )
-      if (cinnamonEmergency) return cinnamonEmergency
-      return buildFallbackUnavailableResult(normalized.language)
-    }
-    return {
-      recipe: fallbackRecipe,
-      recipePossible: true,
-      fallbackReason: 'fallback',
-    }
+    return resolveLocalFallbackOrUnavailable(
+      normalized,
+      timer,
+      'catch:generateFailed',
+      normalized.language === 'he'
+        ? 'לא הצלחנו ליצור מתכון אמין מהמרכיבים — נסו שוב.'
+        : 'We could not create a trustworthy recipe from your ingredients — please try again.',
+      [],
+    )
   }
 }
 
@@ -1178,22 +1244,16 @@ export async function generateAIRecipe(userInput) {
     outerTimer.fail('generateAIRecipeCore (15s outer timeout)', error)
     logFetchError('Recipe generation exceeded 15s limit', error)
     const normalized = normalizeUserInput(userInput)
-    const recipe = fetchMockFallbackRecipe(normalized, outerTimer)
-    outerTimer.mark('timeoutRecovery:mockFallback', 'Success')
-    outerTimer.printTable()
-    if (!recipe) {
-      const cinnamonEmergency = attemptCinnamonEmergencyResult(
+    return reconcileAIRecipeResult(
+      resolveLocalFallbackOrUnavailable(
         normalized,
         outerTimer,
-        'outerTimeout:mockFallbackFailed',
-      )
-      if (cinnamonEmergency) return reconcileAIRecipeResult(cinnamonEmergency)
-      return buildFallbackUnavailableResult(normalized.language)
-    }
-    return reconcileAIRecipeResult({
-      recipe,
-      recipePossible: true,
-      fallbackReason: 'fallback',
-    })
+        'outerTimeout',
+        normalized.language === 'he'
+          ? 'לא הצלחנו ליצור מתכון אמין מהמרכיבים — נסו שוב.'
+          : 'We could not create a trustworthy recipe from your ingredients — please try again.',
+        [],
+      ),
+    )
   }
 }

@@ -58,4 +58,30 @@ assert(
 )
 console.log('✅ dish idea pancakes quality →', pancakes.name, pancakes.ingredients.join(' | '))
 
+const carrotCake = buildValidatedMockRecipe({
+  category: 'dairy',
+  recipeType: 'meal',
+  ingredients: '',
+  dishIdea: 'עוגת גזר',
+  cookingTime: 45,
+  mood: 'cozy',
+  language: 'he',
+})
+assert(carrotCake?.name === 'עוגת גזר', `expected עוגת גזר, got ${carrotCake?.name}`)
+const carrotCanons = ingredientCanons(carrotCake)
+assert(carrotCanons.includes('flour'), `carrot cake missing flour: ${carrotCake.ingredients?.join(', ')}`)
+assert(carrotCanons.includes('carrot'), `carrot cake missing carrot: ${carrotCake.ingredients?.join(', ')}`)
+assert(carrotCanons.includes('egg'), `carrot cake missing egg: ${carrotCake.ingredients?.join(', ')}`)
+assert(carrotCanons.includes('sugar'), `carrot cake missing sugar: ${carrotCake.ingredients?.join(', ')}`)
+assert(
+  carrotCanons.includes('baking powder'),
+  `carrot cake missing baking powder: ${carrotCake.ingredients?.join(', ')}`,
+)
+assert(
+  carrotCanons.includes('cinnamon'),
+  `carrot cake missing cinnamon: ${carrotCake.ingredients?.join(', ')}`,
+)
+assert((carrotCake.steps ?? []).length >= 4, 'carrot cake needs realistic steps')
+console.log('✅ dish idea carrot cake →', carrotCake.name, carrotCake.ingredients.join(' | '))
+
 console.log('\nAll dish idea tests passed')
