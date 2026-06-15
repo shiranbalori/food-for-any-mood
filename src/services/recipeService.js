@@ -1,6 +1,7 @@
 import { RECIPE_GENERATION_MODE } from '../config/recipeProvider'
 import { assessGenerationFeasibility } from '../utils/recipeGenerationPolicy.js'
 import { buildValidationFailureMessage } from '../utils/recipePreReturnValidation.js'
+import { normalizeMusicPlatform } from '../utils/musicPlatform'
 import { buildValidatedMockRecipe, generateAIRecipe } from './aiRecipeService'
 import { buildMockRecipe } from './mockRecipeProvider'
 
@@ -17,6 +18,7 @@ import { buildMockRecipe } from './mockRecipeProvider'
  * @property {MusicPlatform} musicPlatform
  * @property {number} [servings=4]
  * @property {'meal' | 'dessert'} [recipeType='meal']
+ * @property {string} [dishIdea='']
  *
  * @typedef {Object} GenerateRecipeOptions
  * @property {string} [language='he']
@@ -76,9 +78,10 @@ export function normalizeGenerateParams(params) {
     cookingTime: params.cookingTime ?? 30,
     mood: params.mood ?? 'cozy',
     isGlutenFree: Boolean(params.isGlutenFree),
-    musicPlatform: params.musicPlatform ?? 'spotify',
+    musicPlatform: normalizeMusicPlatform(params.musicPlatform),
     servings: params.servings ?? 4,
     recipeType: params.recipeType ?? 'meal',
+    dishIdea: params.dishIdea ?? '',
   }
 }
 
@@ -101,8 +104,7 @@ export function validateGeneratedRecipe(value) {
     r.nutrition &&
     typeof r.nutrition.calories === 'number' &&
     typeof r.healthScore === 'number' &&
-    Array.isArray(r.tags) &&
-    r.playlist != null
+    Array.isArray(r.tags)
   )
 }
 
@@ -220,10 +222,12 @@ function toAppRecipe(recipe, meta) {
     healthScore: recipe.healthScore,
     spiceLevel: recipe.spiceLevel,
     tags: recipe.tags,
-    playlist: recipe.playlist,
+    playlist: normalizeMusicPlatform(meta.musicPlatform) ? recipe.playlist : null,
     optionalUpgrades: recipe.optionalUpgrades ?? [],
     generatedFromPreferences: Boolean(recipe.generatedFromPreferences),
     categoryNote: recipe.categoryNote ?? null,
+    baseIngredientsAdded: Boolean(recipe.baseIngredientsAdded),
+    requestedDishIdea: recipe.requestedDishIdea ?? null,
     savedAt: null,
   }
 }
@@ -275,6 +279,7 @@ export async function generateAppRecipe(params, options = {}) {
     category: normalized.category,
     isGlutenFree: normalized.isGlutenFree,
     language: mergedOptions.language,
+    dishIdea: normalized.dishIdea,
   })
   if (!feasibility.recipePossible) {
     const { reason, missingIngredients } = buildValidationFailureMessage({}, feasibility, {

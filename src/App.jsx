@@ -30,6 +30,7 @@ import ChallengeSubmitModal from './components/dailyChallenge/ChallengeSubmitMod
 import AuthModal from './components/AuthModal'
 import { userSubmittedToday } from './services/dailyChallengeService'
 import { useLanguage } from './i18n/useLanguage'
+import { isMusicPlatformSelected } from './utils/musicPlatform'
 import { getTheme } from './utils/themes'
 import { generateAppRecipe } from './services/recipeService'
 import { useIsMobileLayout } from './hooks/useIsMobileLayout'
@@ -78,18 +79,16 @@ const GLOBAL_PAGES = {
 
 const INITIAL_FORM = {
   ingredients: '',
+  dishIdea: '',
   time: 30,
   mood: 'cozy',
   glutenFree: false,
-  musicPlatform: 'spotify',
+  musicPlatform: null,
   servings: 4,
 }
 
-function createInitialForm(isMobileLayout) {
-  return {
-    ...INITIAL_FORM,
-    musicPlatform: isMobileLayout ? null : INITIAL_FORM.musicPlatform,
-  }
+function createInitialForm() {
+  return { ...INITIAL_FORM }
 }
 
 export default function App() {
@@ -100,7 +99,7 @@ export default function App() {
   const [myRecipesCount, setMyRecipesCount] = useState(0)
   const [category, setCategory] = useState('any')
   const [recipeType, setRecipeType] = useState('meal')
-  const [form, setForm] = useState(() => createInitialForm(isMobileLayout))
+  const [form, setForm] = useState(() => createInitialForm())
   const [recipe, setRecipe] = useState(null)
   const [loading, setLoading] = useState(false)
   const [savedRecipes, setSavedRecipes] = useState(getSavedRecipes)
@@ -147,11 +146,6 @@ export default function App() {
   useEffect(() => {
     recipeRef.current = recipe
   }, [recipe])
-
-  useEffect(() => {
-    if (isMobileLayout) return
-    setForm((prev) => (prev.musicPlatform ? prev : { ...prev, musicPlatform: 'spotify' }))
-  }, [isMobileLayout])
 
   const getNavigationSnapshot = useCallback(
     (overrides = {}) => ({
@@ -349,9 +343,7 @@ export default function App() {
   }
 
   const showMoodSection =
-    !isMobileLayout ||
-    form.musicPlatform === 'spotify' ||
-    form.musicPlatform === 'youtube'
+    !isMobileLayout || isMusicPlatformSelected(form.musicPlatform)
 
   const handleGenerate = useCallback(
     async (options = {}) => {
@@ -392,6 +384,7 @@ export default function App() {
           {
             category,
             ingredients: form.ingredients,
+            dishIdea: form.dishIdea,
             cookingTime: form.time,
             mood: form.mood,
             isGlutenFree: form.glutenFree,
@@ -768,7 +761,7 @@ export default function App() {
       time: saved.time ?? 30,
       mood: saved.mood ?? 'cozy',
       glutenFree: saved.glutenFree ?? false,
-      musicPlatform: saved.musicPlatform ?? 'spotify',
+      musicPlatform: saved.musicPlatform ?? null,
     })
     setUsedTemplateKeys(saved.templateKey ? [saved.templateKey] : [])
     setRecipe(saved)
@@ -848,7 +841,7 @@ export default function App() {
                 <MusicPlatformSelector
                   selected={form.musicPlatform}
                   onChange={handleMusicPlatformChange}
-                  allowDeselect={isMobileLayout}
+                  allowDeselect
                   theme={theme}
                 />
               </div>

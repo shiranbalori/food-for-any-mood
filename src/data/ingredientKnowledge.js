@@ -108,13 +108,24 @@ export const INGREDIENT_NUTRITION = {
   default: { calories: 15, protein: 0.5, carbs: 2, fat: 0.5 },
 }
 
+function ingredientTermMatches(normalized, term) {
+  if (!term) return false
+  if (normalized === term) return true
+  if (term.length >= 3 && normalized.includes(term)) return true
+  if (normalized.length >= 3 && term.includes(normalized)) {
+    const re = new RegExp(`(?:^|\\s)${normalized.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?:\\s|$)`)
+    return re.test(term)
+  }
+  return false
+}
+
 export function canonicalIngredient(raw) {
   const normalized = normalizeIngredient(raw)
   if (!normalized) return null
 
   for (const [canonical, aliases] of Object.entries(INGREDIENT_SYNONYMS)) {
     const all = [canonical, ...aliases].map(normalizeIngredient)
-    if (all.some((term) => normalized === term || normalized.includes(term) || term.includes(normalized))) {
+    if (all.some((term) => ingredientTermMatches(normalized, term))) {
       return canonical
     }
   }

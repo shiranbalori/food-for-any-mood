@@ -33,6 +33,8 @@ import {
   validateGeneratedRecipeRealism,
 } from '../utils/recipeRealismValidation'
 import { ensureRecipeCookingEssentials } from '../utils/recipeCookingEssentials'
+import { normalizeMusicPlatform } from '../utils/musicPlatform'
+import { hasDishIdea } from '../utils/dishIdeaUtils'
 import {
   buildCinnamonEmergencyRecipe,
   describeCinnamonEmergencyDetection,
@@ -103,6 +105,7 @@ function attemptCinnamonEmergencyResult(userInput, timer, context) {
  * @property {string[]} [excludeDessertCategories]
  * @property {number} [servings=4]
  * @property {'meal' | 'dessert'} [recipeType='meal']
+ * @property {string} [dishIdea='']
  */
 
 /**
@@ -133,13 +136,14 @@ function buildApiRequestPayload(userInput) {
     cookingTime: userInput.cookingTime ?? 30,
     mood: userInput.mood ?? 'cozy',
     isGlutenFree: Boolean(userInput.isGlutenFree),
-    musicPlatform: userInput.musicPlatform ?? 'spotify',
+    musicPlatform: normalizeMusicPlatform(userInput.musicPlatform),
     servings: userInput.servings ?? 4,
     recipeType: userInput.recipeType ?? 'meal',
     language: userInput.language ?? 'he',
     excludeTitles: userInput.excludeTitles ?? [],
     excludeCookingMethods: userInput.excludeCookingMethods ?? [],
     excludeDessertCategories: userInput.excludeDessertCategories ?? [],
+    dishIdea: userInput.dishIdea ?? '',
   }
 }
 
@@ -150,7 +154,7 @@ function normalizeUserInput(userInput) {
     cookingTime: userInput.cookingTime ?? 30,
     mood: userInput.mood ?? 'cozy',
     isGlutenFree: Boolean(userInput.isGlutenFree),
-    musicPlatform: userInput.musicPlatform ?? 'spotify',
+    musicPlatform: normalizeMusicPlatform(userInput.musicPlatform),
     language: userInput.language ?? 'he',
     pantrySuffix: userInput.pantrySuffix,
     excludeTemplateKeys: userInput.excludeTemplateKeys ?? [],
@@ -159,6 +163,7 @@ function normalizeUserInput(userInput) {
     excludeDessertCategories: userInput.excludeDessertCategories ?? [],
     servings: userInput.servings ?? 4,
     recipeType: userInput.recipeType ?? 'meal',
+    dishIdea: userInput.dishIdea ?? '',
   }
 }
 
@@ -172,6 +177,7 @@ function assertUserInput(userInput) {
 }
 
 function isPreferenceBasedGeneration(userInput) {
+  if (hasDishIdea(userInput)) return false
   return parseUserIngredients(userInput?.ingredients ?? '').length === 0
 }
 
@@ -194,8 +200,7 @@ function isValidGeneratedRecipe(value) {
     recipe.nutrition &&
     typeof recipe.nutrition.calories === 'number' &&
     typeof recipe.healthScore === 'number' &&
-    Array.isArray(recipe.tags) &&
-    recipe.playlist != null
+    Array.isArray(recipe.tags)
   )
 }
 
@@ -373,10 +378,14 @@ function finalizeRecipeForUser(userInput, recipe, meta = {}) {
         ...recipe,
         ingredients: cleanedIngredients,
         steps: cleanedSteps,
+        patternId: recipe.patternId,
+        requestedDishIdea: recipe.requestedDishIdea ?? userInput.dishIdea,
       },
       {
         language: userInput.language ?? 'he',
         recipeType: userInput.recipeType ?? 'meal',
+        dishIdea: userInput.dishIdea ?? recipe.requestedDishIdea,
+        patternId: recipe.patternId,
       },
     )
     parsed = {
@@ -486,6 +495,9 @@ function finalizeRecipeForUser(userInput, recipe, meta = {}) {
       generatedFromPreferences: preferenceBased,
       categoryNote: categoryNote || undefined,
       optionalUpgrades: preferenceBased ? [] : (typed.optionalUpgrades ?? []),
+      baseIngredientsAdded: typed.baseIngredientsAdded,
+      requestedDishIdea: typed.requestedDishIdea,
+      playlist: normalizeMusicPlatform(userInput.musicPlatform) ? typed.playlist : null,
     },
     userInput.language ?? 'he',
   )
@@ -618,6 +630,7 @@ function buildCategoryFallbackRecipe(userInput) {
       {
         category: userInput.category,
         ingredients: userInput.ingredients,
+        dishIdea: userInput.dishIdea ?? '',
         cookingTime: userInput.cookingTime,
         mood: userInput.mood,
         isGlutenFree: userInput.isGlutenFree,
@@ -632,6 +645,7 @@ function buildCategoryFallbackRecipe(userInput) {
         excludeTitles: userInput.excludeTitles,
         excludeCookingMethods: userInput.excludeCookingMethods,
         excludeDessertCategories: userInput.excludeDessertCategories,
+        dishIdea: userInput.dishIdea ?? '',
       },
     )
 
@@ -702,6 +716,7 @@ function buildCategoryFallbackRecipe(userInput) {
     {
       category: userInput.category,
       ingredients: userInput.ingredients,
+      dishIdea: userInput.dishIdea ?? '',
       cookingTime: userInput.cookingTime,
       mood: userInput.mood,
       isGlutenFree: userInput.isGlutenFree,
@@ -716,6 +731,7 @@ function buildCategoryFallbackRecipe(userInput) {
       excludeTitles: userInput.excludeTitles,
       excludeCookingMethods: userInput.excludeCookingMethods,
       excludeDessertCategories: userInput.excludeDessertCategories,
+      dishIdea: userInput.dishIdea ?? '',
     },
   )
   const { recipe: finalized, passed, validation, categoryPassed } = finalizeRecipeForUser(
@@ -889,6 +905,7 @@ async function generateAIRecipeCore(userInput) {
     category: normalized.category,
     isGlutenFree: normalized.isGlutenFree,
     language: normalized.language,
+    dishIdea: normalized.dishIdea,
   })
   timer.mark('assessIngredientFeasibility', feasibility.recipePossible ? 'Success' : 'Failed')
   if (!feasibility.recipePossible) {

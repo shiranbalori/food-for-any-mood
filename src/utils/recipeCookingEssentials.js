@@ -7,6 +7,11 @@ import { canonicalIngredient, ingredientsMatch } from '../data/ingredientKnowled
 import { stripQuantityPrefix, parseAnyLeadingMeasurement } from './measurementUnits'
 import { getBasicPantryLabel, stripBasicPantryLabel } from './dessertRecipeBuilder'
 import { isSystemPantryIngredient } from './ingredientAllowlist'
+import {
+  applyDishCookingProfile,
+  resolveDishCookingOptions,
+  stripForbiddenDishIngredients,
+} from './dishCookingProfiles'
 
 /** @typedef {{ canon: string, he: string, en: string, needsPantryLabel?: boolean }} EssentialPreset */
 
@@ -138,9 +143,21 @@ function dishTypeRequiresSalt(recipe, recipeType) {
   return dishTypeRequiresLiquid(recipe, recipeType)
 }
 
-function dishTypeRequiresOil(recipe) {
+function dishUsesButterFat(recipe, options = {}) {
+  if (options.useButterNotOil) return true
   const steps = stepsBlob(recipe)
-  if (/\b(?:שמן|oil|olive)\b/i.test(steps)) return true
+  const ingredients = ingredientLines(recipe)
+  if (/\b(?:חמאה|butter)\b/i.test(steps)) return true
+  return ingredientsIncludeCanon(ingredients, 'butter')
+}
+
+function dishTypeRequiresOil(recipe, options = {}) {
+  const profile = options.dishProfile
+  if (profile?.useButterNotOil || profile?.forbiddenCanons?.includes('oil')) return false
+  if (dishUsesButterFat(recipe, options)) return false
+
+  const steps = stepsBlob(recipe)
+  if (/\b(?:שמן(?:\s+זית)?|oil|olive\s+oil)\b/i.test(steps)) return true
   if (/מטגנ(?:ים|)|saut[ée]|fry|brown/i.test(steps)) return true
   return false
 }
@@ -184,20 +201,40 @@ function formatEssentialLine(presetKey, { language = 'he', recipeType = 'meal', 
   return `${base} ${label}`.trim()
 }
 
+function shouldSkipGenericCanon(canon, options = {}) {
+  const skip = options.skipGenericCanons ?? options.dishProfile?.skipGenericCanons ?? []
+  return skip.includes(canon)
+}
+
 /**
  * Determine which essential preset keys are missing from the ingredient list.
  */
-export function findMissingCookingEssentials(recipe, { recipeType = 'meal' } = {}) {
+export function findMissingCookingEssentials(recipe, options = {}) {
+  const resolved = resolveDishCookingOptions(recipe, options)
+  const recipeType = resolved.recipeType ?? 'meal'
+  const profile = resolved.dishProfile
   const ingredients = ingredientLines(recipe)
   const steps = stepsBlob(recipe)
   const missingKeys = []
   const neededCanons = new Set()
 
-  if (dishTypeRequiresLiquid(recipe, recipeType)) neededCanons.add('water')
+  if (profile?.requiresLiquid || dishTypeRequiresLiquid(recipe, recipeType)) neededCanons.add('water')
   if (dishTypeRequiresSalt(recipe, recipeType)) neededCanons.add('salt')
-  if (dishTypeRequiresOil(recipe)) neededCanons.add('oil')
+  if (dishTypeRequiresOil(recipe, resolved)) neededCanons.add('oil')
 
   for (const canon of bakedDessertNeeds(recipe, recipeType)) {
+    neededCanons.add(canon)
+  }
+
+  if (profile?.requiresBakingStaples) {
+    for (const canon of ['flour', 'sugar', 'egg', 'butter', 'baking powder', 'vanilla']) {
+      if (/\b(?:קמח|flour|סוכר|sugar|ביצ|egg|חמאה|butter|אבק(?:ת|ה)\s+אפייה|baking\s+powder|וניל|vanilla)\b/i.test(`${recipe.name}\n${steps}`)) {
+        neededCanons.add(canon)
+      }
+    }
+  }
+
+  for (const canon of profile?.requiredCanons ?? []) {
     neededCanons.add(canon)
   }
 
@@ -206,6 +243,9 @@ export function findMissingCookingEssentials(recipe, { recipeType = 'meal' } = {
   }
 
   for (const canon of neededCanons) {
+    if (shouldSkipGenericCanon(canon, resolved)) continue
+    if (profile?.forbiddenCanons?.includes(canon)) continue
+    if (canon === 'oil' && dishUsesButterFat(recipe, resolved)) continue
     if (ingredientsIncludeCanon(ingredients, canon)) continue
     if (canon === 'water' && ingredientsIncludeCanon(ingredients, 'broth')) continue
     const key = presetKeyForCanon(canon, { recipeType, steps, ingredients })
@@ -219,28 +259,34 @@ export function findMissingCookingEssentials(recipe, { recipeType = 'meal' } = {
  * Add missing cooking essentials so the recipe matches its steps and dish type.
  */
 export function ensureRecipeCookingEssentials(recipe, options = {}) {
-  const language = options.language ?? 'he'
-  const recipeType = options.recipeType ?? 'meal'
-  const pantryLabel = options.pantryLabel ?? ''
-  const ingredients = [...ingredientLines(recipe)]
-  const missingKeys = findMissingCookingEssentials(recipe, { recipeType })
+  const resolved = resolveDishCookingOptions(recipe, options)
+  const language = resolved.language ?? 'he'
+  const recipeType = resolved.recipeType ?? 'meal'
+  const pantryLabel = resolved.pantryLabel ?? ''
 
-  if (!missingKeys.length) return recipe
+  let working = applyDishCookingProfile(recipe, resolved)
+  const ingredients = [...ingredientLines(working)]
+  const missingKeys = findMissingCookingEssentials(working, resolved)
 
   const additions = missingKeys
     .map((key) => formatEssentialLine(key, { language, recipeType, pantryLabel }))
     .filter(Boolean)
 
-  return {
-    ...recipe,
+  working = {
+    ...working,
     ingredients: [...ingredients, ...additions],
   }
+
+  return stripForbiddenDishIngredients(working, resolved.dishProfile)
 }
 
 /**
  * @returns {{ ok: boolean, failures: string[] }}
  */
-export function validateRecipeCookingEssentials(recipe, { recipeType = 'meal' } = {}) {
+export function validateRecipeCookingEssentials(recipe, options = {}) {
+  const resolved = resolveDishCookingOptions(recipe, options)
+  const recipeType = resolved.recipeType ?? 'meal'
+  const profile = resolved.dishProfile
   const failures = []
   const steps = stepsBlob(recipe)
   const ingredients = ingredientLines(recipe)
@@ -261,8 +307,14 @@ export function validateRecipeCookingEssentials(recipe, { recipeType = 'meal' } 
     failures.push('missing_salt')
   }
 
-  if (dishTypeRequiresOil(recipe) && !ingredientsIncludeCanon(ingredients, 'oil')) {
+  if (dishTypeRequiresOil(recipe, resolved) && !ingredientsIncludeCanon(ingredients, 'oil')) {
     failures.push('missing_oil')
+  }
+
+  for (const canon of profile?.requiredCanons ?? []) {
+    if (!ingredientsIncludeCanon(ingredients, canon)) {
+      failures.push(`dish_missing_${canon.replace(/\s+/g, '_')}`)
+    }
   }
 
   for (const canon of staplesMentionedInSteps(steps)) {

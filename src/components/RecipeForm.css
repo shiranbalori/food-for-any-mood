@@ -27,8 +27,28 @@
   margin-bottom: 0.55rem;
 }
 
-.recipe-form__field--ingredients .recipe-form__hint {
-  margin-top: 0.35rem;
+.recipe-form__field--dish-idea {
+  margin-bottom: 1.1rem;
+}
+
+.recipe-form__dish-idea-input {
+  width: 100%;
+  padding: 0.85rem 1.1rem;
+  border: 1.5px solid rgba(148, 163, 184, 0.25);
+  border-radius: var(--radius-sm);
+  font-size: 0.95rem;
+  transition:
+    border-color var(--transition),
+    box-shadow var(--transition),
+    background var(--transition);
+  background: var(--surface-solid);
+  box-sizing: border-box;
+}
+
+.recipe-form__dish-idea-input:focus {
+  outline: none;
+  border-color: var(--theme-accent);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--theme-accent) 15%, transparent);
 }
 
 .recipe-form__field--time {
@@ -161,6 +181,50 @@
   width: 100%;
 }
 
+@media (max-width: 899px) {
+  .recipe-form__field--ingredients {
+    margin-bottom: 0.35rem;
+  }
+
+  .recipe-form__field--dish-idea {
+    margin-bottom: 0.55rem;
+  }
+
+  .recipe-form__field--time {
+    margin-bottom: 0.75rem;
+  }
+
+  .recipe-form__ingredients-input {
+    display: block;
+    width: 100%;
+  }
+
+  .recipe-form__ingredients-text {
+    width: 100%;
+    max-width: 100%;
+    margin: 0;
+  }
+
+  .recipe-form__ingredients-textarea,
+  .recipe-form__field--ingredients textarea {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    margin: 0;
+    padding: 0.85rem 1.1rem;
+    border: 1.5px solid rgba(148, 163, 184, 0.25);
+    border-radius: var(--radius-sm);
+    font-size: 0.95rem;
+    background: var(--surface-solid);
+    box-sizing: border-box;
+    min-height: 96px;
+  }
+
+  .ingredient-image-upload {
+    margin-bottom: 0.35rem;
+  }
+}
+
 @media (max-width: 767px) {
   .recipe-form {
     padding: 0.85rem 0.95rem;
@@ -172,7 +236,15 @@
   }
 
   .recipe-form__field--ingredients {
-    margin-bottom: 0.4rem;
+    margin-bottom: 0.35rem;
+  }
+
+  .recipe-form__field--dish-idea {
+    margin-bottom: 0.5rem;
+  }
+
+  .recipe-form__field--time {
+    margin-bottom: 0.65rem;
   }
 
   .recipe-form__field--ingredients label {
@@ -185,9 +257,7 @@
   }
 
   .recipe-form__field textarea {
-    padding: 0.75rem 0.85rem;
-    font-size: 0.88rem;
-    min-height: 72px;
+    min-height: 96px;
   }
 
   .recipe-form__hint {

@@ -857,7 +857,7 @@ export function buildDessertIngredientList(
   pattern,
   filteredUserIngredients,
   displayNames,
-  { language = 'he', pantryLabel = '' } = {},
+  { language = 'he', pantryLabel = '', forceFullPatternIngredients = false } = {},
 ) {
   if (!pattern) return []
 
@@ -872,7 +872,13 @@ export function buildDessertIngredientList(
   }
 
   for (const canon of userOrder) {
-    if (!userCanons.has(canon) && !(canon === 'egg' && userCanons.has('eggs'))) continue
+    if (
+      !forceFullPatternIngredients &&
+      !userCanons.has(canon) &&
+      !(canon === 'egg' && userCanons.has('eggs'))
+    ) {
+      continue
+    }
     const preset = pattern.userQuantities?.[canon]
     if (preset) {
       lines.push(language === 'en' ? preset.en : preset.he)
@@ -886,7 +892,7 @@ export function buildDessertIngredientList(
   }
 
   for (const staple of pattern.pantryStaples ?? []) {
-    if (userHasCanon(userCanons, staple.canon)) continue
+    if (!forceFullPatternIngredients && userHasCanon(userCanons, staple.canon)) continue
     const line = language === 'en' ? staple.en : staple.he
     lines.push(`${line} ${pantryLabel}`.trim())
   }
@@ -903,6 +909,7 @@ export function buildRealisticDessertFromPattern(
     cookingTime = 30,
     pantryLabel = '',
     servings = 4,
+    forceFullPatternIngredients = false,
   } = {},
 ) {
   const bake = Math.min(cookingTime, Math.max(20, Math.round(cookingTime * 0.85)))
@@ -910,11 +917,12 @@ export function buildRealisticDessertFromPattern(
   let ingredients = buildDessertIngredientList(pattern, filteredUserIngredients, displayNames, {
     language,
     pantryLabel,
+    forceFullPatternIngredients,
   })
   const steps = language === 'en' ? pattern.stepsEn(bake) : pattern.stepsHe(bake)
   ;({ ingredients } = ensureRecipeCookingEssentials(
-    { ingredients, steps },
-    { language, recipeType: 'dessert', pantryLabel },
+    { ingredients, steps, name, patternId: pattern.id },
+    { language, recipeType: 'dessert', pantryLabel, patternId: pattern.id },
   ))
 
   const base = {

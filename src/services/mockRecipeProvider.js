@@ -14,7 +14,7 @@ import {
 import { getIngredientLabel } from '../data/ingredientLabels'
 import { getRecipeCopy } from '../i18n/recipeCopy'
 import { inferPreferredStyles, RECIPE_TAGS } from '../data/recipeStyles'
-import { recommendPlaylist } from '../utils/playlistEngine'
+import { buildPlaylistIfSelected } from '../utils/musicPlatform'
 import {
   parseUserIngredients,
   validateRecipeRelevance,
@@ -24,6 +24,7 @@ import { buildGroundedChefTitle, buildGroundedSoupStewTitle, validateTitleGround
 import { isLiteralIngredientTitle } from '../utils/recipeTitle'
 import { buildDessertDishTitle } from '../utils/dessertDishTitle'
 import { selectAndBuildDishFromPatterns } from '../utils/dishSelection'
+import { buildRecipeFromDishIdea, resolveDishIdeaTarget } from '../utils/dishIdeaGeneration'
 import { buildChefIntro } from '../utils/chefIntro'
 import { buildStepsFromUserIngredients } from '../utils/userIngredientSteps'
 import {
@@ -1310,8 +1311,14 @@ function finalizeRecipe(recipe, ingredientsRaw, language, meta = {}) {
     source: 'mock',
     preserveOriginalSteps: Boolean(meta.preserveOriginalSteps),
     skipRequantify: Boolean(meta.skipRequantify),
+    dishIdeaDriven: Boolean(meta.dishIdeaDriven),
   })
-  return parsed
+  return {
+    ...parsed,
+    baseIngredientsAdded: recipe.baseIngredientsAdded ?? parsed.baseIngredientsAdded,
+    requestedDishIdea: recipe.requestedDishIdea ?? parsed.requestedDishIdea,
+    dishIdeaDriven: Boolean(meta.dishIdeaDriven ?? recipe.dishIdeaDriven),
+  }
 }
 
 function hasUnusualIngredientCombo(userIngredients) {
@@ -1645,7 +1652,7 @@ export function buildIngredientFirstFallbackRecipe(
     cookingTime,
     mood,
     isGlutenFree = false,
-    musicPlatform = 'spotify',
+    musicPlatform = null,
     servings = 4,
     recipeType = 'meal',
   },
@@ -1657,6 +1664,7 @@ export function buildIngredientFirstFallbackRecipe(
     excludeCookingMethods = [],
     excludeDessertCategories = [],
     excludeTemplateKeys = [],
+    dishIdea = '',
   } = {},
 ) {
   const kosherCategory = resolveTemplateCategory(category, ingredients)
@@ -1671,6 +1679,106 @@ export function buildIngredientFirstFallbackRecipe(
   const displayNames = filteredUserIngredients.map((item) =>
     formatIngredient(item, language, isGlutenFree),
   )
+
+  let dishIdeaBuild = null
+  if (dishIdea?.trim()) {
+    dishIdeaBuild = buildRecipeFromDishIdea(dishIdea, {
+      category,
+      ingredients,
+      language,
+      cookingTime,
+      servings,
+      excludeTitles,
+      excludeTemplateKeys,
+      excludeCookingMethods,
+      excludeDessertCategories,
+    })
+  }
+
+  if (dishIdeaBuild) {
+    const effectiveRecipeType = dishIdeaBuild.recipeType
+    const dishPattern = dishIdeaBuild.pattern
+    const name = dishIdeaBuild.built.name
+    const recipeSteps = dishIdeaBuild.built.steps
+    const finalIngredients = dishIdeaBuild.built.ingredients
+    const precomputedNutrition = dishIdeaBuild.built.nutrition
+    const precomputedHealthScore = dishIdeaBuild.built.healthScore
+    const matchPercentage = filteredUserIngredients.length
+      ? Math.min(99, Math.max(78, Math.round((filteredUserIngredients.length / Math.max(finalIngredients.length, 1)) * 100)))
+      : 88
+
+    const playlist = buildPlaylistIfSelected(
+      {
+        mood,
+        category: dishIdeaBuild.patternCategory ?? kosherCategory,
+        style: 'comfort',
+        cookTime: cookingTime,
+        spiceLevel: effectiveRecipeType === 'dessert' ? 0 : 1,
+        recipeName: name,
+      },
+      musicPlatform,
+      language,
+    )
+
+    const recipe = {
+      name,
+      description: '',
+      ingredients: finalIngredients,
+      steps: recipeSteps,
+      matchPercentage,
+      spiceLevel: effectiveRecipeType === 'dessert' ? 0 : 1,
+      optionalUpgrades: buildOptionalUpgrades(filteredUserIngredients, {
+        language,
+        recipeType: effectiveRecipeType,
+        selectedCategory: category,
+      }),
+      nutrition: precomputedNutrition ?? { calories: 420, protein: 12, carbs: 45, fat: 18, servings },
+      healthScore:
+        precomputedHealthScore ??
+        calculateHealthScoreFromRecipe({
+          ingredients: finalIngredients,
+          calories: 420,
+          protein: 12,
+          carbs: 45,
+          fat: 18,
+          servings,
+        }),
+      tags: ['comfortFood'],
+      playlist,
+      baseIngredientsAdded: dishIdeaBuild.baseIngredientsAdded,
+      requestedDishIdea: dishIdeaBuild.dishIdea,
+      patternId: dishIdeaBuild.target.patternId,
+      dishIdeaDriven: true,
+    }
+
+    const finalizedRecipe = finalizeRecipe(recipe, ingredients, language, {
+      cookingTime,
+      style: 'comfort',
+      servings,
+      recipeType: effectiveRecipeType,
+      category,
+      isGlutenFree,
+      preserveOriginalSteps: true,
+      skipRequantify: Boolean(precomputedNutrition),
+      dishIdeaDriven: true,
+    })
+
+    return {
+      recipe: finalizedRecipe,
+      meta: {
+        id: `dish-idea-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        templateKey: dishPattern?.id ?? 'dish-idea',
+        category,
+        mood,
+        cookingTime,
+        isGlutenFree,
+        musicPlatform,
+        language,
+        style: 'comfort',
+        cookTime: cookingTime,
+      },
+    }
+  }
 
   const copy = getRecipeCopy(language)
   const moodPhrase = copy.moodFlavor[mood] ?? copy.defaultMood
@@ -1837,7 +1945,7 @@ export function buildIngredientFirstFallbackRecipe(
     (filteredUserIngredients.length ? 1 : 0.75)
   const matchPercentage = Math.min(99, Math.max(72, Math.round(matchRatio * 100)))
 
-  const playlist = recommendPlaylist(
+  const playlist = buildPlaylistIfSelected(
     { mood, category: kosherCategory, style: 'quick', cookTime: cookingTime, spiceLevel: 1, recipeName: name },
     musicPlatform,
     language,
@@ -1935,7 +2043,7 @@ function buildDessertMockRecipe(
     cookingTime,
     mood,
     isGlutenFree = false,
-    musicPlatform = 'spotify',
+    musicPlatform = null,
     servings = 4,
   },
   { language = 'he', pantrySuffix = '(from your pantry)', validation = null, excludeTitles = [], excludeCookingMethods = [], excludeDessertCategories = [], excludeTemplateKeys = [] } = {},
@@ -1993,7 +2101,7 @@ function buildDessertMockRecipe(
       ? `A dessert tailored with${copy.descriptionJoiner}${moodPhrase}${copy.descriptionMiddle}${cookTime}${copy.descriptionMinutes}`
       : `קינוח מותאם${copy.descriptionJoiner}${moodPhrase}${copy.descriptionMiddle}${cookTime}${copy.descriptionMinutes}`
 
-  const playlist = recommendPlaylist(
+  const playlist = buildPlaylistIfSelected(
     { mood, category, style: 'comfort', cookTime, spiceLevel: 0, recipeName: template.name },
     musicPlatform,
     language,
@@ -2060,7 +2168,7 @@ function buildSoupStewMockRecipe(
     cookingTime,
     mood,
     isGlutenFree = false,
-    musicPlatform = 'spotify',
+    musicPlatform = null,
     servings = 4,
   },
   {
@@ -2111,7 +2219,7 @@ function buildSoupStewMockRecipe(
       ? `A comforting soup or stew tailored with${copy.descriptionJoiner}${moodPhrase}${copy.descriptionMiddle}${cookTime}${copy.descriptionMinutes}`
       : `מרק/תבשיל מנחם${copy.descriptionJoiner}${moodPhrase}${copy.descriptionMiddle}${cookTime}${copy.descriptionMinutes}`
 
-  const playlist = recommendPlaylist(
+  const playlist = buildPlaylistIfSelected(
     { mood, category, style: 'comfort', cookTime, spiceLevel: template.spiceLevel ?? 0, recipeName: template.name },
     musicPlatform,
     language,
@@ -2186,9 +2294,10 @@ export function buildMockRecipe(
     cookingTime,
     mood,
     isGlutenFree = false,
-    musicPlatform = 'spotify',
+    musicPlatform = null,
     servings = 4,
     recipeType = 'meal',
+    dishIdea = '',
   },
   {
     language = 'he',
@@ -2199,8 +2308,35 @@ export function buildMockRecipe(
     excludeDessertCategories = [],
   } = {},
 ) {
+  const dishTarget = resolveDishIdeaTarget(dishIdea, { category, recipeType, language })
+  const effectiveRecipeType = dishTarget?.recipeType ?? getEffectiveRecipeType(recipeType, category)
+
+  if (dishIdea?.trim()) {
+    return buildIngredientFirstFallbackRecipe(
+      {
+        category,
+        ingredients,
+        cookingTime,
+        mood,
+        isGlutenFree,
+        musicPlatform,
+        servings,
+        recipeType: effectiveRecipeType,
+        dishIdea,
+      },
+      {
+        language,
+        pantrySuffix,
+        excludeTitles,
+        excludeCookingMethods,
+        excludeDessertCategories,
+        excludeTemplateKeys,
+        dishIdea,
+      },
+    )
+  }
+
   const templateCategory = resolveTemplateCategory(category, ingredients)
-  const effectiveRecipeType = getEffectiveRecipeType(recipeType, category)
 
   if (effectiveRecipeType === 'dessert') {
     return buildDessertMockRecipe(
@@ -2310,7 +2446,7 @@ export function buildMockRecipe(
     template,
   )
 
-  const playlist = recommendPlaylist(
+  const playlist = buildPlaylistIfSelected(
     {
       mood,
       category,

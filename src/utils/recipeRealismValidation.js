@@ -99,7 +99,7 @@ function isWeakGenericDishTitle(title, userIngredients) {
 export function validateGeneratedRecipeRealism(
   recipe,
   userIngredients = [],
-  { language = 'he', forPatternSelection = false, recipeType = 'meal' } = {},
+  { language = 'he', forPatternSelection = false, recipeType = 'meal', dishIdeaDriven = false } = {},
 ) {
   const failures = []
   const title = recipe?.name ?? ''
@@ -119,7 +119,7 @@ export function validateGeneratedRecipeRealism(
   }
   if (isWeakGenericDishTitle(title, userIngredients)) failures.push('weak_dish_title')
 
-  if (userIngredients.length) {
+  if (userIngredients.length && !dishIdeaDriven) {
     const userLinesMissingQty = userIngredients.filter((userIng) => {
       const line = ingredients.find((entry) => ingredientsMatch(entry, userIng))
       return line && !ingredientLineHasQuantity(line)
@@ -127,7 +127,7 @@ export function validateGeneratedRecipeRealism(
     if (userLinesMissingQty.length) failures.push('missing_quantity')
   }
 
-  if (userIngredients.length) {
+  if (userIngredients.length && !dishIdeaDriven) {
     const unmatched = userIngredients.filter(
       (userIng) => !ingredients.some((line) => ingredientsMatch(line, userIng)),
     )

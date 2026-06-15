@@ -139,17 +139,18 @@ function classifyCanons(canons) {
 
 export function assessIngredientFeasibility(
   userIngredientsRaw,
-  { recipeType = 'meal', category = 'any', isGlutenFree = false, language = 'he' } = {},
+  { recipeType = 'meal', category = 'any', isGlutenFree = false, language = 'he', dishIdea = '' } = {},
 ) {
   return assessGenerationFeasibility(userIngredientsRaw, {
     recipeType,
     category,
     isGlutenFree,
     language,
+    dishIdea,
   })
 }
 
-export function validateRecipeBeforeReturn(recipe, userIngredientsRaw = '', { language = 'he' } = {}) {
+export function validateRecipeBeforeReturn(recipe, userIngredientsRaw = '', { language = 'he', dishIdeaDriven = false } = {}) {
   void language
   const userIngredients = parseUserIngredients(userIngredientsRaw)
   const ingredients = recipe.ingredients ?? []
@@ -157,7 +158,9 @@ export function validateRecipeBeforeReturn(recipe, userIngredientsRaw = '', { la
   const stepsText = steps.join('\n')
   const failures = []
 
-  const unauthorizedIngredients = findUnauthorizedRecipeIngredients(recipe, userIngredientsRaw)
+  const unauthorizedIngredients = dishIdeaDriven
+    ? []
+    : findUnauthorizedRecipeIngredients(recipe, userIngredientsRaw)
   if (userIngredients.length && unauthorizedIngredients.length) {
     failures.push('unauthorized_ingredients')
   }

@@ -1,4 +1,5 @@
 import { useLanguage } from '../i18n/useLanguage'
+import { isMusicPlatformSelected } from '../utils/musicPlatform'
 import { buildSmartPlaylistSearch } from '../utils/playlistEngine'
 import './PlaylistCard.css'
 
@@ -35,6 +36,14 @@ export default function PlaylistCard({
   compact = false,
 }) {
   const { t, language } = useLanguage()
+  const selectedPlatform = isMusicPlatformSelected(musicPlatform)
+    ? musicPlatform
+    : isMusicPlatformSelected(playlist?.platform)
+      ? playlist.platform
+      : null
+
+  if (!selectedPlatform) return null
+
   const data = buildSmartPlaylistSearch(
     {
       mood: mood ?? 'cozy',
@@ -44,7 +53,7 @@ export default function PlaylistCard({
       recipeName: recipeName ?? '',
       spiceLevel: spiceLevel ?? 0,
     },
-    musicPlatform ?? playlist?.platform ?? 'spotify',
+    selectedPlatform,
     language,
   )
   const isSpotify = data.platform === 'spotify'

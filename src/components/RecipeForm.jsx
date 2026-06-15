@@ -49,14 +49,35 @@ export default function RecipeForm({
           <div className="recipe-form__ingredients-text">
             <textarea
               id="ingredients"
+              className="recipe-form__ingredients-textarea"
               placeholder={t('ingredientsPlaceholder')}
               value={form.ingredients}
               onChange={(e) => onChange('ingredients', e.target.value)}
               rows={3}
             />
-            <span className="recipe-form__hint">{t('ingredientsHint')}</span>
           </div>
         </div>
+      </div>
+
+      <div className="recipe-form__field recipe-form__field--dish-idea">
+        <div className="voice-field__label-row">
+          <label htmlFor="dishIdea">{t('dishIdeaLabel')}</label>
+          <VoiceInputButton
+            disabled={disabled}
+            onTranscript={(text) =>
+              onChange('dishIdea', mergeTranscriptIntoField(form.dishIdea, text, 'dishIdea'))
+            }
+          />
+        </div>
+        <input
+          id="dishIdea"
+          type="text"
+          className="recipe-form__dish-idea-input"
+          placeholder={t('dishIdeaPlaceholder')}
+          value={form.dishIdea}
+          onChange={(e) => onChange('dishIdea', e.target.value)}
+        />
+        <span className="recipe-form__hint">{t('dishIdeaHint')}</span>
       </div>
 
       <div className="recipe-form__controls">

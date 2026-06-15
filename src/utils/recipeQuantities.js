@@ -31,7 +31,8 @@ const STAPLE_PROFILE_KEYS = {
   'olive oil': 'olive oil',
   'שמן זית': 'olive oil',
   olive: 'olive oil',
-  oil: 'olive oil',
+  oil: 'oil',
+  שמן: 'oil',
   egg: 'egg',
   eggs: 'eggs',
   ביצה: 'egg',
@@ -103,6 +104,7 @@ const QUANTITY_PROFILES = {
   quinoa: { unit: 'cup', base: 0.5, perServing: true },
   flour: { unit: 'cup', base: 0.25, perServing: false },
   sugar: { unit: 'tbsp', base: 1, perServing: false },
+  'baking powder': { unit: 'tsp', base: 1, perServing: false },
   cinnamon: { unit: 'tsp', base: 0.5, perServing: false },
   cocoa: { unit: 'tbsp', base: 2, perServing: false },
   chocolate: { unit: 'gram', base: 100, perServing: false },
@@ -235,13 +237,23 @@ function stripQuantity(raw) {
   return { name: withoutQty, canonical: canonicalIngredient(withoutQty), measured: null }
 }
 
+function profileAliasMatches(normalized, aliasNorm) {
+  if (normalized === aliasNorm) return true
+  if (aliasNorm.length >= 3 && normalized.includes(aliasNorm)) return true
+  if (normalized.length >= 3 && aliasNorm.includes(normalized)) {
+    const re = new RegExp(`(?:^|\\s)${normalized.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?:\\s|$)`)
+    return re.test(aliasNorm)
+  }
+  return false
+}
+
 function resolveProfileKey(canon, name) {
   const normalized = normalizeIngredient(name)
   const normalizedCanon = canon ? normalizeIngredient(canon) : ''
 
   for (const [alias, key] of Object.entries(STAPLE_PROFILE_KEYS)) {
     const aliasNorm = normalizeIngredient(alias)
-    if (normalized === aliasNorm || normalized.includes(aliasNorm)) return key
+    if (profileAliasMatches(normalized, aliasNorm)) return key
     if (normalizedCanon === aliasNorm) return key
   }
 

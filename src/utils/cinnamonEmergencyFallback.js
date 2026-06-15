@@ -5,7 +5,7 @@
 
 import { canonicalIngredient } from '../data/ingredientKnowledge'
 import { parseUserIngredients } from './ingredientRelevance'
-import { recommendPlaylist } from './playlistEngine'
+import { buildPlaylistIfSelected } from './musicPlatform'
 
 const CINNAMON_DESSERT_CANONS = new Set(['flour', 'sugar', 'butter', 'cinnamon'])
 const DESSERT_RECIPE_TYPES = new Set(['dessert', 'קינוח'])
@@ -36,7 +36,7 @@ export function buildCinnamonEmergencyRecipe(userInput) {
   const category = userInput?.category ?? 'dairy'
   const cookingTime = userInput?.cookingTime ?? 30
   const mood = userInput?.mood ?? 'cozy'
-  const musicPlatform = userInput?.musicPlatform ?? 'spotify'
+  const musicPlatform = userInput?.musicPlatform ?? null
   const servings = userInput?.servings ?? 4
 
   const name = 'עוגיות חמאה וקינמון'
@@ -60,7 +60,7 @@ export function buildCinnamonEmergencyRecipe(userInput) {
       ? 'עוגיות חמאה וקינמון קלאסיות — בצק פשוט שאופים עד פריך וזהוב.'
       : 'Classic butter cinnamon cookies — simple dough baked until lightly golden.'
 
-  const playlist = recommendPlaylist(
+  const playlist = buildPlaylistIfSelected(
     { mood, category, style: 'comfort', cookTime: cookingTime, spiceLevel: 0, recipeName: name },
     musicPlatform,
     language,

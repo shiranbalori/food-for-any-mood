@@ -187,13 +187,46 @@ export const REALISTIC_SOUP_PATTERNS = [
       'Season and serve hot.',
     ],
   },
+  {
+    id: 'vegetable_soup',
+    required: new Set(['carrot', 'onion']),
+    category: 'parve',
+    selectionPriority: 30,
+    nameHe: 'מרק ירקות',
+    nameEn: 'Vegetable Soup',
+    userQuantities: {
+      carrot: { he: '2 גזרים', en: '2 carrots' },
+      onion: { he: '1 בצל', en: '1 onion' },
+    },
+    pantryStaples: [
+      { canon: 'potato', he: '2 תפוחי אדמה', en: '2 potatoes' },
+      { canon: 'garlic', he: '2 שיני שום', en: '2 garlic cloves' },
+      { canon: 'oil', he: '2 כפות שמן', en: '2 tbsp oil' },
+      { canon: 'salt', he: '1/2 כפית מלח', en: '1/2 tsp salt' },
+      { canon: 'black pepper', he: '1/4 כפית פלפל שחור', en: '1/4 tsp black pepper' },
+    ],
+    stepsHe: (cook) => [
+      'קוצצים בצל, גזר, תפוחי אדמה ושום.',
+      'מחממים שמן בסיר ומטגנים בצל, גזר ושום 4 דקות.',
+      'מוסיפים תפוחי אדמה ומים, מרתיחים.',
+      `מבשלים ${Math.max(20, Math.round(cook * 0.75))} דקות עד שהירקות רכות.`,
+      'מתבלים במלח ופלפל ומגישים חם.',
+    ],
+    stepsEn: (cook) => [
+      'Chop onion, carrots, potatoes, and garlic.',
+      'Warm oil in a pot; sauté onion, carrots, and garlic for 4 minutes.',
+      'Add potatoes and water; bring to a boil.',
+      `Simmer about ${Math.max(20, Math.round(cook * 0.75))} minutes until vegetables are tender.`,
+      'Season with salt and pepper; serve hot.',
+    ],
+  },
 ]
 
 export function buildSoupIngredientList(
   pattern,
   filteredUserIngredients,
   displayNames,
-  { language = 'he', pantryLabel = '' } = {},
+  { language = 'he', pantryLabel = '', forceFullPatternIngredients = false } = {},
 ) {
   if (!pattern) return []
 
@@ -207,7 +240,7 @@ export function buildSoupIngredientList(
   }
 
   for (const canon of userOrder) {
-    if (!userHasCanon(userCanons, canon)) continue
+    if (!forceFullPatternIngredients && !userHasCanon(userCanons, canon)) continue
     const preset = pattern.userQuantities?.[canon]
     if (preset) {
       lines.push(language === 'en' ? preset.en : preset.he)
@@ -218,7 +251,7 @@ export function buildSoupIngredientList(
   }
 
   for (const staple of pattern.pantryStaples ?? []) {
-    if (userHasCanon(userCanons, staple.canon)) continue
+    if (!forceFullPatternIngredients && userHasCanon(userCanons, staple.canon)) continue
     const line = language === 'en' ? staple.en : staple.he
     lines.push(`${line} ${pantryLabel}`.trim())
   }
@@ -285,6 +318,7 @@ export function buildRealisticSoupFromPattern(
     cookingTime = 30,
     pantryLabel = '',
     servings = 4,
+    forceFullPatternIngredients = false,
   } = {},
 ) {
   const cook = Math.min(cookingTime, Math.max(20, Math.round(cookingTime * 0.85)))
@@ -292,11 +326,12 @@ export function buildRealisticSoupFromPattern(
   let ingredients = buildSoupIngredientList(pattern, filteredUserIngredients, displayNames, {
     language,
     pantryLabel,
+    forceFullPatternIngredients,
   })
   const steps = language === 'en' ? pattern.stepsEn(cook) : pattern.stepsHe(cook)
   ;({ ingredients } = ensureRecipeCookingEssentials(
-    { ingredients, steps },
-    { language, recipeType: 'soup_stew', pantryLabel },
+    { ingredients, steps, name, patternId: pattern.id },
+    { language, recipeType: 'soup_stew', pantryLabel, patternId: pattern.id },
   ))
 
   const base = {

@@ -18,7 +18,10 @@
 
 import { canonicalIngredient } from '../data/ingredientKnowledge'
 import { parseUserIngredients } from './ingredientRelevance'
+import { normalizeDishIdea } from './dishIdeaUtils'
 import { isAnyCategory } from './recipeCategoryGuard'
+
+export { normalizeDishIdea, hasDishIdea } from './dishIdeaUtils'
 
 const DAIRY_CANON = new Set([
   'milk', 'cheese', 'cream', 'butter', 'yogurt', 'ricotta', 'parmesan', 'feta', 'cottage cheese', 'mozzarella',
@@ -191,7 +194,7 @@ export function assessInputCategoryConstraints(
  */
 export function assessGenerationFeasibility(
   userIngredientsRaw,
-  { recipeType = 'meal', category = 'any', isGlutenFree = false, language = 'he' } = {},
+  { recipeType = 'meal', category = 'any', isGlutenFree = false, language = 'he', dishIdea = '' } = {},
 ) {
   void recipeType
   const inputCheck = assessInputCategoryConstraints(userIngredientsRaw, { category, isGlutenFree, language })
@@ -201,6 +204,15 @@ export function assessGenerationFeasibility(
       reason: inputCheck.reason,
       missingIngredients: inputCheck.missingIngredients ?? [],
       suggestedCategory: inputCheck.suggestedCategory,
+    }
+  }
+
+  if (normalizeDishIdea(dishIdea)) {
+    return {
+      recipePossible: true,
+      dishIdeaBased: true,
+      reason: '',
+      missingIngredients: [],
     }
   }
 

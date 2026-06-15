@@ -638,13 +638,106 @@ export const REALISTIC_MEAL_PATTERNS = [
       'Season with salt and serve hot with bread.',
     ],
   },
+  {
+    id: 'classic_pancakes',
+    required: new Set(['flour']),
+    category: 'dairy',
+    selectionPriority: 30,
+    nameHe: 'פנקייקים',
+    nameEn: 'Pancakes',
+    userQuantities: {
+      flour: { he: '150 גרם קמח', en: '150 g flour' },
+    },
+    pantryStaples: [
+      { canon: 'egg', he: '2 ביצים', en: '2 eggs' },
+      { canon: 'milk', he: '200 מ"ל חלב', en: '200 ml milk' },
+      { canon: 'sugar', he: '2 כפות סוכר', en: '2 tbsp sugar' },
+      { canon: 'butter', he: '2 כפות חמאה', en: '2 tbsp butter' },
+      { canon: 'baking powder', he: '1 כפית אבקת אפייה', en: '1 tsp baking powder' },
+      { canon: 'salt', he: '1/4 כפית מלח', en: '1/4 tsp salt' },
+    ],
+    stepsHe: (cook) => [
+      'מערבבים קמח, סוכר, אבקת אפייה ומלח בקערה.',
+      'מוסיפים חלב, ביצים ומערבבים לבלילה חלקה.',
+      `מחממים מחבת עם חמאה ומטגנים פנקייקים ${Math.max(12, Math.round(cook / 3))} דקות מכל צד עד הזהבה.`,
+      'מגישים חם.',
+    ],
+    stepsEn: (cook) => [
+      'Whisk flour, sugar, baking powder, and salt in a bowl.',
+      'Add milk and eggs; mix until smooth.',
+      `Warm a pan with butter and fry pancakes about ${Math.max(12, Math.round(cook / 3))} minutes per side until golden.`,
+      'Serve warm.',
+    ],
+  },
+  {
+    id: 'tomato_basil_pasta',
+    required: new Set(['pasta', 'tomato']),
+    category: 'parve',
+    selectionPriority: 29,
+    nameHe: 'פסטה ברוטב עגבניות',
+    nameEn: 'Tomato Pasta',
+    userQuantities: {
+      pasta: { he: '300 גרם פסטה', en: '300 g pasta' },
+      tomato: { he: '4 עגבניות', en: '4 tomatoes' },
+    },
+    pantryStaples: [
+      { canon: 'onion', he: '1 בצל', en: '1 onion' },
+      { canon: 'garlic', he: '3 שיני שום', en: '3 garlic cloves' },
+      { canon: 'oil', he: '3 כפות שמן', en: '3 tbsp oil' },
+      { canon: 'salt', he: '1/2 כפית מלח', en: '1/2 tsp salt' },
+      { canon: 'basil', he: 'חופן עלי בזיליקום', en: 'handful fresh basil' },
+    ],
+    stepsHe: (cook) => [
+      'מרתיחים סיר מים מומלחים ומבשלים את הפסטה עד al dente, מסננים.',
+      'קוצצים בצל, שום ועגבניות.',
+      'מחממים שמן במחבת, מטגנים בצל ושום, מוסיפים עגבניות ומבשלים רוטב 8–10 דקות.',
+      'מערבבים עם הפסטה, מתבלים במלח ובזיליקום ומגישים חם.',
+    ],
+    stepsEn: (cook) => [
+      'Boil salted water and cook pasta until al dente; drain.',
+      'Chop onion, garlic, and tomatoes.',
+      'Warm oil in a pan; sauté onion and garlic, add tomatoes, and simmer 8–10 minutes.',
+      'Toss with pasta, season with salt and basil, and serve hot.',
+    ],
+  },
+  {
+    id: 'margherita_pizza',
+    required: new Set(['flour', 'tomato', 'cheese']),
+    category: 'dairy',
+    selectionPriority: 28,
+    nameHe: 'פיצה מרגריטה',
+    nameEn: 'Margherita Pizza',
+    userQuantities: {
+      flour: { he: '300 גרם קמח', en: '300 g flour' },
+      tomato: { he: '3 עגבניות', en: '3 tomatoes' },
+      cheese: { he: '200 גרם מוצרלה', en: '200 g mozzarella' },
+    },
+    pantryStaples: [
+      { canon: 'oil', he: '2 כפות שמן', en: '2 tbsp oil' },
+      { canon: 'salt', he: '1 כפית מלח', en: '1 tsp salt' },
+      { canon: 'garlic', he: '2 שיני שום', en: '2 garlic cloves' },
+      { canon: 'basil', he: 'עלי בזיליקום', en: 'fresh basil leaves' },
+    ],
+    stepsHe: (cook) => [
+      'מערבבים קמח, מלח, שמן ומים לבצק רך, לשים 5 דקות ומרדימים 20 דקות.',
+      'פותחים בצק עגול, מורחים רוטב עגבניות עם שום.',
+      `מפזרים גבינה, אופים בתנור חם ${Math.max(12, Math.round(cook * 0.6))} דקות עד הזהבה.`,
+      'מוסיפים בזיליקום ומגישים.',
+    ],
+    stepsEn: (cook) => [
+      'Mix flour, salt, oil, and water into a soft dough; knead 5 minutes and rest 20 minutes.',
+      'Stretch the dough, spread tomato sauce with garlic.',
+      `Top with cheese and bake in a hot oven about ${Math.max(12, Math.round(cook * 0.6))} minutes until golden.`,
+      'Add basil and serve.',
+    ],
+  },
 ]
 
 export function buildMealIngredientList(
   pattern,
   filteredUserIngredients,
   displayNames,
-  { language = 'he', pantryLabel = '' } = {},
+  { language = 'he', pantryLabel = '', forceFullPatternIngredients = false } = {},
 ) {
   if (!pattern) return []
 
@@ -659,7 +752,13 @@ export function buildMealIngredientList(
   }
 
   for (const canon of userOrder) {
-    if (!userCanons.has(canon) && !(canon === 'egg' && userCanons.has('eggs'))) continue
+    if (
+      !forceFullPatternIngredients &&
+      !userCanons.has(canon) &&
+      !(canon === 'egg' && userCanons.has('eggs'))
+    ) {
+      continue
+    }
     const preset = pattern.userQuantities?.[canon]
     if (preset) {
       lines.push(language === 'en' ? preset.en : preset.he)
@@ -673,7 +772,7 @@ export function buildMealIngredientList(
   }
 
   for (const staple of pattern.pantryStaples ?? []) {
-    if (userHasCanon(userCanons, staple.canon)) continue
+    if (!forceFullPatternIngredients && userHasCanon(userCanons, staple.canon)) continue
     const line = language === 'en' ? staple.en : staple.he
     lines.push(`${line} ${pantryLabel}`.trim())
   }
@@ -745,6 +844,7 @@ export function buildRealisticMealFromPattern(
     cookingTime = 30,
     pantryLabel = '',
     servings = 4,
+    forceFullPatternIngredients = false,
   } = {},
 ) {
   const cook = Math.min(cookingTime, Math.max(12, Math.round(cookingTime / 2)))
@@ -752,11 +852,12 @@ export function buildRealisticMealFromPattern(
   let ingredients = buildMealIngredientList(pattern, filteredUserIngredients, displayNames, {
     language,
     pantryLabel,
+    forceFullPatternIngredients,
   })
   const steps = language === 'en' ? pattern.stepsEn(cook) : pattern.stepsHe(cook)
   ;({ ingredients } = ensureRecipeCookingEssentials(
-    { ingredients, steps },
-    { language, recipeType: 'meal', pantryLabel },
+    { ingredients, steps, name, patternId: pattern.id },
+    { language, recipeType: 'meal', pantryLabel, patternId: pattern.id },
   ))
 
   const base = {

@@ -16,6 +16,8 @@ import { resolveRecipeNutritionScore } from '../utils/nutritionScore'
 
 import { sanitizeIngredientList } from '../utils/ingredientFormatting'
 
+import { isMusicPlatformSelected } from '../utils/musicPlatform'
+
 import './RecipeCard.css'
 
 
@@ -250,12 +252,12 @@ export default function RecipeCard({
 
   const cookTime = recipe.cookTime ?? recipe.time
 
+  const playlistPlatform = musicPlatform ?? recipe.musicPlatform
 
+  const showPlaylist = isMusicPlatformSelected(playlistPlatform)
 
   useEffect(() => {
-
     console.log('RENDERED_RECIPE', recipe)
-
   }, [recipe])
 
 
@@ -419,6 +421,16 @@ export default function RecipeCard({
         <p className="recipe-card__category-note animate-in stagger-2" role="note">
 
           {recipe.categoryNote}
+
+        </p>
+
+      )}
+
+      {recipe.baseIngredientsAdded && (
+
+        <p className="recipe-card__base-ingredients-note animate-in stagger-2" role="note">
+
+          {t('baseIngredientsNotice')}
 
         </p>
 
@@ -780,13 +792,14 @@ export default function RecipeCard({
 
 
 
+      {showPlaylist && (
       <PlaylistCard
 
         compact
 
         playlist={recipe.playlist}
 
-        musicPlatform={musicPlatform ?? recipe.musicPlatform}
+        musicPlatform={playlistPlatform}
 
         mood={recipe.mood}
 
@@ -801,6 +814,7 @@ export default function RecipeCard({
         spiceLevel={recipe.spiceLevel}
 
       />
+      )}
 
 
 

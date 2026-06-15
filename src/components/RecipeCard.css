@@ -403,6 +403,18 @@
   border: 1px dashed color-mix(in srgb, var(--theme-accent, #3b82f6) 22%, transparent);
 }
 
+.recipe-card__base-ingredients-note {
+  margin: 0 0 1rem;
+  padding: 0.65rem 0.85rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  line-height: 1.45;
+  color: var(--text-muted);
+  background: rgba(59, 130, 246, 0.08);
+  border-radius: var(--radius-xs);
+  border: 1px dashed rgba(59, 130, 246, 0.22);
+}
+
 .recipe-card__steps-header {
   display: flex;
   flex-wrap: wrap;

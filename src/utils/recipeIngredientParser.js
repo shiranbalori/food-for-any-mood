@@ -384,9 +384,14 @@ function validateRecipeQualityCore(userIngredients, recipe, language = 'he', opt
 
   const unnaturalSteps = hasUnnaturalStepPhrasing(recipe.steps ?? [], language)
   const weakSteps = (recipe.steps ?? []).filter((step) => !stepHasMeaningfulAction(step))
-  const preReturn = validateRecipeBeforeReturn(recipe, userIngredients.join(', '), { language })
+  const dishIdeaDriven = Boolean(options.dishIdeaDriven)
+  const preReturn = validateRecipeBeforeReturn(recipe, userIngredients.join(', '), {
+    language,
+    dishIdeaDriven,
+  })
   const unauthorizedIngredients = preReturn?.unauthorizedIngredients ?? []
-  const unauthorizedOk = userIngredients.length === 0 || unauthorizedIngredients.length === 0
+  const unauthorizedOk =
+    dishIdeaDriven || userIngredients.length === 0 || unauthorizedIngredients.length === 0
   const stepsAligned = verifyStepIngredientAlignment(
     recipe.ingredients ?? [],
     recipe.steps ?? [],
@@ -397,11 +402,12 @@ function validateRecipeQualityCore(userIngredients, recipe, language = 'he', opt
   const ingredientCount = recipe.ingredients?.length ?? 0
   const maxUnusedNonStaples = Math.max(2, Math.ceil(ingredientCount * 0.4))
   const relevanceOk =
+    dishIdeaDriven ||
     userIngredients.length === 0 ||
     (relevance.matchRatio >= MIN_INGREDIENT_MATCH_RATIO && relevance.titleHasIngredient)
   const unusedOk = unusedInSteps.length <= maxUnusedNonStaples
   const invalidOk = invalidIngredients.length === 0
-  const userIngredientsOk = userExplicitMissing.length === 0
+  const userIngredientsOk = dishIdeaDriven || userExplicitMissing.length === 0
   const titleOk = titleValidation.ok
   const groundingOk = userIngredients.length === 0 || grounding.titleOk
   const maxAllowedWeakSteps = (recipe.steps?.length ?? 0) >= 4 ? 1 : 0
@@ -606,7 +612,10 @@ export function applyRecipeIngredientParser(recipe, userIngredientsRaw = '', lan
     }
   }
 
-  let validation = validateRecipeQuality(userIngredients, tagged, language, options)
+  let validation = validateRecipeQuality(userIngredients, tagged, language, {
+    ...options,
+    dishIdeaDriven: Boolean(options.dishIdeaDriven),
+  })
   const safeValidation = {
     ...validation,
     unauthorizedIngredients: validation?.unauthorizedIngredients ?? [],
