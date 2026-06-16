@@ -1,6 +1,7 @@
 import { RECIPE_GENERATION_MODE } from '../config/recipeProvider'
 import { assessGenerationFeasibility, hasDishIdea } from '../utils/recipeGenerationPolicy.js'
 import { parseUserIngredients } from '../utils/ingredientRelevance.js'
+import { assessRecipeInputSafety } from '../utils/recipeInputValidation.js'
 import { buildValidationFailureMessage } from '../utils/recipePreReturnValidation.js'
 import { normalizeMusicPlatform } from '../utils/musicPlatform'
 import { buildValidatedMockRecipe, generateAIRecipe } from './aiRecipeService'
@@ -274,6 +275,22 @@ function tryLastResortLocalFallback(normalized, mergedOptions) {
 export async function generateAppRecipe(params, options = {}) {
   const normalized = normalizeGenerateParams(params)
   const mergedOptions = { ...DEFAULT_OPTIONS, ...options, language: options.language ?? normalized.language ?? 'he' }
+
+  const inputSafety = assessRecipeInputSafety({
+    ingredients: normalized.ingredients,
+    dishIdea: normalized.dishIdea,
+    language: mergedOptions.language,
+  })
+  if (!inputSafety.ok) {
+    return {
+      recipe: null,
+      recipePossible: false,
+      impossibleReason: inputSafety.reason,
+      missingIngredients: [],
+      inputValidationFailed: true,
+      fallbackReason: null,
+    }
+  }
 
   const feasibility = assessGenerationFeasibility(normalized.ingredients, {
     recipeType: normalized.recipeType,

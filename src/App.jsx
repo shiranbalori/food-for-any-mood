@@ -380,6 +380,7 @@ export default function App() {
           recipePossible,
           impossibleReason,
           missingIngredients,
+          inputValidationFailed,
         } = await generateAppRecipe(
           {
             category,
@@ -411,7 +412,8 @@ export default function App() {
           setShowRecipeForm(true)
           setImpossibleRecipe({
             reason: impossibleReason,
-            missingIngredients: missingIngredients ?? [],
+            missingIngredients: inputValidationFailed ? [] : (missingIngredients ?? []),
+            inputValidationFailed: Boolean(inputValidationFailed),
           })
           return
         }
@@ -874,7 +876,7 @@ export default function App() {
             {!loading && impossibleRecipe && !recipe && (
               <div className="app__backend-notice app__backend-notice--error" role="alert">
                 <p>{impossibleRecipe.reason}</p>
-                {impossibleRecipe.missingIngredients?.length > 0 && (
+                {impossibleRecipe.missingIngredients?.length > 0 && !impossibleRecipe.inputValidationFailed && (
                   <p>
                     {t('recipeMissingIngredients')}{' '}
                     {impossibleRecipe.missingIngredients.join(', ')}

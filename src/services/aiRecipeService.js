@@ -23,7 +23,7 @@ import {
   buildValidationFailureMessage,
   validateRecipeBeforeReturn,
 } from '../utils/recipePreReturnValidation'
-import { assessIngredientSafety } from '../utils/ingredientSafetyValidation'
+import { assessRecipeInputSafety } from '../utils/recipeInputValidation'
 import { assessCategoryFit } from '../utils/recipeCategoryFit'
 import { validateRecipeDiversity, detectCookingMethod } from '../utils/recipeDiversity'
 import { createRecipeGenerationTimer } from '../utils/recipeGenerationTiming'
@@ -970,18 +970,20 @@ async function generateAIRecipeCore(userInput) {
   console.log('[aiRecipeService] selectedLanguage:', normalized.language)
   console.log('[aiRecipeService] category received:', normalized.category)
 
-  const safety = assessIngredientSafety(normalized.ingredients, { language: normalized.language })
-  timer.mark('assessIngredientSafety', safety.ok ? 'Success' : 'Failed')
-  if (!safety.ok) {
-    if (hasGenerationInput(normalized)) {
-      return resolveLocalFallbackOrUnavailable(normalized, timer, 'safety:reject', safety.reason, safety.invalidIngredients ?? [])
-    }
+  const inputSafety = assessRecipeInputSafety({
+    ingredients: normalized.ingredients,
+    dishIdea: normalized.dishIdea,
+    language: normalized.language,
+  })
+  timer.mark('assessRecipeInputSafety', inputSafety.ok ? 'Success' : 'Failed')
+  if (!inputSafety.ok) {
     timer.printTable()
     return {
       recipe: null,
       recipePossible: false,
-      impossibleReason: safety.reason,
-      missingIngredients: safety.invalidIngredients ?? [],
+      impossibleReason: inputSafety.reason,
+      missingIngredients: [],
+      inputValidationFailed: true,
       fallbackReason: null,
     }
   }
