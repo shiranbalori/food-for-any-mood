@@ -25,19 +25,19 @@ export const DAILY_QUIZ_QUESTIONS = [
       en: 'What type of rice is traditionally used for sushi?',
     },
     options: {
-      he: ['בסמטי', 'ארבוריו', 'אורז קצר גרגר', 'יסמין'],
+      he: ['בסמטי', 'ארבוריו', 'אורז קצר-גרגר', 'יסמין'],
       en: ['Basmati', 'Arborio', 'Short-grain rice', 'Jasmine'],
     },
     correctIndex: 2,
     explanation: {
-      he: 'סושי מוכן עם אורז קצר גרגר דביק, שמאפשר לעצב את הרול בקלות.',
+      he: 'לסושי משתמשים באורז קצר-גרגר דביק, שמאפשר לעצב את הרול בקלות.',
       en: 'Sushi is made with sticky short-grain rice that holds together when shaped.',
     },
   },
   {
     id: 'vitamin-c',
     question: {
-      he: 'איזה ויטמין מצוי בכמות גבוהה במלפפון?',
+      he: 'איזה ויטמין נמצא במלפפון?',
       en: 'Which vitamin is found in notable amounts in cucumbers?',
     },
     options: {
@@ -73,12 +73,12 @@ export const DAILY_QUIZ_QUESTIONS = [
       en: 'What happens when onions are cooked until deeply golden?',
     },
     options: {
-      he: ['התסיסה', 'תגובת מאיה', 'הקפאה מהירה', 'אמולסיה'],
+      he: ['התסיסה', 'תגובת Maillard', 'הקפאה מהירה', 'אמולסיה'],
       en: ['Fermentation', 'Maillard reaction', 'Flash freezing', 'Emulsification'],
     },
     correctIndex: 1,
     explanation: {
-      he: 'הזהבה נובעת מתגובת מאיה — תגובה בין סוכרים לחלבונים שיוצרת טעמים וארומות עשירים.',
+      he: 'ההזהבה נובעת מתגובת Maillard — תגובה בין סוכרים לחלבונים שיוצרת טעמים וניחוחות עשירים.',
       en: 'Browning comes from the Maillard reaction — sugars and proteins create rich flavors and aromas.',
     },
   },
@@ -94,7 +94,7 @@ export const DAILY_QUIZ_QUESTIONS = [
     },
     correctIndex: 2,
     explanation: {
-      he: 'רוטב אלפרדו הלך כמעט תמיד עם פטוציני רחבים שתופסים את הרוטב הקרמי.',
+      he: 'רוטב אלפרדו מוגש כמעט תמיד עם פטוציני רחבים, שסופגים היטב את הרוטב הקרמי.',
       en: 'Alfredo sauce is classically served with wide fettuccine that catches the creamy sauce.',
     },
   },
@@ -126,7 +126,7 @@ export const DAILY_QUIZ_QUESTIONS = [
     },
     correctIndex: 1,
     explanation: {
-      he: 'וואסבי אמיתי מכין משורש Wasabia japonica, ולא מחזיק מעמד זמן רב מחוץ למטבח.',
+      he: 'וואסבי אמיתי עשוי משורש החזרת היפנית (Wasabia japonica), והחריפות נחלשת מהר אחרי גרידה.',
       en: 'True wasabi comes from Wasabia japonica root and loses potency quickly once grated.',
     },
   },
@@ -138,7 +138,7 @@ export const DAILY_QUIZ_QUESTIONS = [
     },
     options: {
       he: [
-        'הוא עלול להתפרק ולהתמרר',
+        'עלול להתפרק ולפתח טעם מר',
         'הוא נשרף ומעלה עשן חזק',
         'הוא הופך לבהיר ומתאים לטיגון עמוק',
         'חום גבוה מעלה את נקודת העישון שלו',
@@ -152,7 +152,7 @@ export const DAILY_QUIZ_QUESTIONS = [
     },
     correctIndex: 0,
     explanation: {
-      he: 'חימום יתר עלול לשבור חומצות שומן וליצור טעם מר ועשן לא נעים.',
+      he: 'חימום יתר עלול לפרק את השומן וליצור טעם מר ואף עשן.',
       en: 'Excessive heat can break down fats and produce bitter, unpleasant flavors.',
     },
   },
@@ -163,7 +163,7 @@ export const DAILY_QUIZ_QUESTIONS = [
       en: 'Capers are actually...',
     },
     options: {
-      he: ['זרעי עגבניה', 'ניצני פרחים', 'עלי בייבי', 'פירות יבשים'],
+      he: ['זרעי עגבניה', 'ניצני פרחים', 'עלים צעירים', 'פירות יבשים'],
       en: ['Tomato seeds', 'Flower buds', 'Baby leaves', 'Dried fruits'],
     },
     correctIndex: 1,
@@ -184,7 +184,7 @@ export const DAILY_QUIZ_QUESTIONS = [
     },
     correctIndex: 1,
     explanation: {
-      he: 'מיסו הוא משחה מותססת מפולי סויה שמשמשת במרקים, רטבים ומארינדים יפניים.',
+      he: 'מיסו הוא מחית סויה מותססת שמשמשת במרקים, רטבים וממולאים במטבח היפני.',
       en: 'Miso is a fermented soybean paste used in Japanese soups, sauces, and marinades.',
     },
   },
@@ -200,7 +200,7 @@ export const DAILY_QUIZ_QUESTIONS = [
     },
     correctIndex: 1,
     explanation: {
-      he: 'ביצה בינונית מספקת בערך 6 גרם חלבון איכותי, בעיקר בחלבון.',
+      he: 'ביצה בינונית מספקת בערך 6 גרם חלבון איכותי, רובו בלבן הביצה.',
       en: 'A medium egg provides roughly 6 g of high-quality protein, mostly in the white.',
     },
   },
@@ -216,7 +216,7 @@ export const DAILY_QUIZ_QUESTIONS = [
     },
     correctIndex: 2,
     explanation: {
-      he: 'זעפרן מורכב מצבעות של פרח הכרכום, ולכן הוא יקר ונדיר.',
+      he: 'זעפרן מורכב מעלי כותרת של פרח הכרכום, ולכן הוא יקר ונדיר.',
       en: 'Saffron consists of crocus flower stigmas, which makes it rare and expensive.',
     },
   },
@@ -232,7 +232,7 @@ export const DAILY_QUIZ_QUESTIONS = [
     },
     correctIndex: 1,
     explanation: {
-      he: 'הגרסה הקלאסית נאפית עם פרוסת לחם ושכבת גבינה מותכת מעל המרק העשיר.',
+      he: 'בגרסה הקלאסית שמים על המרק פרוסת לחם עם גבינה ואופים עד התזהבה.',
       en: 'The classic version is gratinated with bread and melted cheese over rich onion broth.',
     },
   },
@@ -243,12 +243,12 @@ export const DAILY_QUIZ_QUESTIONS = [
       en: 'Umami mainly describes which kind of taste?',
     },
     options: {
-      he: ['מתוק', 'מלוח־עמוק ומלא', 'חמוץ בלבד', 'מר בלבד'],
+      he: ['מתוק', 'עמוק ומשביע', 'חמוץ בלבד', 'מר בלבד'],
       en: ['Sweet', 'Savory and rich', 'Only sour', 'Only bitter'],
     },
     correctIndex: 1,
     explanation: {
-      he: 'אומאמי הוא טעם מלוח־עמוק שמורגש במרכיבים כמו עגבניות, פטריות ופרמזן.',
+      he: 'אומאמי הוא טעם עמוק ומלווה, שמורגש בעגבניות, פטריות וגבינת פרמזן.',
       en: 'Umami is a savory depth found in ingredients like tomatoes, mushrooms, and Parmesan.',
     },
   },
@@ -264,7 +264,7 @@ export const DAILY_QUIZ_QUESTIONS = [
     },
     correctIndex: 1,
     explanation: {
-      he: 'קוסקוס מסורתי מיוצר מגרגרי סולת חיטה קטנים שמבושלים באדים.',
+      he: 'קוסקוס מסורתי מיוצר מגרגרי סולת חיטה קטנים שמבשלים באידוי.',
       en: 'Traditional couscous is tiny steamed granules of wheat semolina.',
     },
   },
@@ -280,7 +280,7 @@ export const DAILY_QUIZ_QUESTIONS = [
     },
     correctIndex: 1,
     explanation: {
-      he: 'אבוקדו הוא פרי (בERRY) עם גלעין אחד גדול, למרות השימוש שלו כמנה מלוחה.',
+      he: 'אבוקדו הוא פרי עם גלעין יחיד גדול, למרות שמשתמשים בו בעיקר במנות מלוחות.',
       en: 'Avocado is a fruit (a berry with one large seed), though we often use it in savory dishes.',
     },
   },
@@ -291,12 +291,12 @@ export const DAILY_QUIZ_QUESTIONS = [
       en: 'What is baking soda’s role in baking?',
     },
     options: {
-      he: ['מוסיפה מתיקות', 'מסייעת בהתפחה', 'מקשיחה בצק', 'צובעת את העוגה'],
+      he: ['מוסיפה מתיקות', 'מסייעת בתפיחה', 'מקשיחה בצק', 'צובעת את העוגה'],
       en: ['Adds sweetness', 'Helps leavening', 'Hardens dough', 'Colors the cake'],
     },
     correctIndex: 1,
     explanation: {
-      he: 'סודה לשתייה משחררת CO₂ בתגובה עם חומציות ומסייעת לבצק לנפוח.',
+      he: 'סודה לשתייה משחררת פחמן דו-חמצני (CO₂) בתגובה עם חומציות, ומסייעת לבצק לתפוח.',
       en: 'Baking soda releases CO₂ when reacting with acidity, helping batters rise.',
     },
   },
@@ -312,7 +312,7 @@ export const DAILY_QUIZ_QUESTIONS = [
     },
     correctIndex: 0,
     explanation: {
-      he: 'טחינה היא משחה עשירה מגרגירי שומשום קלויים וטחונים.',
+      he: 'טחינה היא מרח עשיר מגרגירי שומשום קלויים וטחונים.',
       en: 'Tahini is a rich paste made from roasted and ground sesame seeds.',
     },
   },

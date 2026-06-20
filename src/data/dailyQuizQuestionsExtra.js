@@ -30,7 +30,7 @@ export const DAILY_QUIZ_QUESTIONS_EXTRA = [
     },
     correctIndex: 1,
     explanation: {
-      he: 'קרמל מתחיל להיווצר סביב 160°C, כשסוכר מתחמם ומשחים.',
+      he: 'קרמל מתחיל להיווצר סביב 160°C, כשהסוכר מתחמם ומקבל צבע וטעם קרמליים.',
       en: 'Caramelization begins around 160°C (320°F) as sugar heats and browns.',
     },
   },
@@ -53,32 +53,32 @@ export const DAILY_QUIZ_QUESTIONS_EXTRA = [
   {
     id: 'poach-method',
     question: {
-      he: 'מהי שיטת בישול "פושה" (poaching)?',
+      he: 'מהי שיטת בישול "פוש" (poaching)?',
       en: 'What is poaching as a cooking method?',
     },
     options: {
-      he: ['בישול בנוזל מתון בטמפרטורה נמוכה', 'צלייה ישירה על גחלים', 'טיגון בשמן עמוק', 'אידוי בלחץ גבוה'],
+      he: ['בישול עדין בנוזל בטמפרטורה נמוכה', 'צלייה ישירה על גחלים', 'טיגון בשמן עמוק', 'אידוי בלחץ גבוה'],
       en: ['Gentle cooking in liquid at low temperature', 'Direct grilling over coals', 'Deep frying in oil', 'High-pressure steaming'],
     },
     correctIndex: 0,
     explanation: {
-      he: 'פושה מבשל מזון בנוזל שאינו רותח, כמו מים, חלב או יין, בטמפרטורה נמוכה.',
+      he: 'בפוש (poaching) מבשלים מזון בנוזל שלא מגיע לרתיחה — מים, חלב או יין — בטמפרטורה נמוכה.',
       en: 'Poaching cooks food gently in liquid that is not boiling, such as water, milk or wine.',
     },
   },
   {
     id: 'blanch-vegetables',
     question: {
-      he: 'למה מטבלים ירקות במים רותחים לזמן קצר?',
+      he: 'למה מבשלים ירקות רגע במים רותחים?',
       en: 'Why are vegetables briefly boiled in water?',
     },
     options: {
-      he: ['להסיר עורות, לרכך ולשמור על צבע', 'להוסיף מתיקות', 'להפוך אותם לפריכים', 'להעלים ויטמינים'],
+      he: ['לריכוך, שמירה על צבע והקלה על קילוף', 'להוספת מתיקות', 'להפיכתם לפריכים', 'להעלמת ויטמינים'],
       en: ['To peel, soften and preserve color', 'To add sweetness', 'To make them crispy', 'To remove vitamins'],
     },
     correctIndex: 0,
     explanation: {
-      he: 'בלנש מבשל ירקות לזמן קצר ואז מקרר, כדי לרכך, לשמור צבע ולהקל על קילוף.',
+      he: 'בבלנש (blanching) משרים ירקות רגע במים רותחים ואז מצננים — כדי לרכך, לשמור על הצבע ולהקל על הקילוף.',
       en: 'Blanching briefly cooks vegetables then cools them to soften, set color and ease peeling.',
     },
   },
@@ -94,7 +94,7 @@ export const DAILY_QUIZ_QUESTIONS_EXTRA = [
     },
     correctIndex: 0,
     explanation: {
-      he: 'סוּ-ויד הוא בישול מזון ארוז בוואקום במים בטמפרטורה מבוקרת ומדויקת.',
+      he: 'סו-וויד (sous-vide) הוא בישול של מזון ארוז בוואקום, בטמפרטורה מדויקת, בתוך מי אמבט.',
       en: 'Sous-vide cooks vacuum-sealed food in a precisely controlled water bath.',
     },
   },
@@ -105,12 +105,12 @@ export const DAILY_QUIZ_QUESTIONS_EXTRA = [
       en: 'Why should meat rest after roasting or grilling?',
     },
     options: {
-      he: ['כדי שהמיצים יתפזרו מחדש', 'כדי שיתקרר לחלוטין', 'כדי להקשיח את הבשר', 'כדי להוסיף טעם מעושן'],
+      he: ['כדי שהמיצים יתפזרו שוב בכל חתיכה', 'כדי שיתקרר לחלוטין', 'כדי להקשיח את הבשר', 'כדי להוסיף טעם מעושן'],
       en: ['So juices redistribute evenly', 'So it cools completely', 'To toughen the meat', 'To add smoky flavor'],
     },
     correctIndex: 0,
     explanation: {
-      he: 'מנוחה מאפשרת למיצים שנדחפו למרכז לחזור לכל חתיכה, והתוצאה עסיסית יותר.',
+      he: 'מנוחה מאפשרת למיצים שנדחפו למרכז לחזור ולהתפזר בחתיכה — והבשר יוצא עסיסי יותר.',
       en: 'Resting lets juices pushed to the center flow back through the cut for a juicier result.',
     },
   },
@@ -126,7 +126,7 @@ export const DAILY_QUIZ_QUESTIONS_EXTRA = [
     },
     correctIndex: 0,
     explanation: {
-      he: 'דגליזינג משחרר את השאריות הצרובות מהמחבת עם יין, מרק או מים ליצירת רוטב עשיר.',
+      he: 'דגליזינג משחרר את השאריות הצרובות מהמחבת עם יין, ציר או מים — וכך בונים רוטב עשיר.',
       en: 'Deglazing loosens browned bits from the pan with wine, stock or water to build a rich sauce.',
     },
   },
@@ -137,12 +137,12 @@ export const DAILY_QUIZ_QUESTIONS_EXTRA = [
       en: 'What characterizes braising as a cooking method?',
     },
     options: {
-      he: ['צלייה קלה ואז בישול ארוך בנוזל', 'טיגון מהיר בשמן', 'אידוי בלבד', 'הקפאה ואז צלייה'],
+      he: ['צריבה קלה ואז בישול ארוך בנוזל', 'טיגון מהיר בשמן', 'אידוי בלבד', 'הקפאה ואז צלייה'],
       en: ['Light browning then long cooking in liquid', 'Quick frying in oil', 'Steaming only', 'Freezing then roasting'],
     },
     correctIndex: 0,
     explanation: {
-      he: 'בראיז משלב חום יבש לצריבה קלה עם בישול איטי בנוזל, מתאים לבשר וירקות קשים.',
+      he: 'בראיז משלבים צריבה קלה על מחבת עם בישול איטי בנוזל — מתאים לבשר וירקות קשים.',
       en: 'Braising combines light browning with slow cooking in liquid, ideal for tough meats and vegetables.',
     },
   },
@@ -158,7 +158,7 @@ export const DAILY_QUIZ_QUESTIONS_EXTRA = [
     },
     correctIndex: 0,
     explanation: {
-      he: 'ג\'וליין הוא חיתוך לגפרורים דקים, נפוץ בסלטים, גרניש וירקות מוקפצים.',
+      he: 'ג\'וליין הוא חיתוך לרצועות דקות, שכיח בסלטים, לקישוט וירקות מוקפצים.',
       en: 'Julienne means thin matchstick strips, common in salads, garnishes and stir-fries.',
     },
   },
@@ -169,12 +169,12 @@ export const DAILY_QUIZ_QUESTIONS_EXTRA = [
       en: 'What is the role of yeast in bread?',
     },
     options: {
-      he: ['מייצר פחמן דו-חמצני ומרים את הבצק', 'מוסיף מתיקות', 'מחמם את התנור', 'מקשיח את הקמח'],
+      he: ['מייצרים פחמן דו-חמצני ומרימים את הבצק', 'מוסיפים מתיקות', 'מחממים את התנור', 'מקשיחים את הקמח'],
       en: ['Produces carbon dioxide and raises dough', 'Adds sweetness', 'Heats the oven', 'Hardens flour'],
     },
     correctIndex: 0,
     explanation: {
-      he: 'שמרים מפרקים סוכרים ומייצרים גז שגורם לבצק לנפוח ולהתרחב.',
+      he: 'שמרים מפרקים סוכרים ומייצרים פחמן דו-חמצני, שגורם לבצק לתפוח.',
       en: 'Yeast ferments sugars and releases gas that makes dough rise and expand.',
     },
   },
@@ -206,7 +206,7 @@ export const DAILY_QUIZ_QUESTIONS_EXTRA = [
     },
     correctIndex: 0,
     explanation: {
-      he: 'התפחה מאפשרת לשמרים או לשאור להמשיך לייצר גז ולהגדיל את נפח הבצק.',
+      he: 'התפחה מאפשרת לשמרים או למחמצת להמשיך לייצר פחמן דו-חמצני ולהגדיל את נפח הבצק.',
       en: 'Proofing lets yeast or leavening continue producing gas and increasing dough volume.',
     },
   },
@@ -238,7 +238,7 @@ export const DAILY_QUIZ_QUESTIONS_EXTRA = [
     },
     correctIndex: 0,
     explanation: {
-      he: 'בצק שו מבושל על הסיר ואז באפייה, ויוצר מאפים חלולים כמו אקלר.',
+      he: 'בצק שו מבושל קודם על הגז, ואז נאפה בתנור — ויוצר מאפים חלולים כמו אקלר.',
       en: 'Choux paste is cooked on the stovetop then baked, creating hollow pastries like éclairs.',
     },
   },
@@ -254,7 +254,7 @@ export const DAILY_QUIZ_QUESTIONS_EXTRA = [
     },
     correctIndex: 0,
     explanation: {
-      he: 'טמפרינג מסדר את גבישי הקקאו בשוקולד, כך שהוא מבריק, נשבר יפה ואינו מקבל כתמים.',
+      he: 'טמפרינג מסדר את גבישי חמאת הקקאו, כך שהשוקולד מבריק, נשבר בחדות ולא מתכתש.',
       en: 'Tempering aligns cocoa butter crystals so chocolate is glossy, snappy and resistant to bloom.',
     },
   },
@@ -281,12 +281,12 @@ export const DAILY_QUIZ_QUESTIONS_EXTRA = [
       en: 'What creates the layers in puff pastry?',
     },
     options: {
-      he: ['לסיכת חמאה בין דפי בצק', 'הוספת שמרים', 'אידוי הבצק', 'ערבוב עם מים בלבד'],
+      he: ['שכבות חמאה בין דפי בצק', 'הוספת שמרים', 'אידוי הבצק', 'ערבוב עם מים בלבד'],
       en: ['Laminating butter between dough sheets', 'Adding yeast', 'Steaming the dough', 'Mixing with water only'],
     },
     correctIndex: 0,
     explanation: {
-      he: 'בצק עלים נוצר מקיפול חמאה בתוך בצק; בחום הלחות הופכת לאדים ומרימה שכבות.',
+      he: 'בצק עלים נוצר מקיפול חמאה לתוך הבצק; בחום, הלח שבחמאה הופך לאדים ומרים שכבות.',
       en: 'Puff pastry folds butter into dough; heat turns moisture to steam and lifts layers apart.',
     },
   },
@@ -302,7 +302,7 @@ export const DAILY_QUIZ_QUESTIONS_EXTRA = [
     },
     correctIndex: 0,
     explanation: {
-      he: 'קרם פטיסייר הוא קרם בישול מבוסס חלמונים ועמילן, בסיס לעוגות ומאפים ממולאים.',
+      he: 'קרם פטיסייר הוא קרם מתוק מבושל מחלמונים ועמילן — בסיס למילוי עוגות ומאפים.',
       en: 'Crème pâtissière is a cooked custard of yolks and starch, used to fill cakes and pastries.',
     },
   },
@@ -318,7 +318,7 @@ export const DAILY_QUIZ_QUESTIONS_EXTRA = [
     },
     correctIndex: 0,
     explanation: {
-      he: 'מחמצת היא תרבית של שמרים וחיידקים טבעיים שמתחזקים במזון קבוע של קמח ומים.',
+      he: 'מחמצת היא תערובת חיה של שמרים וחיידקים טבעיים שמתחזקים במזון קבוע של קמח ומים.',
       en: 'A sourdough starter is a culture of wild yeast and bacteria maintained with flour and water.',
     },
   },
@@ -350,7 +350,7 @@ export const DAILY_QUIZ_QUESTIONS_EXTRA = [
     },
     correctIndex: 0,
     explanation: {
-      he: 'אגוז המוסקט הוא הגרעין של פרי עץ המוסקט; מעטפתו החיצונית היא מוסקט.',
+      he: 'אגוז המוסקט הוא הגרעין של פרי עץ המוסקט; המעטפת החיצונית נקראת מוסקט.',
       en: 'Nutmeg is the seed inside nutmeg fruit; its outer covering is mace.',
     },
   },
@@ -398,7 +398,7 @@ export const DAILY_QUIZ_QUESTIONS_EXTRA = [
     },
     correctIndex: 0,
     explanation: {
-      he: 'כורכומין הוא הפיגמנט הפעיל בכורכום, ידוע גם בשימושים קולינריים ומסורתיים.',
+      he: 'כורכומין הוא הצבען הפעיל בכורכום, שמעניק לו את הגוון הצהוב-כתום.',
       en: 'Curcumin is the active pigment in turmeric, valued in cooking and traditional use.',
     },
   },
@@ -446,7 +446,7 @@ export const DAILY_QUIZ_QUESTIONS_EXTRA = [
     },
     correctIndex: 0,
     explanation: {
-      he: 'רוטב דגים מותסס הוא עמוד תווך במטבח תאילנדי, וייטנאמי וקמבודי.',
+      he: 'רוטב דגים מותסס הוא מרכיב מרכזי במטבח תאילנדי, וייטנאמי וקמבודי.',
       en: 'Fermented fish sauce is essential in Thai, Vietnamese and Cambodian cooking.',
     },
   },
@@ -462,7 +462,7 @@ export const DAILY_QUIZ_QUESTIONS_EXTRA = [
     },
     correctIndex: 0,
     explanation: {
-      he: 'גוצ\'וג\'אנג הוא רסק פלפלים אדומים מותסס מתוק־חריף, מרכזי במטבח הקוריאני.',
+      he: 'גוצ\'וג\'אנג הוא רסק פלפלים אדומים מותסס, מתוק-חריף, ומרכיב מרכזי במטבח הקוריאני.',
       en: 'Gochujang is a sweet-spicy fermented red chili paste central to Korean cuisine.',
     },
   },
@@ -478,7 +478,7 @@ export const DAILY_QUIZ_QUESTIONS_EXTRA = [
     },
     correctIndex: 0,
     explanation: {
-      he: 'חריסה היא תבלין צפון־אפריקאי עשיר בפלפלים, שום ותבלינים, פופולרי במיוחד בתוניסיה.',
+      he: 'חריסה היא רסק חריף צפון-אפריקאי, עשיר בפלפלים, שום ותבלינים — ובמיוחד בתוניסיה.',
       en: 'Harissa is a North African chili paste rich in peppers, garlic and spices, especially Tunisian.',
     },
   },
@@ -494,7 +494,7 @@ export const DAILY_QUIZ_QUESTIONS_EXTRA = [
     },
     correctIndex: 0,
     explanation: {
-      he: 'גהי נוצר מחמאה שמבושלת עד הפרדת המוצקים, ונפוץ במטבח ההודי.',
+      he: 'גהי נוצר מחמאה שמבושלת עד הפרדת המוצקים, ושכיח במטבח ההודי.',
       en: 'Ghee is butter cooked until milk solids separate, widely used in Indian cooking.',
     },
   },
@@ -510,7 +510,7 @@ export const DAILY_QUIZ_QUESTIONS_EXTRA = [
     },
     correctIndex: 0,
     explanation: {
-      he: 'מירין מוסיף מתיקות עדינה וברק לרטבים, מרינדות ותבשילים יפניים.',
+      he: 'מירין מוסיף מתיקות עדינה וגימור מבריק לרטבים, מרינדות ותבשילים יפניים.',
       en: 'Mirin adds gentle sweetness and gloss to Japanese sauces, marinades and simmered dishes.',
     },
   },
@@ -537,12 +537,12 @@ export const DAILY_QUIZ_QUESTIONS_EXTRA = [
       en: 'How is tofu made from soy milk?',
     },
     options: {
-      he: ['על ידי גיבוי (קואגולציה)', 'באידוי בלבד', 'בהקפאה', 'בטיגון עמוק'],
+      he: ['באמצעות גירוי (קואגולציה)', 'באידוי בלבד', 'בהקפאה', 'בטיגון עמוק'],
       en: ['By coagulation', 'By steaming only', 'By freezing', 'By deep frying'],
     },
     correctIndex: 0,
     explanation: {
-      he: 'טופו נוצר כשמוסיפים מגבש לחלב סויה, והחלבונים מתגבשים לגוש רך.',
+      he: 'טופו נוצר כשמוסיפים חומר גירוי (קואגולנט) לחלב סויה, והחלבונים מתגבשים לגוש רך.',
       en: 'Tofu forms when a coagulant is added to soy milk and proteins set into soft curds.',
     },
   },
@@ -622,7 +622,7 @@ export const DAILY_QUIZ_QUESTIONS_EXTRA = [
     },
     correctIndex: 0,
     explanation: {
-      he: 'פאייה מבושלת במחבת רחבה כדי לאפשר התאדות אחידה וקריספיות בתחתית.',
+      he: 'פאייה מבושלת במחבת רחבה ושטוחה, כדי שהנוזלים יתאדו בצורה אחידה ותיווצר שכבה פריכה בתחתית.',
       en: 'Paella cooks in a wide pan so liquid evaporates evenly and the bottom can crisp.',
     },
   },
@@ -638,7 +638,7 @@ export const DAILY_QUIZ_QUESTIONS_EXTRA = [
     },
     correctIndex: 0,
     explanation: {
-      he: 'טאג\'ין הוא כלי בישול וגם שם למנות שמבושלות לאט עם תבלינים, פירות יבשים וירקות.',
+      he: 'בטאג\'ין מבשלים לאט; המכסה החרוטי מחזיר את האדים אל התבשיל ושומר על לחות וטעמים.',
       en: 'A tagine is both a pot and a style of slow-cooked dishes with spices, dried fruit and vegetables.',
     },
   },
@@ -654,7 +654,7 @@ export const DAILY_QUIZ_QUESTIONS_EXTRA = [
     },
     correctIndex: 0,
     explanation: {
-      he: 'אינג\'רה מופכת מבלילת טף מותססת ומשמשת גם כ"צלחת" לאוכל.',
+      he: 'אינג\'רה מכינים מבלילת טף מותססת, והיא משמשת גם כ"צלחת" לאוכל.',
       en: 'Injera is a spongy flatbread from fermented teff batter and doubles as an edible plate.',
     },
   },
@@ -681,12 +681,12 @@ export const DAILY_QUIZ_QUESTIONS_EXTRA = [
       en: 'How are fish "cooked" in ceviche?',
     },
     options: {
-      he: ['בחומצה ממיץ לימון', 'במים רותחים', 'בתנור גבוה', 'בשמן עמוק'],
+      he: ['במיץ ליים חומצי', 'במים רותחים', 'בתנור גבוה', 'בשמן עמוק'],
       en: ['In acidic lime juice', 'In boiling water', 'In a hot oven', 'In deep oil'],
     },
     correctIndex: 0,
     explanation: {
-      he: 'חומציות הלימון משנה את מבנה החלבונים בדג ונותנת מרקם כאילו מבושל.',
+      he: 'חומציות הליים משנה את מבנה החלבונים בדג ונותנת לו מרקם של דג מבושל.',
       en: 'Lime acidity denatures fish proteins, giving a texture similar to light cooking.',
     },
   },
@@ -718,7 +718,7 @@ export const DAILY_QUIZ_QUESTIONS_EXTRA = [
     },
     correctIndex: 0,
     explanation: {
-      he: 'פו מבוסס על ציר עצמות עשיר שמבושל שעות עם תבלינים כמו כוכב אניס וקינמון.',
+      he: 'פו מבוסס על ציר עצמות ארוך, שמבושל שעות עם תבלינים כמו אניס כוכבים וקינמון.',
       en: 'Pho relies on a rich bone broth simmered for hours with spices like star anise and cinnamon.',
     },
   },
@@ -766,7 +766,7 @@ export const DAILY_QUIZ_QUESTIONS_EXTRA = [
     },
     correctIndex: 0,
     explanation: {
-      he: 'פלאפל הוא כדורי שתיתן טחונים מתובלים שמטוגנים או נאפים.',
+      he: 'פלאפל הוא כדורי קטניות טחונות מתובלים שמטוגנים או נאפים.',
       en: 'Falafel are seasoned ground legume balls that are fried or baked.',
     },
   },
@@ -798,7 +798,7 @@ export const DAILY_QUIZ_QUESTIONS_EXTRA = [
     },
     correctIndex: 0,
     explanation: {
-      he: 'תרד עשיר בברזל, אם כי ספיגתו מושפעת גם מחומצים אורגניים וממרכיבים אחרים.',
+      he: 'תרד עשיר בברזל, אם כי ספיגתו מושפעת גם מחומצות וממרכיבים אחרים במזון.',
       en: 'Spinach is rich in iron, though absorption is influenced by oxalates and other compounds.',
     },
   },
@@ -910,7 +910,7 @@ export const DAILY_QUIZ_QUESTIONS_EXTRA = [
     },
     correctIndex: 0,
     explanation: {
-      he: 'ליקופן נותן לעגבניות את הגוון האדום ונחקר בקשר לתכונותיו כנוגד חמצון.',
+      he: 'ליקופן נותן לעגבניות את הגוון האדום, והוא ידוע כנוגד חמצון.',
       en: 'Lycopene gives tomatoes their red color and is studied for antioxidant properties.',
     },
   },
@@ -942,7 +942,7 @@ export const DAILY_QUIZ_QUESTIONS_EXTRA = [
     },
     correctIndex: 0,
     explanation: {
-      he: 'פקטין, שקיים בפירות כמו תפוחים ודרכים, עוזר לריבה להתמצק עם סוכר וחום.',
+      he: 'פקטין, שקיים בפירות כמו תפוחים והדרים, עוזר לריבה להתמצק עם סוכר וחום.',
       en: 'Pectin in fruits like apples and citrus helps jam set with sugar and heat.',
     },
   },
@@ -958,7 +958,7 @@ export const DAILY_QUIZ_QUESTIONS_EXTRA = [
     },
     correctIndex: 0,
     explanation: {
-      he: 'לציטין בחלמון מסייע לשמן ולחומץ להתמזג לתערובת יציבה וקרמית.',
+      he: 'לציטין בחלמון מסייע לשמן ולחומץ (או מיץ לימון) להתמזג לתערובת יציבה וקרמית.',
       en: 'Lecithin in egg yolk helps oil and acid blend into a stable creamy emulsion.',
     },
   },
@@ -969,12 +969,12 @@ export const DAILY_QUIZ_QUESTIONS_EXTRA = [
       en: 'What happens to egg protein when it is cooked?',
     },
     options: {
-      he: ['הוא מתעוות (denatures) ומתמצק', 'הוא נעלם לחלוטין', 'הופך לסוכר', 'הופך לשומן'],
+      he: ['המבנה שלו משתנה והוא מתמצק', 'הוא נעלם לחלוטין', 'הופך לסוכר', 'הופך לשומן'],
       en: ['It denatures and sets', 'It disappears completely', 'It turns into sugar', 'It turns into fat'],
     },
     correctIndex: 0,
     explanation: {
-      he: 'חום משנה את מבנה החלבון, ולכן חלבון ביצה הופך מאודה ללבן מוצק.',
+      he: 'חום משנה את מבנה החלבון, ולכן חלבון הביצה הופך משקוף ללבן מוצק.',
       en: 'Heat changes protein structure, turning translucent egg white into solid white.',
     },
   },
@@ -1006,7 +1006,7 @@ export const DAILY_QUIZ_QUESTIONS_EXTRA = [
     },
     correctIndex: 0,
     explanation: {
-      he: 'מעל נקודת העישון השמן מתחיל להתפרק ולפתח טעמים מרים; חשוב לבחור שמן מתאים לטיגון.',
+      he: 'מעל נקודת העישון השמן מתחיל להתפרק ולפתח טעם מר; חשוב לבחור שמן מתאים לחום הגבוה.',
       en: 'Above the smoke point oil breaks down and tastes harsh; choosing the right oil matters for frying.',
     },
   },
@@ -1022,7 +1022,7 @@ export const DAILY_QUIZ_QUESTIONS_EXTRA = [
     },
     correctIndex: 0,
     explanation: {
-      he: 'מלח כשר עם גרגרים גדולים מאפשר שליטה טובה יותר בתיבול בבישול ידני.',
+      he: 'מלח כשר, עם גרגרים גדולים, מאפשר לתבל ביד בצורה מדויקת יותר.',
       en: 'Kosher salt\'s larger crystals give better control when seasoning by hand.',
     },
   },
@@ -1033,12 +1033,12 @@ export const DAILY_QUIZ_QUESTIONS_EXTRA = [
       en: 'What does "al dente" mean for pasta?',
     },
     options: {
-      he: ['מבושל אך עדיין נשמרה נגיסה', 'רך לחלוטין', 'לא מבושל כלל', 'מטוגן בשמן'],
+      he: ['מבושל אך עדיין קצת נעכש', 'רך לחלוטין', 'לא מבושל כלל', 'מטוגן בשמן'],
       en: ['Cooked but still firm to bite', 'Completely soft', 'Completely raw', 'Fried in oil'],
     },
     correctIndex: 0,
     explanation: {
-      he: 'אל דנטה פירושו "לשן" – פסטה עם מרקם קלות קשה במרכז, כפי שמעדיפים באיטליה.',
+      he: '"אל דנטה" פירושו "לשן" — פסטה עם מרקם קלות קשה במרכז, כפי שאוהבים באיטליה.',
       en: '"Al dente" means "to the tooth"—pasta with a slight firmness at the center, as preferred in Italy.',
     },
   },
@@ -1049,12 +1049,12 @@ export const DAILY_QUIZ_QUESTIONS_EXTRA = [
       en: 'What is "wok hei" in Chinese cooking?',
     },
     options: {
-      he: ['טעם עישון מטיגון מהיר בווק', 'מרינדה מתוקה', 'רוטב סויה מיושן', 'תבלין יבש'],
+      he: ['ניחוח מעושן מטיגון מהיר בווק', 'מרינדה מתוקה', 'רוטב סויה מיושן', 'תערובת תבלינים יבשה'],
       en: ['Smoky flavor from fast wok cooking', 'Sweet marinade', 'Aged soy sauce', 'Dry spice mix'],
     },
     correctIndex: 0,
     explanation: {
-      he: 'ווק היי, "נשימת הווק", מתקבל מטיגון מהיר בעוצמה גבוהה ומעניק ארומה עשן־מטוגן.',
+      he: 'ווק היי ("נשימת הווק") מתקבל מטיגון מהיר בלהבה חזקה, ומעניק ניחוח מעושן וקלוי.',
       en: 'Wok hei, or "breath of the wok," comes from intense fast stir-frying and a lightly charred aroma.',
     },
   },
@@ -1070,7 +1070,7 @@ export const DAILY_QUIZ_QUESTIONS_EXTRA = [
     },
     correctIndex: 0,
     explanation: {
-      he: 'זסט הוא שכבת הקליפה הצבעונית ללא החלק הלבן המר, ומוסיף ארומה חזקה.',
+      he: 'זסט הוא שכבת הקליפה הצבעונית, בלי החלק הלבן המר — ומוסיף ניחוח חזק.',
       en: 'Zest is the colored outer peel without bitter white pith, adding intense aroma.',
     },
   },
@@ -1081,12 +1081,12 @@ export const DAILY_QUIZ_QUESTIONS_EXTRA = [
       en: 'What does reducing a sauce do?',
     },
     options: {
-      he: ['מסמיך וממריץ טעמים', 'מוסיף מים', 'מקפיא את הרוטב', 'מסיר את כל המלח'],
+      he: ['מסמיך ומרכז את הטעמים', 'מוסיף מים', 'מקפיא את הרוטב', 'מסיר את כל המלח'],
       en: ['Thickens and intensifies flavors', 'Adds water', 'Freezes the sauce', 'Removes all salt'],
     },
     correctIndex: 0,
     explanation: {
-      he: 'בישול ארוך מפחית נוזלים ומרכז טעמים, כמו ברוטב בלסמי או ציר עשיר.',
+      he: 'בישול ארוך גורם לאידוי נוזלים ומעשיר את הטעם — למשל ברוטב בלסמי מצומצם או בציר עשיר.',
       en: 'Long simmering evaporates liquid and concentrates flavors, as in balsamic reduction or rich stock.',
     },
   },
@@ -1102,7 +1102,7 @@ export const DAILY_QUIZ_QUESTIONS_EXTRA = [
     },
     correctIndex: 0,
     explanation: {
-      he: 'באן מארי מחמם בעדינות, נפוץ להפשקת שוקולד, קרמים ועוגות רכות.',
+      he: 'באן-מארי מחמם בעדינות — שיטה נפוצה להמסת שוקולד, הכנת קרמים ואפיית עוגות עדינות.',
       en: 'A bain-marie provides gentle heat, common for melting chocolate, custards and delicate cakes.',
     },
   },
@@ -1150,7 +1150,7 @@ export const DAILY_QUIZ_QUESTIONS_EXTRA = [
     },
     correctIndex: 0,
     explanation: {
-      he: 'סורבה הוא קינוח קפוא חלבי־ללא, מבוסס פירות וסירופ סוכר.',
+      he: 'סורבה הוא קינוח קפוא ללא חלב, מבוסס פירות וסירופ סוכר.',
       en: 'Sorbet is a dairy-free frozen dessert based on fruit and sugar syrup.',
     },
   },
@@ -1166,7 +1166,7 @@ export const DAILY_QUIZ_QUESTIONS_EXTRA = [
     },
     correctIndex: 0,
     explanation: {
-      he: 'טירמיסו מגיע מ"טירה מי סו" – "הרימו אותי", בהתייחס לאנרגיה מקפה וסוכר.',
+      he: 'השם "טירמיסו" מגיע מהביטוי האיטלקי tirami su – "הרימו אותי", בהתייחס לאנרגיה של הקפה והסוכר.',
       en: 'Tiramisu comes from "tirami su"—"pick me up," referring to coffee and sugar energy.',
     },
   },
@@ -1262,7 +1262,7 @@ export const DAILY_QUIZ_QUESTIONS_EXTRA = [
     },
     correctIndex: 0,
     explanation: {
-      he: 'מאצ\'ה הוא תה ירוק שטוחים מוצלים שנטחנו לאבקה, בשימוש בתה יפני וקינוחים.',
+      he: 'מאצ\'ה הוא אבקת תה ירוק מעלי תה שהוצלו לפני הקטיף — משמש בתה היפני ובקינוחים.',
       en: 'Matcha is shade-grown green tea ground to powder, used in Japanese tea and desserts.',
     },
   },
@@ -1273,12 +1273,12 @@ export const DAILY_QUIZ_QUESTIONS_EXTRA = [
       en: 'What is dashi, the base of Japanese soups?',
     },
     options: {
-      he: ['ציר מקלפי קומבו וקטניות בוניטו', 'רוטב עגבניות', 'חלב קוקוס', 'מרק עוף מוצל'],
+      he: ['ציר מעלה קומבו ופתיתי בוניטו', 'רוטב עגבניות', 'חלב קוקוס', 'מרק עוף מוצל'],
       en: ['Broth from kombu kelp and bonito flakes', 'Tomato sauce', 'Coconut milk', 'Instant chicken soup'],
     },
     correctIndex: 0,
     explanation: {
-      he: 'דאשי מעניק אומאמי עדין ומהווה בסיס למיסו, ראמן ותבשילים יפניים רבים.',
+      he: 'דאשי מעניק אומאמי עדין ומהווה בסיס למיסו, ראמן ועוד תבשילים יפניים רבים.',
       en: 'Dashi gives gentle umami and forms the base for miso, ramen and many Japanese dishes.',
     },
   },
